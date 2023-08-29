@@ -1,32 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Core;
-
-public interface IValidateSelf
-{
-    bool Validate();
-}
-
-public static class ConfigurationExtensions
-{
-    public static IServiceCollection AddValidation<TOptions>(this IServiceCollection services, string? name = null)
-        where TOptions : class, IValidateSelf
-        => services.PostConfigure<TOptions>(
-            name,
-            options => MaybeValidateConfigurations<TOptions>(name, options)
-        );
-
-    private static void MaybeValidateConfigurations<TOptions>(string? name, TOptions obj)
-        where TOptions : class, IValidateSelf
-    {
-        if (!obj.Validate())
-            throw new OptionsValidationException(name, typeof(TOptions), new[] { "Invalid configuration" });
-    }
-}
 
 public static class NetworkExtensions
 {
@@ -126,60 +102,5 @@ public static class NetworkExtensions
         }
 
         return false;
-    }
-}
-
-public static class TaskExtensions
-{
-    public static async Task IgnoreExceptionsAsync(this Task task, CancellationToken? cancellationToken = default)
-    {
-        try
-        {
-            task = task.WaitAsync(cancellationToken ?? CancellationToken.None);
-            if (cancellationToken is not null)
-                task = task.ContinueWith(async t => await t.IgnoreExceptionsAsync().ConfigureAwait(false));
-            await task.WaitAsync(cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            // Ignored.
-        }
-    }
-
-    public static async Task<bool> OperationCancelledToBoolean(this Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(false);
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-    }
-
-    public static async Task<T?> ConvertExceptionsToNull<T>(this Task<T> task)
-    {
-        try
-        {
-            return await task.ConfigureAwait(false);
-        }
-        catch
-        {
-            return default;
-        }
-    }
-
-    public static async Task<T?> OperationCancelledToNull<T>(this Task<T> task)
-    {
-        try
-        {
-            return await task.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return default;
-        }
     }
 }

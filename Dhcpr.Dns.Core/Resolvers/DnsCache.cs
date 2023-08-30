@@ -27,10 +27,8 @@ public class DnsCache : IDnsCache
         var key = new QueryCacheKey(request, request.Questions[0]);
         if (_memoryCache.TryGetValue(key, out QueryCacheData? data) && data is not null)
         {
-            response = Response.FromArray(data.Payload);
+            response = new Response(data.Response);
             response.Id = request.Id;
-            response.Questions.Clear();
-            response.Questions.Add(request.Questions[0]);
             // TODO: Update answers with adjusted TTL
             return true;
         }
@@ -46,7 +44,10 @@ public class DnsCache : IDnsCache
                 .Select(i => i.TimeToLive)
                 .OrderBy(i => i)
                 .ToPooledList();
-        if (timeToLivePooledList.Count == 0) return;
+        if (timeToLivePooledList.Count == 0)
+        {
+            timeToLivePooledList.Add(TimeSpan.FromMinutes(1));
+        }
         var cacheTimeToLive = timeToLivePooledList.First();
         if (cacheTimeToLive <= TimeSpan.Zero) return;
 

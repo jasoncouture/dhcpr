@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 using DNS.Client;
@@ -7,89 +6,9 @@ using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core;
-
-public record struct QueryCacheKey(string Domain, RecordType Type, RecordClass Class, OperationCode OperationCode)
-{
-    public QueryCacheKey(IRequest request, IMessageEntry question) : this(question.Name.ToString()!, question.Type,
-        question.Class, request.OperationCode)
-    {
-    }
-}
-
-public record class QueryCacheData(byte[] Payload, DateTimeOffset Created)
-{
-    public QueryCacheData(IResponse response) : this(response.ToArray(), DateTimeOffset.Now) { }
-}
-
-public interface IDnsCache
-{
-    bool TryGetCachedResponse(IRequest request, [NotNullWhen(true)] out IResponse? response);
-    void TryAddCacheEntry(IRequest request, IResponse response);
-}
-
-public class DnsCache : IDnsCache
-{
-    private readonly IMemoryCache _memoryCache;
-
-    public DnsCache(IMemoryCache memoryCache)
-    {
-        _memoryCache = memoryCache;
-    }
-
-    public bool TryGetCachedResponse(IRequest request, [NotNullWhen(true)] out IResponse? response)
-    {
-        response = null;
-        if (request.Questions.Count != 1) return false;
-        var key = new QueryCacheKey(request, request.Questions[0]);
-        if (_memoryCache.TryGetValue(key, out QueryCacheData? data) && data is not null)
-        {
-            response = Response.FromArray(data.Payload);
-            response.Id = request.Id;
-            response.Questions.Clear();
-            response.Questions.Add(request.Questions[0]);
-            // TODO: Update answers with adjusted TTL
-            return true;
-        }
-
-        return false;
-    }
-
-    public void TryAddCacheEntry(IRequest request, IResponse response)
-    {
-        if (request.Questions.Count != 1) return;
-        using var timeToLivePooledList =
-            response.AnswerRecords.Concat(response.AdditionalRecords).Concat(response.AuthorityRecords)
-                .Select(i => i.TimeToLive)
-                .OrderBy(i => i)
-                .ToPooledList();
-        if (timeToLivePooledList.Count == 0) return;
-        var cacheTimeToLive = timeToLivePooledList.First();
-        if (cacheTimeToLive <= TimeSpan.Zero) return;
-
-        var cacheSlidingExpiration =
-            TimeSpan.FromSeconds(Math.Floor(Math.Min((cacheTimeToLive / 4).TotalSeconds, 10.0)));
-        
-
-        var key = new QueryCacheKey(request, request.Questions[0]);
-        var cacheEntry = _memoryCache.CreateEntry(key);
-        cacheEntry.Value = new QueryCacheData(response);
-        cacheEntry.AbsoluteExpirationRelativeToNow = cacheTimeToLive;
-        if (cacheSlidingExpiration < cacheTimeToLive)
-        {
-            cacheEntry.SlidingExpiration = cacheSlidingExpiration;
-        }
-
-        cacheEntry.Priority = CacheItemPriority.High;
-    }
-}
-
-public interface IRecursiveResolver : IMultiResolver
-{
-}
 
 public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
 {

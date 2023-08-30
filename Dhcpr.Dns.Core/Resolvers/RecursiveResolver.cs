@@ -39,8 +39,6 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
             var lookupName = question.Name.ToString()!;
 
             using var lookupNameParts = lookupName.Split('.').Reverse().ToPooledList();
-            _logger.LogDebug("Starting recursive lookup for {name}, starting with initial server {server}", lookupName,
-                _servers);
             var innerResolver =
                 _resolverCache.GetMultiResolver<ParallelResolver, UdpRequestResolver>(_servers, CreateParallelResolver,
                     CreateUdpResolver) as IRequestResolver;
@@ -61,7 +59,6 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                 clientRequest.Questions.Add(new Question(new Domain(lookupName), RecordType.SRV));
                 clientRequest.RecursionDesired = true;
                 clientRequest.OperationCode = OperationCode.Query;
-                _logger.LogDebug("Looking up next nameservers via recursive query {currentName}", currentLookup);
                 var results = await innerResolver.Resolve(clientRequest, cancellationToken).ConfigureAwait(false);
                 if (results is null or not { ResponseCode: ResponseCode.NoError or ResponseCode.NameError })
                 {
@@ -76,17 +73,15 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                 if (nameServerRecords.Count == 0)
                 {
                     _logger.LogDebug(
-                        "Recursive lookup for part {currentName} got a response without error, but gave no answers: {results}",
-                        currentLookup, results);
-                    break;
+                        "Recursive lookup for part {currentName} got a response without error, but gave no answers, will try to continue with current nameservers",
+                        currentLookup);
+                    continue;
                 }
 
                 using var endpoints = nameServerRecords
                     .Where(i => i.Type is RecordType.A or RecordType.AAAA)
                     .Select(answer => new IPEndPoint(GetAddress(answer.Data), 53))
                     .ToPooledList();
-                _logger.LogDebug("Got nameservers {nameservers} for recursive part {currentName}",
-                    string.Join(", ", endpoints), lookupName);
 
                 innerResolver = _resolverCache.GetMultiResolver(endpoints, CreateParallelResolver, CreateUdpResolver);
             }

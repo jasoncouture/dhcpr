@@ -51,7 +51,7 @@ public class DnsCache : IDnsCache
         if (cacheTimeToLive <= TimeSpan.Zero) return;
 
         var cacheSlidingExpiration =
-            TimeSpan.FromSeconds(Math.Floor(Math.Min((cacheTimeToLive / 4).TotalSeconds, 10.0)));
+            TimeSpan.FromSeconds(Math.Floor(Math.Max((cacheTimeToLive / 4).TotalSeconds, 10.0)));
         
 
         var key = new QueryCacheKey(request, request.Questions[0]);

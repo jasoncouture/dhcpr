@@ -2,6 +2,6 @@
 
 namespace Dhcpr.Dns.Core;
 
-public interface IParallelDnsResolver : IRequestResolver
+public interface IParallelDnsResolver : IRequestResolver, IMultiResolver
 {
 }

@@ -20,6 +20,7 @@ Console.CancelKeyPress += (_, e) =>
 
 var dnsConfiguration = builder.Configuration.GetDnsConfiguration();
 builder.Services.AddDns(dnsConfiguration);
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 

@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+
 using Dhcpr.Core;
+
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
@@ -14,9 +16,8 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
         AddResolvers(resolvers.ToArray());
     }
 
-    private IEnumerable<Task<IResponse?>> GetResolverTasks(IRequest request, CancellationToken cancellationToken)
+    private PooledList<Task<IResponse?>> GetResolverTasks(IRequest request, CancellationToken cancellationToken)
     {
-        ;
         using var resolvers = Resolvers;
         return resolvers
             .Select(
@@ -24,9 +25,6 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
                     Justification = "Enumerable is enumerated immediately.")]
                 async (i) =>
                 {
-                    // Yield to force a transition to async, so we can capture even synchronous
-                    // operation cancelled exceptions.
-                    await Task.Yield();
                     try
                     {
                         return await i.Resolve(request, cancellationToken)
@@ -41,7 +39,8 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
                 // Make 100% sure the cancellation token is respected
                 await i.WaitAsync(cancellationToken)
                     .ConvertExceptionsToNull()
-                    .ConfigureAwait(false));
+                    .ConfigureAwait(false))
+            .ToPooledList();
     }
 
     public override async Task<IResponse?> Resolve(IRequest request,
@@ -49,7 +48,7 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
     {
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        using var tasks = GetResolverTasks(request, cancellationTokenSource.Token).ToPooledList();
+        using var tasks = GetResolverTasks(request, cancellationTokenSource.Token);
 
         while (tasks.Count > 0)
         {
@@ -57,8 +56,8 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
             cancellationToken.ThrowIfCancellationRequested();
             tasks.Remove(completed);
             var response = await completed.ConfigureAwait(false);
-            if (response is null or { ResponseCode: ResponseCode.NameError } or
-                { ResponseCode: ResponseCode.ServerFailure }) continue;
+            if (response is null or not { ResponseCode: ResponseCode.NameError or ResponseCode.NoError })
+                continue;
             cancellationTokenSource.Cancel();
             return response;
         }

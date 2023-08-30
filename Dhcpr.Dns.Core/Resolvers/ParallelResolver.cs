@@ -1,13 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core;
+using Dhcpr.Core.Linq;
 
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
-using Microsoft.Extensions.Primitives;
-
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
 {

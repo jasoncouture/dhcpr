@@ -1,8 +1,10 @@
-﻿using DNS.Client.RequestResolver;
+﻿using Dhcpr.Dns.Core.Container;
+
+using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class InternalResolver : IRequestResolver
 {

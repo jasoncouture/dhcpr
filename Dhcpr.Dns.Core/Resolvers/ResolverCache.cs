@@ -1,11 +1,13 @@
 ﻿using System.Net;
 
+using Dhcpr.Core.Linq;
+
 using DNS.Client.RequestResolver;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class ResolverCache : IResolverCache
 {

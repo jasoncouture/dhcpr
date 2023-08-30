@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 
 using Dhcpr.Core;
+using Dhcpr.Dns.Core.Resolvers;
 
 using DNS.Protocol;
 using DNS.Server;

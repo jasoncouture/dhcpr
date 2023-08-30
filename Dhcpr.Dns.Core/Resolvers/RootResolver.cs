@@ -4,12 +4,11 @@ using Dhcpr.Core;
 
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
-using DNS.Protocol.ResourceRecords;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public class RootResolver : IRootResolver, IDisposable
 {

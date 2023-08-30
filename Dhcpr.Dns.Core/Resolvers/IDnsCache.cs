@@ -2,7 +2,7 @@
 
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public interface IDnsCache
 {

@@ -3,6 +3,8 @@
 using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
+using Dhcpr.Server;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

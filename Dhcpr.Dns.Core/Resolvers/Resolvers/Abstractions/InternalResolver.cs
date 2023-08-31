@@ -4,7 +4,7 @@ using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 public sealed class InternalResolver : IRequestResolver
 {

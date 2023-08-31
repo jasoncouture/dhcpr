@@ -4,8 +4,10 @@ using System.Net;
 using System.Text;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
 
-using DNS.Client;
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
@@ -14,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
 {

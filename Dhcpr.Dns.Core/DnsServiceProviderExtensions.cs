@@ -1,10 +1,13 @@
-﻿using Dhcpr.Core;
+﻿using System.Text;
+
+using Dhcpr.Core;
 using Dhcpr.Dns.Core.Resolvers;
 
 using DNS.Client.RequestResolver;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Dhcpr.Dns.Core;
 
@@ -22,6 +25,8 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IResolverCache, ResolverCache>();
         services.AddSingleton<IDnsCache, DnsCache>();
         services.AddSingleton<IForwardResolver, ForwardResolver>();
+
+        services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
         
         services.Configure<DnsConfiguration>(configuration).AddValidation<DnsConfiguration>();
         services.Configure<RootServerConfiguration>(configuration.GetSection(nameof(DnsConfiguration.RootServers))).AddValidation<RootServerConfiguration>();

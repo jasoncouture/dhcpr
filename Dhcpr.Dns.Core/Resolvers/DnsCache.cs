@@ -29,6 +29,7 @@ public class DnsCache : IDnsCache
         {
             response = new Response(data.Response);
             response.Id = request.Id;
+            response.AuthorativeServer = false;
             // TODO: Update answers with adjusted TTL
             return true;
         }
@@ -39,6 +40,10 @@ public class DnsCache : IDnsCache
     public void TryAddCacheEntry(IRequest request, IResponse response)
     {
         if (request.Questions.Count != 1) return;
+        if (request.Questions[0].Type is RecordType.A or RecordType.AAAA && response.ResponseCode == ResponseCode.NoError && response.AnswerRecords.Count == 0)
+        {
+            return;
+        }
         using var timeToLivePooledList =
             response.AnswerRecords.Concat(response.AdditionalRecords).Concat(response.AuthorityRecords)
                 .Select(i => i.TimeToLive)

@@ -5,6 +5,7 @@ using Dhcpr.Core.Linq;
 using DNS.Client.RequestResolver;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Resolvers;
@@ -13,32 +14,50 @@ public sealed class ResolverCache : IResolverCache
 {
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<ResolverCache> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
-    public ResolverCache(IMemoryCache memoryCache, ILogger<ResolverCache> logger)
+    public ResolverCache(IMemoryCache memoryCache, ILogger<ResolverCache> logger, IServiceProvider serviceProvider)
     {
         _memoryCache = memoryCache;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     public T GetResolver<T>(IPEndPoint endPoint, Func<IPEndPoint, T> createResolverCallback) where T : IRequestResolver
     {
         var key = ResolverCacheKey.Create<T>(endPoint);
-        if (_memoryCache.TryGetValue<T>(key, out var resolver) && resolver is not null)
-            return resolver;
-        resolver = createResolverCallback.Invoke(endPoint);
+        return GetFromCache<ResolverCacheKey, T>(key) ?? AddToCache(key, createResolverCallback.Invoke(endPoint));
+    }
 
+    private T? GetFromCache<TKey, T>(TKey key) where TKey : notnull
+        where T : IRequestResolver
+    {
+        _memoryCache.TryGetValue<T>(key, out var resolver);
+
+        return resolver;
+    }
+
+    private T AddToCache<TKey, T>(TKey key, T resolver)
+        where TKey : notnull
+        where T : IRequestResolver
+    {
         using var cacheEntry = _memoryCache.CreateEntry(key);
         cacheEntry.Value = resolver;
         cacheEntry.SetAbsoluteExpiration(DateTimeOffset.Now.AddHours(24));
         cacheEntry.SetSlidingExpiration(TimeSpan.FromMinutes(5));
         cacheEntry.Priority = CacheItemPriority.Low;
         cacheEntry.Dispose();
-        _logger.LogInformation("Cache miss for resolver key: {key}, resolver {type}:{hashCode} created", key,
-            resolver.GetType(), resolver.GetHashCode());
         return resolver;
     }
 
-    public TOuter GetMultiResolver<TOuter, TInner>(IEnumerable<IPEndPoint> endPoints,
+    public ICachedResolver GetCacheForResolver(IRequestResolver resolver)
+    {
+        var key = CachedResolverCacheKey.FromInstance(resolver);
+        return GetFromCache<CachedResolverCacheKey, CachedResolver>(key) ??
+               AddToCache(key, ActivatorUtilities.CreateInstance<CachedResolver>(_serviceProvider, resolver));
+    }
+
+    public TOuter GetResolver<TOuter, TInner>(IEnumerable<IPEndPoint> endPoints,
         Func<IEnumerable<IRequestResolver>, TOuter> createMultiResolver, Func<IPEndPoint, TInner> createInnerResolver)
         where TOuter : MultiResolver
         where TInner : IRequestResolver
@@ -47,18 +66,9 @@ public sealed class ResolverCache : IResolverCache
         var cacheKey =
             new MultiResolverCacheKey(
                 orderedEndPoints.Select(i => new ResolverCacheKey(i, typeof(TInner))).ToArray(), typeof(TOuter));
-        if (_memoryCache.TryGetValue<TOuter>(cacheKey, out var cachedResolver) && cachedResolver is not null)
-            return cachedResolver;
-        using var innerResolvers = orderedEndPoints.Select(i => GetResolver(i, createInnerResolver))
-            .ToPooledList();
-        cachedResolver = createMultiResolver.Invoke(innerResolvers.Cast<IRequestResolver>());
-        using var cacheEntry = _memoryCache.CreateEntry(cacheKey);
-        cacheEntry.Value = cachedResolver;
-        cacheEntry.SetAbsoluteExpiration(DateTimeOffset.Now.AddHours(24));
-        cacheEntry.SetSlidingExpiration(TimeSpan.FromMinutes(5));
-        cacheEntry.Priority = CacheItemPriority.Low;
-        cacheEntry.Dispose();
 
-        return cachedResolver;
+        return GetFromCache<MultiResolverCacheKey, TOuter>(cacheKey) ?? AddToCache(cacheKey,
+            createMultiResolver.Invoke(orderedEndPoints.Select(i => GetResolver<TInner>(i, createInnerResolver))
+                .Cast<IRequestResolver>()));
     }
 }

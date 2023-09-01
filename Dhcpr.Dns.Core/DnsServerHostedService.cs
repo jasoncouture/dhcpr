@@ -33,7 +33,7 @@ public class DnsServerHostedService : IHostedService
             .ToArray();
         for (var x = 0; x < dnsConfiguration.Value.ListenAddresses.Length; x++)
         {
-            var endPoint = dnsConfiguration.Value.ListenAddresses[x].GetEndpoint(53);
+            var endPoint = dnsConfiguration.Value.ListenAddresses[x].GetIPEndPoint(53);
             var server = CreateServer(endPoint, resolver);
             _servers[x] = server;
         }

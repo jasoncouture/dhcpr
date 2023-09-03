@@ -106,6 +106,7 @@ public class DhcpServerHostedService : BackgroundService
                 await EncodeAndSendAsync(requestContext, cancellationToken);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,

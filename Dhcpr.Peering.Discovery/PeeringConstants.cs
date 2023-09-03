@@ -2,5 +2,5 @@
 
 public static class PeeringConstants
 {
-    public const int DefaultClusterPort =  443;
+    public const int DefaultClusterPort = 443;
 }

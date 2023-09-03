@@ -12,7 +12,7 @@ public static class RootHints
 {
     private static readonly HashSet<IPAddress> _rootServerAddresses = new();
     public static string RootServerCacheFile { get; set; } = "root-servers.txt";
-    private static DateTimeOffset _lastRefresh = DateTimeOffset.Now.AddDays(-2);
+    private static readonly DateTimeOffset _lastRefresh = DateTimeOffset.Now.AddDays(-2);
 
     public static TimeSpan TimeSinceLastRefresh => DateTimeOffset.Now - _lastRefresh;
 

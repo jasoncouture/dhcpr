@@ -72,7 +72,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             response = new Response(response);
             response.Id = request.Id;
         }
-        
+
         if (request.Questions[0].Type is RecordType.CNAME or RecordType.A or RecordType.AAAA &&
             response.AnswerRecords.Any(i => i.Type == RecordType.CNAME) &&
             !response.AnswerRecords.Any(i => i.Type is RecordType.A or RecordType.AAAA))

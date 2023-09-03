@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Server", "Dhcpr.Serve
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Storage", "Dhcpr.Storage\Dhcpr.Storage.csproj", "{A5D06A82-E288-4183-8A85-F0473306D09A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dhcp.Core.UnitTests", "Dhcpr.Dhcp.Core.UnitTests\Dhcpr.Dhcp.Core.UnitTests.csproj", "{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,5 +56,9 @@ Global
 		{A5D06A82-E288-4183-8A85-F0473306D09A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5D06A82-E288-4183-8A85-F0473306D09A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5D06A82-E288-4183-8A85-F0473306D09A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

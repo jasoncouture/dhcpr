@@ -2,6 +2,7 @@
 
 public interface IDhcpRequestHandler
 {
-    int Order => 0;
+    int Priority => 0;
+    string Name => GetType().Name;
     ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken);
 }

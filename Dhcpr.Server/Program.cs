@@ -1,3 +1,4 @@
+using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
 using Dhcpr.Server;
@@ -21,6 +22,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();
 builder.Services.AddMemoryCache();
+builder.Services.AddCoreServices();
 builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
 builder.Services.AddDhcp(builder.Configuration.GetSection("DHCP"));
 

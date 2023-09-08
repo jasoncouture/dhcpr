@@ -10,8 +10,7 @@ public class DnsConfiguration : IValidateSelf
 
     public string[] ListenAddresses { get; set; } =
     {
-        "127.0.0.1:53",
-        "[::1]:53"
+        "127.0.0.1:53"
     };
     public string[] Forwarders { get; set; } =
     {

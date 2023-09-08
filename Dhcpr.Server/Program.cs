@@ -24,5 +24,8 @@ builder.Services.AddDns(dnsConfiguration);
 var app = builder.Build();
 
 
-await app.RunAsync(shutdownTokenSource.Token);
+await app.StartAsync(shutdownTokenSource.Token);
+Console.WriteLine("Server started, press ctrl+c to shutdown");
+
+await app.WaitForShutdownAsync(shutdownTokenSource.Token);
 

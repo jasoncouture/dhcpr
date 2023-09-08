@@ -2,67 +2,16 @@
 using Dhcpr.Core;
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
-using Microsoft.Extensions.Options;
+
 using Microsoft.Extensions.Primitives;
 
 namespace Dhcpr.Dns.Core;
 
-public interface IDnsResolver : IRequestResolver
-{
-}
-
-public interface IParallelDnsResolver : IRequestResolver
-{
-}
-
-public interface ISequentialDnsResolver : IRequestResolver
-{
-}
-
-public sealed class DnsResolver : IDnsResolver, IDisposable
-{
-    private long _useParallelResolver;
-    private readonly IDisposable? _configChangeSubscription;
-    private readonly Func<IRequest, CancellationToken, Task<IResponse?>> _parallelMethod;
-    private readonly Func<IRequest, CancellationToken, Task<IResponse?>> _sequentalMethod;
-
-    private Func<IRequest, CancellationToken, Task<IResponse?>> SelectedMethod =>
-        UseParallelResolver ? _parallelMethod : _sequentalMethod;
-
-    public DnsResolver(IOptionsMonitor<DnsConfiguration> configuration, IParallelDnsResolver parallelDnsResolver,
-        ISequentialDnsResolver sequentialDnsResolver)
-    {
-        _configChangeSubscription = configuration.OnChange(OnConfigurationChanged);
-        _parallelMethod = parallelDnsResolver.Resolve;
-        _sequentalMethod = sequentialDnsResolver.Resolve;
-        OnConfigurationChanged(configuration.CurrentValue);
-    }
-
-    private bool UseParallelResolver => _useParallelResolver == 1;
-
-    private void OnConfigurationChanged(DnsConfiguration configuration)
-    {
-        Interlocked.Exchange(ref _useParallelResolver, configuration.UseParallelResolver ? 1 : 0);
-    }
-
-    public async Task<IResponse?> Resolve(IRequest request,
-        CancellationToken cancellationToken = new CancellationToken())
-    {
-        return await SelectedMethod(request, cancellationToken).ConfigureAwait(false);
-    }
-
-
-    public void Dispose()
-    {
-        _configChangeSubscription?.Dispose();
-    }
-}
-
 public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
 {
-    public ParallelResolver(params IRequestResolver[] resolvers)
+    public ParallelResolver(IEnumerable<IRequestResolver> resolvers)
     {
-        AddResolvers(resolvers);
+        AddResolvers(resolvers.ToArray());
     }
 
     private IEnumerable<Task<IResponse?>> GetResolverTasks(IRequest request, CancellationToken cancellationToken)

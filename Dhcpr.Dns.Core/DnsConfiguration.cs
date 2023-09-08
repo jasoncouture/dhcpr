@@ -23,7 +23,7 @@ public class DnsConfiguration : IValidateSelf
         var endPoints = new IPEndPoint[addresses.Length];
         for (var x = 0; x < addresses.Length; x++)
         {
-            endPoints[x] = addresses[x].GetEndpoint(53);
+            endPoints[x] = addresses[x].GetIPEndPoint(53);
         }
 
         return endPoints;

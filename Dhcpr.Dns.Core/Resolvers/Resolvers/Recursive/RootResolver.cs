@@ -44,7 +44,7 @@ public class RootResolver : IRootResolver, IDisposable
 
     private static IEnumerable<IPEndPoint> GetEndPoints(IEnumerable<string> endPoints)
     {
-        return endPoints.Select(i => i.GetEndpoint(53));
+        return endPoints.Select(i => i.GetIPEndPoint(53));
     }
 
     private IEnumerable<IRequestResolver> GetResolvers(IEnumerable<string> endPoints)

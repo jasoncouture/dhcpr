@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
@@ -49,13 +49,6 @@ public sealed class ResolverCache : IResolverCache
         cacheEntry.Priority = CacheItemPriority.Low;
         cacheEntry.Dispose();
         return resolver;
-    }
-
-    public ICachedResolver GetCacheForResolver(IRequestResolver resolver)
-    {
-        var key = CachedResolverCacheKey.FromInstance(resolver);
-        return GetFromCache<CachedResolverCacheKey, CachedResolver>(key) ??
-               AddToCache(key, ActivatorUtilities.CreateInstance<CachedResolver>(_serviceProvider, resolver));
     }
 
     public TOuter GetResolver<TOuter, TInner>(IEnumerable<IPEndPoint> endPoints,

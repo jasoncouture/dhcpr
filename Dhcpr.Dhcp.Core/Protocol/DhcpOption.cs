@@ -104,7 +104,6 @@ public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
 
     public void WriteAndAdvance(ref Span<byte> buffer)
     {
-        int written = 0;
         buffer[0] = (byte)Code;
         buffer = buffer[1..];
         if (IsFixedSize(Code))

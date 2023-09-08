@@ -242,7 +242,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is { ResponseCode: ResponseCode.NoError })
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntryAsync(request, response);
+                await _dnsCache.TryAddCacheEntryAsync(request, response, cancellationToken).ConfigureAwait(false);
                 return response;
             }
 
@@ -250,7 +250,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is { ResponseCode: ResponseCode.NoError })
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntryAsync(request, response);
+                await _dnsCache.TryAddCacheEntryAsync(request, response, cancellationToken).ConfigureAwait(false);
                 return response;
             }
 
@@ -258,7 +258,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is not null)
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntryAsync(request, response);
+                await _dnsCache.TryAddCacheEntryAsync(request, response, cancellationToken).ConfigureAwait(false);
                 return response;
             }
 

@@ -16,6 +16,6 @@ public static class ConfigurationExtensions
         where TOptions : class, IValidateSelf
     {
         if (!obj.Validate())
-            throw new OptionsValidationException(name, typeof(TOptions), new[] { "Invalid configuration" });
+            throw new OptionsValidationException(name ?? "default", typeof(TOptions), new[] { "Invalid configuration" });
     }
 }

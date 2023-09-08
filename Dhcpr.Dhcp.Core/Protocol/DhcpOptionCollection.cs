@@ -45,7 +45,6 @@ public sealed record DhcpOptionCollection(ImmutableArray<DhcpOption> Options) : 
     }
 
     public static DhcpOptionCollection Empty { get; } = new();
-    private readonly int? _length;
     private Dictionary<DhcpOptionCode, IEnumerable<DhcpOption>>? _optionsDictionary;
 
     private static Dictionary<DhcpOptionCode, IEnumerable<DhcpOption>> CreateOptionsDictionary(

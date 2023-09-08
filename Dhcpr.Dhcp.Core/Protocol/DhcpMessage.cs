@@ -143,6 +143,11 @@ public record DhcpMessage(
         return options;
     }
 
+    public void EncodeTo(byte[] buffer)
+    {
+        EncodeTo(buffer[..Size].AsSpan());
+    }
+
     public void EncodeTo(Span<byte> buffer)
     {
         // Unclear if these can occupy the last byte, or the last byte must be null.

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class CanonicalNameDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<CanonicalNameDnsResourceRecord>
+public sealed class CanonicalNameDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<CanonicalNameDnsResourceRecord>
 {
     public string Name { get; set; } = string.Empty;
 

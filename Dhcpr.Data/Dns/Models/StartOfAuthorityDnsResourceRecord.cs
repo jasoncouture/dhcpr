@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class StartOfAuthorityDnsResourceRecord : DnsResourceRecord, IDataRecord<StartOfAuthorityDnsResourceRecord>
+public sealed class StartOfAuthorityDnsResourceRecord : DnsResourceRecord, IDataRecord<StartOfAuthorityDnsResourceRecord>
 {
     public string Domain { get; set; } = string.Empty;
     public string Master { get; set; } = string.Empty;

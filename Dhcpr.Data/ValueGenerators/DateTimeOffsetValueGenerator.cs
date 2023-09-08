@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.ValueGeneration;
 
 namespace Dhcpr.Data.ValueGenerators;
 
-public class DateTimeOffsetValueGenerator : ValueGenerator<DateTimeOffset>
+public sealed class DateTimeOffsetValueGenerator : ValueGenerator<DateTimeOffset>
 {
     private readonly IProperty _property;
     private readonly bool _generateOnAdd;

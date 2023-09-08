@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class PointerDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<PointerDnsResourceRecord>
+public sealed class PointerDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<PointerDnsResourceRecord>
 {
     public string Name { get; set; } = string.Empty;
 

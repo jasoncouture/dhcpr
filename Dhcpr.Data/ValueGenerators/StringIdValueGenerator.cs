@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.ValueGeneration;
 
 namespace Dhcpr.Data.ValueGenerators;
 
-public class StringIdValueGenerator : ValueGenerator<string>
+public sealed class StringIdValueGenerator : ValueGenerator<string>
 {
     private readonly IProperty _property;
 

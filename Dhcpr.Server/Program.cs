@@ -18,12 +18,8 @@ var builder = WebApplication.CreateBuilder(args);
 // builder.Configuration.AddEnvironmentVariables();
 // builder.Configuration.AddCommandLine(args);
 
-builder.Services.AddDbContextPool<IDataContext, DataContext>(b =>
-{
-    var connectionString = builder.Configuration.GetConnectionString("Default");
-    b.UseSqlite(connectionString);
-});
 // Add services to the container.
+builder.Services.AddDatabaseServices();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();

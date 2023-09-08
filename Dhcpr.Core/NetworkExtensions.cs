@@ -27,10 +27,41 @@ public static class NetworkExtensions
         return new IPAddress(networkBytes);
     }
 
+    public static bool TryParseClasslessInterDomainRouting(this string input, [NotNullWhen(true)] out IPAddress? address, [NotNullWhen(true)] out IPAddress? subnet)
+    {
+        address = default;
+        subnet = default;
+        var parts = input.Split('/');
+        if (parts.Length != 2) return false;
+        if (!IPAddress.TryParse(parts[0], out address))
+            return false;
+        if (!int.TryParse(parts[1], out var maskBits))
+            return false;
+        if (maskBits > GetBitCount(address.AddressFamily) || maskBits < 0)
+            return false;
+
+        subnet = ClasslessInterDomainRoutingToNetworkMask(maskBits, address.AddressFamily);
+
+        return true;
+    }
+
+    private static int GetBitCount(AddressFamily addressFamily)
+    {
+        if (addressFamily == AddressFamily.InterNetwork) return 32;
+        if (addressFamily == AddressFamily.InterNetworkV6) return 128;
+
+        return -1;
+    }
+
     public static IPAddress ClasslessInterDomainRoutingToNetworkMask(this int bitCount, AddressFamily addressFamily)
     {
         if (addressFamily != AddressFamily.InterNetwork && addressFamily != AddressFamily.InterNetworkV6)
             throw new InvalidOperationException("Only IPv4 and IPv6 are supported.");
+        if (bitCount < 0) throw new ArgumentOutOfRangeException(nameof(bitCount));
+        if (addressFamily == AddressFamily.InterNetwork && bitCount > 32)
+            throw new ArgumentOutOfRangeException(nameof(bitCount));
+        if (addressFamily == AddressFamily.InterNetworkV6 && bitCount > 128)
+            throw new ArgumentOutOfRangeException(nameof(bitCount));
         Span<byte> netmaskBytes = stackalloc byte[addressFamily == AddressFamily.InterNetwork ? 4 : 16];
         for (var x = 0; x < netmaskBytes.Length && bitCount > 0; x++)
         {

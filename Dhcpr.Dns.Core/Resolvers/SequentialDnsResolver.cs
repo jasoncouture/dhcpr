@@ -1,7 +1,8 @@
 ﻿using Dhcpr.Core;
+
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class SequentialDnsResolver : MultiResolver, ISequentialDnsResolver
 {

@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 
+namespace Dhcpr.Server;
+
 public sealed class DhcpServer : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)

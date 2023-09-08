@@ -1,7 +1,9 @@
-﻿using DNS.Client.RequestResolver;
+﻿using Dhcpr.Core.Linq;
+
+using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public abstract class MultiResolver : IMultiResolver
 {

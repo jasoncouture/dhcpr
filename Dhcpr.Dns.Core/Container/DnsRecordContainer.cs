@@ -1,6 +1,8 @@
-﻿using DNS.Protocol.ResourceRecords;
+﻿using Dhcpr.Core.Linq;
 
-namespace Dhcpr.Dns.Core;
+using DNS.Protocol.ResourceRecords;
+
+namespace Dhcpr.Dns.Core.Container;
 
 public class DnsRecordContainer
 {

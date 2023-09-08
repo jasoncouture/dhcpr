@@ -1,6 +1,6 @@
 ﻿using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public record class QueryCacheData(byte[] Payload, DateTimeOffset Created)
 {

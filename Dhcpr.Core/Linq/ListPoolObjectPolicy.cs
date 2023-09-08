@@ -1,8 +1,6 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection.Metadata;
-using Microsoft.Extensions.ObjectPool;
+﻿using Microsoft.Extensions.ObjectPool;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Core.Linq;
 
 internal class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T>>
 {

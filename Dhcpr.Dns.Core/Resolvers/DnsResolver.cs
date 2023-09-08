@@ -3,7 +3,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class DnsResolver : IDnsResolver, IDisposable
 {

@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 
+namespace Dhcpr.Server;
+
 public static class ConfigurationLoaderExtensions
 {
     private static IConfiguration GetConfiguration(string jsonFile, string environmentVariablePrefix)

@@ -1,4 +1,6 @@
-﻿namespace Dhcpr.Dns.Core;
+﻿using Dhcpr.Core.Linq;
+
+namespace Dhcpr.Dns.Core.Container;
 
 public class RootDnsRecordContainer : DnsRecordContainer
 {

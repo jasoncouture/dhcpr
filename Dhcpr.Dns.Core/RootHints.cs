@@ -5,6 +5,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 
+using Dhcpr.Core.Linq;
+
 namespace Dhcpr.Dns.Core;
 
 public static class RootHints

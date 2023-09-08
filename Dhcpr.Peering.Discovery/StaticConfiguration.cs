@@ -1,17 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-using Dhcpr.Core;
+﻿using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System;
 
 namespace Dhcpr.Peering.Discovery;
 
 public class StaticConfiguration
 {
-    public string[] Addresses { get; set; } = Array.Empty<string>();
-
-    [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract", Justification = "Value is set by reflection")]
-    public bool Validate()
-    {
-        if (Addresses is null) return false;
-        return Addresses.All(i => i.IsValidIPAddress());
-    }
+    public Uri[] Peers { get; set; } = Array.Empty<Uri>();
 }

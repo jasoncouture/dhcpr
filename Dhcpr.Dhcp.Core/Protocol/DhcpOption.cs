@@ -61,4 +61,15 @@ public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
         option = new DhcpOption(code, payload);
         return true;
     }
+
+    public void WriteAndAdvance(ref Span<byte> buffer)
+    {
+        buffer[0] = (byte)Code;
+        buffer = buffer[1..];
+        if (IsFixedSize(Code)) return;
+        buffer[0] = (byte)Length;
+        buffer = buffer[1..];
+        Payload.CopyTo(buffer);
+        buffer = buffer[Payload.Length..];
+    }
 }

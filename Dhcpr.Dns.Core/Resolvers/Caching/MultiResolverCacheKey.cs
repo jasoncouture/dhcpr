@@ -1,3 +1,3 @@
-﻿namespace Dhcpr.Dns.Core.Resolvers;
+﻿namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public record struct MultiResolverCacheKey(ResolverCacheKey[] InnerCacheKeys, Type ResolverType);

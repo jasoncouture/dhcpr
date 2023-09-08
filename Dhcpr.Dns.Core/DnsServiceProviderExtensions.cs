@@ -2,6 +2,11 @@
 
 using Dhcpr.Core;
 using Dhcpr.Dns.Core.Resolvers;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
 
 using DNS.Client.RequestResolver;
 

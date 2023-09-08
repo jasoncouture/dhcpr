@@ -1,8 +1,9 @@
 ﻿using Dhcpr.Core;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
 
 public sealed class SequentialDnsResolver : MultiResolver, ISequentialDnsResolver
 {

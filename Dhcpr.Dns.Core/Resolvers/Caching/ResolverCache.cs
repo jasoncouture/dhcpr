@@ -1,6 +1,7 @@
 ﻿using System.Net;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Client.RequestResolver;
 
@@ -8,7 +9,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public sealed class ResolverCache : IResolverCache
 {

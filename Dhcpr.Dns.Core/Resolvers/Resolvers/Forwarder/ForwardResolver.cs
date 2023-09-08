@@ -1,12 +1,16 @@
 ﻿using System.Net;
 
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
+
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 
 public class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
 {

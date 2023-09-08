@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;

@@ -1,6 +1,8 @@
 ﻿using System.Net;
 
 using Dhcpr.Core;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
@@ -9,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 public class RootResolver : IRootResolver, IDisposable
 {

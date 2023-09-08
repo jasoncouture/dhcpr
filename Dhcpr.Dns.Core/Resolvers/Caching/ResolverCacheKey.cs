@@ -2,7 +2,7 @@
 
 using DNS.Client.RequestResolver;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public record struct ResolverCacheKey(IPEndPoint EndPoint, Type ResolverType)
 {

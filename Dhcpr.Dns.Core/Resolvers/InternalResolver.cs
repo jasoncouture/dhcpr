@@ -40,6 +40,7 @@ public sealed class InternalResolver : IRequestResolver
         {
             response.ResponseCode = ResponseCode.NameError;
         }
+
         return Task.FromResult((IResponse)response);
     }
 

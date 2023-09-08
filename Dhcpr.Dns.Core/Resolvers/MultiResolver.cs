@@ -3,7 +3,7 @@ using DNS.Protocol;
 
 namespace Dhcpr.Dns.Core;
 
-public abstract class MultiResolver : IRequestResolver
+public abstract class MultiResolver : IMultiResolver
 {
     public abstract Task<IResponse?> Resolve(IRequest request, CancellationToken cancellationToken = new CancellationToken());
     private readonly HashSet<IRequestResolver> _innerResolvers = new();
@@ -37,9 +37,7 @@ public abstract class MultiResolver : IRequestResolver
             _innerResolvers.Remove(resolver);
     }
 
-
-
-    public PooledList<IRequestResolver> Resolvers
+    protected PooledList<IRequestResolver> Resolvers
     {
         get
         {

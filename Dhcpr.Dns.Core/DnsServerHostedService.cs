@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 
 using Dhcpr.Core;
 
+using DNS.Protocol;
 using DNS.Server;
 
 using Microsoft.Extensions.Hosting;
@@ -17,7 +18,7 @@ public class DnsServerHostedService : IHostedService
     private readonly DnsServer[] _servers;
     private readonly Task[] _runningServers;
 
-    private static readonly ConditionalWeakTable<object, Tuple<ILogger<DnsServer>, IPEndPoint>> _eventHandlers = new();
+    private static readonly ConditionalWeakTable<object, Tuple<ILogger<DnsServer>, IPEndPoint>> ServerData = new();
 
     public DnsServerHostedService(IDnsResolver resolver, IOptions<DnsConfiguration> dnsConfiguration,
         ILogger<DnsServer> logger)
@@ -36,14 +37,14 @@ public class DnsServerHostedService : IHostedService
         }
     }
 
-    private  DnsServer CreateServer(IPEndPoint endPoint, IDnsResolver resolver)
+    private DnsServer CreateServer(IPEndPoint endPoint, IDnsResolver resolver)
     {
         var server = new DnsServer(resolver);
         server.Listening += OnListening;
         server.Requested += OnRequested;
-        server.Responded += OnResponded; 
+        server.Responded += OnResponded;
         server.Errored += OnErrored;
-        _eventHandlers.Add(server, Tuple.Create(_logger, endPoint));
+        ServerData.Add(server, Tuple.Create(_logger, endPoint));
         _logger.LogInformation("Configured for {endPoint}",
             endPoint);
         return server;
@@ -51,25 +52,31 @@ public class DnsServerHostedService : IHostedService
 
     private static (ILogger<DnsServer> logger, IPEndPoint endPoint) GetEventData(object? sender)
     {
-        if (sender is null) 
+        if (sender is null)
             throw new InvalidOperationException("Sender must be set.");
-        if (!_eventHandlers.TryGetValue(sender, out var data)) 
+        if (!ServerData.TryGetValue(sender, out var data))
             throw new InvalidOperationException("What?");
 
         return (data.Item1, data.Item2);
     }
+
     private static void OnErrored(object? sender, DnsServer.ErroredEventArgs e)
     {
         var (logger, endPoint) = GetEventData(sender);
-        logger.LogError(e.Exception, "DNS Server instance listening on {endPoint} has failed with an error", endPoint);   
+        logger.LogError(e.Exception, "DNS Server instance listening on {endPoint} has failed with an error", endPoint);
     }
 
     private static void OnResponded(object? sender, DnsServer.RespondedEventArgs e)
     {
+        var (logger, endPoint) = GetEventData(sender);
+        logger.LogDebug("{endPoint} responded to {sender} with response code {responseCode}: {response}", endPoint,
+            e.Remote, e.Response.ResponseCode, e.Response);
     }
 
     private static void OnRequested(object? sender, DnsServer.RequestedEventArgs e)
     {
+        var (logger, endPoint) = GetEventData(sender);
+        logger.LogDebug("{endPoint} received request from {sender}", endPoint, e.Remote);
     }
 
     private static void OnListening(object? sender, EventArgs e)
@@ -88,7 +95,7 @@ public class DnsServerHostedService : IHostedService
 
         return Task.CompletedTask;
     }
-    
+
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
@@ -108,5 +115,4 @@ public class DnsServerHostedService : IHostedService
             )
             .ConfigureAwait(false);
     }
-
 }

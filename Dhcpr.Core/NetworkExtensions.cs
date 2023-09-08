@@ -66,14 +66,15 @@ public static class NetworkExtensions
         [NotNullWhen(true)] out IPEndPoint? endPoint)
     {
         endPoint = null;
-        if (IPEndPoint.TryParse(addressOrEndPoint, out endPoint))
-            return true;
 
         if (IPAddress.TryParse(addressOrEndPoint, out var ipAddress))
         {
             endPoint = new IPEndPoint(ipAddress, defaultPort);
             return true;
         }
+        
+        if (IPEndPoint.TryParse(addressOrEndPoint, out endPoint))
+            return true;
 
         return false;
     }

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class ServiceDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<ServiceDnsResourceRecord>
+public sealed class ServiceDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<ServiceDnsResourceRecord>
 {
     public ushort Priority { get; set; }
     public ushort Weight { get; set; }

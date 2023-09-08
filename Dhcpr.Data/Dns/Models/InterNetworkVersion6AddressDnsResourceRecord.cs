@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class InterNetworkVersion6AddressDnsResourceRecord : DnsResourceRecord,
+public sealed class InterNetworkVersion6AddressDnsResourceRecord : DnsResourceRecord,
     IDataRecord<InterNetworkVersion6AddressDnsResourceRecord>
 {
     public byte[] InterNetworkVersion6Address { get; set; } = Array.Empty<byte>();

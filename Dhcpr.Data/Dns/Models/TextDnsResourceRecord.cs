@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class TextDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<TextDnsResourceRecord>
+public sealed class TextDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<TextDnsResourceRecord>
 {
     public string Text { get; set; } = string.Empty;
 

@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Data.ValueConverters;
 
-public class TimeSpanValueConverter : ValueConverter<TimeSpan, double>
+public sealed class TimeSpanValueConverter : ValueConverter<TimeSpan, double>
 {
     public TimeSpanValueConverter() : base(t => t.TotalSeconds, d => TimeSpan.FromSeconds(d))
     {

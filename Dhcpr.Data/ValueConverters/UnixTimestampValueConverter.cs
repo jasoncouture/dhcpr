@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Data.ValueConverters;
 
-public class UnixTimestampValueConverter : ValueConverter<DateTimeOffset, long>
+public sealed class UnixTimestampValueConverter : ValueConverter<DateTimeOffset, long>
 {
     public UnixTimestampValueConverter()
         : base

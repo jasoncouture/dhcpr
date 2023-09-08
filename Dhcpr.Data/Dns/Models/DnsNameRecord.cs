@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class DnsNameRecord : IDataRecord<DnsNameRecord>
+public sealed class DnsNameRecord : IDataRecord<DnsNameRecord>
 {
     [DatabaseGenerated(DatabaseGeneratedOption.None)]
     public string Id { get; set; } = string.Empty;

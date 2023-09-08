@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class MailExchangerDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<MailExchangerDnsResourceRecord>
+public sealed class MailExchangerDnsResourceRecord : DnsResourceRecord, ISelfBuildingModel<MailExchangerDnsResourceRecord>
 {
     public ushort Preference { get; set; }
     public string Name { get; set; } = string.Empty;

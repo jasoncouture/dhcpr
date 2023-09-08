@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dhcpr.Data.Dns.Models;
 
-public class DnsCacheEntry : IDataRecord<DnsCacheEntry>
+public sealed class DnsCacheEntry : IDataRecord<DnsCacheEntry>
 { 
     static void ISelfBuildingModel<DnsCacheEntry>.OnModelCreating(EntityTypeBuilder<DnsCacheEntry> builder)
     {

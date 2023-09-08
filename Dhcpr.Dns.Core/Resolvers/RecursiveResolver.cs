@@ -1,14 +1,14 @@
-﻿using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 
-using DNS.Client;
+using Dhcpr.Core.Linq;
+
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
 {

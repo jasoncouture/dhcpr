@@ -1,4 +1,5 @@
 ﻿using Dhcpr.Core;
+using Dhcpr.Dns.Core.Resolvers;
 
 using DNS.Client.RequestResolver;
 

@@ -1,11 +1,13 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
+using Dhcpr.Core.Linq;
+
 using DNS.Protocol;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Dns.Core.Resolvers;
 
 public class DnsCache : IDnsCache
 {

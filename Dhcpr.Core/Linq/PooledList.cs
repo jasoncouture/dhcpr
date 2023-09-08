@@ -1,4 +1,4 @@
-﻿namespace Dhcpr.Dns.Core;
+﻿namespace Dhcpr.Core.Linq;
 
 public sealed class PooledList<T> : List<T>, IDisposable
 {

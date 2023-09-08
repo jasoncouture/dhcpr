@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.ObjectPool;
 
-namespace Dhcpr.Dns.Core;
+namespace Dhcpr.Core.Linq;
 
 public class ListPool<T>
 {

@@ -6,6 +6,7 @@ using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers;
@@ -16,6 +17,7 @@ public class RootResolver : IRootResolver, IDisposable
     private readonly IOptionsMonitor<RootServerConfiguration> _rootServerConfigurationOptions;
     private readonly IResolverCache _resolverCache;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<RootResolver> _logger;
     private readonly IMultiResolver _rootResolvers;
     private readonly IDisposable? _subscription;
 
@@ -24,12 +26,14 @@ public class RootResolver : IRootResolver, IDisposable
     public RootResolver(
         IOptionsMonitor<RootServerConfiguration> rootServerConfigurationOptions,
         IResolverCache resolverCache,
-        IServiceProvider serviceProvider
+        IServiceProvider serviceProvider,
+        ILogger<RootResolver> logger
     )
     {
         _rootServerConfigurationOptions = rootServerConfigurationOptions;
         _resolverCache = resolverCache;
         _serviceProvider = serviceProvider;
+        _logger = logger;
         _rootResolvers = ActivatorUtilities.CreateInstance<RecursiveResolver>(serviceProvider,
             GetEndPoints(_rootServerConfigurationOptions.CurrentValue.Addresses));
         _subscription = _rootServerConfigurationOptions.OnChange(ConfigurationChanged);
@@ -66,6 +70,7 @@ public class RootResolver : IRootResolver, IDisposable
                 .ToArray());
             _activeConfiguration = configuration;
         }
+        _logger.LogDebug("Configuration changed applied");
     }
 
     public async Task<IResponse> Resolve(IRequest request,

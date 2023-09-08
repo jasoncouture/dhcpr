@@ -21,6 +21,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IRootResolver, RootResolver>();
         services.AddSingleton<IResolverCache, ResolverCache>();
         services.AddSingleton<IDnsCache, DnsCache>();
+        services.AddSingleton<IForwardResolver, ForwardResolver>();
         
         services.Configure<DnsConfiguration>(configuration).AddValidation<DnsConfiguration>();
         services.Configure<RootServerConfiguration>(configuration.GetSection(nameof(DnsConfiguration.RootServers))).AddValidation<RootServerConfiguration>();

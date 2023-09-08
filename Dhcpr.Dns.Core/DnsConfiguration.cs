@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
+
 using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core;
@@ -8,20 +9,11 @@ public class DnsConfiguration : IValidateSelf
 {
     public RootServerConfiguration RootServers { get; set; } = new();
 
-    public string[] ListenAddresses { get; set; } =
-    {
-        "127.0.0.1:53"
-    };
-    public string[] Forwarders { get; set; } =
-    {
-        "8.8.8.8",
-        "8.8.4.4",
-        "1.1.1.1",
-        "1.0.0.1"
-    };
+    public string[] ListenAddresses { get; set; } = { "127.0.0.1:53" };
+    public string[] Forwarders { get; set; } = Array.Empty<string>();
 
     public bool UseParallelResolver { get; set; } = true;
-    
+
     private const int DefaultDnsPort = 53;
 
     public IPEndPoint[] GetListenEndpoints() => GetEndpoints(ListenAddresses, DefaultDnsPort);
@@ -39,7 +31,8 @@ public class DnsConfiguration : IValidateSelf
 
     public IPEndPoint[] GetForwarderEndpoints() => GetEndpoints(Forwarders, DefaultDnsPort);
 
-    [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract", Justification = "Values are set by reflection")]
+    [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract",
+        Justification = "Values are set by reflection")]
     public bool Validate()
     {
         if (Forwarders is null) return false;

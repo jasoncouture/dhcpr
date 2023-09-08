@@ -16,17 +16,15 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
 public class DatabaseResolver : IDatabaseResolver
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly DataContext _dataContext;
 
-    public DatabaseResolver(IServiceProvider serviceProvider)
+    public DatabaseResolver(DataContext dataContext)
     {
-        _serviceProvider = serviceProvider;
+        _dataContext = dataContext;
     }
 
     public async Task<IResponse?> Resolve(IRequest request, CancellationToken cancellationToken = default)
     {
-        await using var scope = _serviceProvider.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<DataContext>();
         var question = request.Questions.Single();
         var questionDomain = question.Name.ToString()!.ToLower();
         var requestedRecordTypes = new HashSet<RecordType>() { question.Type };
@@ -39,12 +37,12 @@ public class DatabaseResolver : IDatabaseResolver
             .Select(i => (ResourceRecordType)i)
             .ToHashSet();
         var dbNameRecord =
-            await context.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
+            await _dataContext.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         
         if (dbNameRecord is null || dbNameRecord.CacheEntry) 
             return null;
-        var resourceRecords = context.Set<DnsResourceRecord>()
+        var resourceRecords = _dataContext.Set<DnsResourceRecord>()
             .Include(i => i.Parent)
             .Where(i => i.Parent.Id == dbNameRecord.Id)
             .Where(i => dbRecordTypes.Count == 0 || dbRecordTypes.Contains(i.RecordType))

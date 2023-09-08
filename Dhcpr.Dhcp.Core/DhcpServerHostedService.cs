@@ -1,10 +1,11 @@
-﻿using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 using Dhcpr.Core;
+using Dhcpr.Core.Queue;
+using Dhcpr.Dhcp.Core.Client;
 using Dhcpr.Dhcp.Core.Pipeline;
 using Dhcpr.Dhcp.Core.Protocol;
 
@@ -16,41 +17,45 @@ namespace Dhcpr.Dhcp.Core;
 public class DhcpServerHostedService : BackgroundService
 {
     private readonly ILogger<DhcpServerHostedService> _logger;
-    private readonly IEnumerable<IDhcpRequestHandler> _interceptors;
+    private readonly IMessageQueue<QueuedDhcpMessage> _processingQueue;
     private readonly UdpClient _client = new();
-    private const int DhcpServerPort = 67;
-    private const int DhcpClientPort = 68;
 
-    public DhcpServerHostedService(ILogger<DhcpServerHostedService> logger,
-        IEnumerable<IDhcpRequestHandler> interceptors)
+    public DhcpServerHostedService(
+        ILogger<DhcpServerHostedService> logger,
+        IMessageQueue<QueuedDhcpMessage> processingQueue)
     {
         _logger = logger;
-        _interceptors = interceptors;
+        _processingQueue = processingQueue;
     }
 
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var dhcpServerSocket = _client;
-        var listenEndPoint = new IPEndPoint(IPAddress.Any, DhcpServerPort);
-        dhcpServerSocket.Client.EnableBroadcast = true;
+        using var dhcpServerSocket = _client;
+
         dhcpServerSocket.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
-        dhcpServerSocket.Client.Bind(listenEndPoint);
+        dhcpServerSocket.Client.Bind(Constants.ServerEndpoint);
+        dhcpServerSocket.Client.EnableBroadcast = true;
         var buffer = new byte[16384];
-        var tasks = new List<Task>();
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var receiveResult = await dhcpServerSocket.Client.ReceiveMessageFromAsync(buffer, listenEndPoint)
+            var receiveResult = await dhcpServerSocket.Client.ReceiveMessageFromAsync(buffer, Constants.ServerEndpoint)
                 .ConfigureAwait(false);
             var bufferSlice = buffer[..receiveResult.ReceivedBytes];
-            _logger.LogInformation("Got a {length} byte packet, trying to parse it as a DHCP Message",
-                receiveResult.ReceivedBytes);
             if (!DhcpMessage.TryParse(bufferSlice, out var dhcpMessage))
             {
-                _logger.LogWarning("Unable to parse DHCP packet: {packet}",
+                _logger.LogWarning("Ignoring invalid DHCP packet: {packet}",
                     string.Join(':', bufferSlice.Select(i => i.ToString("X2"))));
-                return;
+                if (receiveResult.ReceivedBytes == buffer.Length)
+                {
+                    _logger.LogWarning(
+                        "Request message may have failed to parse because it's too big. The datagram we received was {size} bytes long, which is the maximum we accept.",
+                        receiveResult.ReceivedBytes
+                    );
+                }
+
+                continue;
             }
 
             if (!TryGetNetworkInformation(receiveResult.PacketInformation.Interface, out var localAddress,
@@ -62,93 +67,16 @@ public class DhcpServerHostedService : BackgroundService
                 continue;
             }
 
-            var networkInfo = new DhcpNetworkInformation(localAddress, subnetMask, broadcastAddress,
-                receiveResult.PacketInformation.Interface);
+            var networkInfo = new DhcpNetworkInformation(new IPNetwork(localAddress, subnetMask, broadcastAddress),
+                receiveResult.PacketInformation.Interface, interfaceName);
             var context = new DhcpRequestContext()
             {
                 Message = dhcpMessage,
                 NetworkInformation = networkInfo,
+                Cancel = false,
                 Response = null
             };
-
-
-            tasks.Add(ProcessDhcpContextAsync(context, stoppingToken));
-            while (tasks.Any(i => i.IsCompleted))
-            {
-                tasks.Remove(await Task.WhenAny(tasks));
-            }
-        }
-
-        if (tasks.Any())
-            await Task.WhenAll(tasks);
-    }
-
-    private async Task ProcessDhcpContextAsync(DhcpRequestContext requestContext, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using (_logger.BeginScope("{macAddress}", requestContext.Message.ClientHardwareAddress))
-            using (_logger.BeginScope("{network}", requestContext.NetworkInformation))
-            {
-                _logger.LogInformation("Processing DHCP message, network information {network}", requestContext.NetworkInformation);
-                foreach (var processingModule in _interceptors)
-                {
-                    try
-                    {
-                        await processingModule.HandleDhcpRequest(requestContext, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex,
-                            "Module fault in processing module: {moduleName}, will attempt to continue",
-                            processingModule.GetType().Name);
-                    }
-                }
-
-                await EncodeAndSendAsync(requestContext, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "Something went wrong when processing a DHCP message for {macAddress}, here's the network information: {networkInfo}",
-                requestContext.Message.ClientHardwareAddress, requestContext.NetworkInformation);
-        }
-    }
-
-    private async Task EncodeAndSendAsync(DhcpRequestContext requestContext, CancellationToken cancellationToken)
-    {
-        if (requestContext.Response is null)
-        {
-            _logger.LogInformation(
-                "No interceptors provided a response DHCP message, no response will be sent.");
-            return;
-        }
-
-        var targetAddress = requestContext.NetworkInformation.BroadcastAddress;
-        if (!requestContext.Message.ClientAddress.Equals(IPAddress.Any) &&
-            !requestContext.Message.Flags.HasFlag(DhcpFlags.Broadcast))
-        {
-            targetAddress = requestContext.Message.ClientAddress;
-        }
-
-        var targetEndPoint = new IPEndPoint(targetAddress, DhcpClientPort);
-        var outboundBuffer = ArrayPool<byte>.Shared.Rent(requestContext.Response.Size);
-        try
-        {
-            outboundBuffer.Initialize();
-            requestContext.Response.EncodeTo(outboundBuffer);
-            await _client.SendAsync(
-                outboundBuffer
-                    .AsMemory(0, requestContext.Response.Size),
-                targetEndPoint,
-                cancellationToken
-            );
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(outboundBuffer);
+            _processingQueue.Enqueue(new QueuedDhcpMessage(dhcpServerSocket, context), stoppingToken);
         }
     }
 
@@ -156,10 +84,10 @@ public class DhcpServerHostedService : BackgroundService
         int interfaceIndex,
         out IPAddress address,
         out IPAddress networkMask,
-        out IPAddress broadcastAddress,
+        out IPAddress networkBroadcastAddress,
         [NotNullWhen(true)] out string? interfaceName)
     {
-        address = networkMask = broadcastAddress = IPAddress.Any;
+        address = networkMask = networkBroadcastAddress = IPAddress.Any;
         interfaceName = null;
         var interfaces = NetworkInterface.GetAllNetworkInterfaces();
         NetworkInterface? matchingInterface = null;
@@ -195,12 +123,7 @@ public class DhcpServerHostedService : BackgroundService
             broadcastAddressBytes[x] = (byte)(addressBytes[x] | networkMaskAddressBytes[x]);
         }
 
-        broadcastAddress = new IPAddress(broadcastAddressBytes);
+        networkBroadcastAddress = new IPAddress(broadcastAddressBytes);
         return true;
-    }
-
-    private void QueueDhcpProcessing()
-    {
-        throw new NotImplementedException();
     }
 }

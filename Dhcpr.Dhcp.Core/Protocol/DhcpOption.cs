@@ -1,10 +1,47 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Dhcpr.Dhcp.Core.Protocol;
 
 public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
 {
+    public DhcpOption(DhcpOptionCode code, string str) : this(code, EncodeString(str))
+    {
+    }
+
+
+    private static ImmutableArray<byte> EncodeString(string str)
+    {
+        var bufferSize = Encoding.ASCII.GetMaxByteCount(str.Length) + 1;
+        Span<byte> buffer = stackalloc byte[bufferSize];
+        Encoding.ASCII.GetBytes(str, buffer);
+        return buffer.ToImmutableArray();
+    }
+
+    public DhcpOption(DhcpOptionCode code, IPAddress address) : this(code, EncodeIPAddress(address))
+    {
+    }
+
+    private static ImmutableArray<byte> EncodeIPAddress(IPAddress address)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetwork)
+            throw new ArgumentException("Only IPv4 addresses are supported", nameof(address));
+        Span<byte> addressBytes = stackalloc byte[4];
+        address.TryWriteBytes(addressBytes, out _);
+        return addressBytes.ToImmutableArray();
+    }
+
+    public DhcpOption(DhcpOptionCode code, IEnumerable<byte> bytes) : this(code, bytes.ToImmutableArray())
+    {
+    }
+
+    public DhcpOption(DhcpOptionCode code, byte b) : this(code, new[] { b }.ToImmutableArray())
+    {
+    }
+
     public override string ToString()
     {
         if (IsFixedSize(Code))
@@ -30,6 +67,10 @@ public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
         StaticOptions[(byte)DhcpOptionCode.RapidCommit] =
             new DhcpOption(DhcpOptionCode.RapidCommit, ImmutableArray<byte>.Empty);
     }
+
+    public static DhcpOption End => StaticOptions[(byte)DhcpOptionCode.End]!;
+    public static DhcpOption Pad => StaticOptions[(byte)DhcpOptionCode.Pad]!;
+    public static DhcpOption RapidCommit => StaticOptions[(byte)DhcpOptionCode.RapidCommit]!;
 
     public int Length => GetEncodedLength(Code, Payload.Length);
 
@@ -63,10 +104,14 @@ public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
 
     public void WriteAndAdvance(ref Span<byte> buffer)
     {
+        int written = 0;
         buffer[0] = (byte)Code;
         buffer = buffer[1..];
-        if (IsFixedSize(Code)) return;
-        buffer[0] = (byte)Length;
+        if (IsFixedSize(Code))
+            return;
+
+
+        buffer[0] = (byte)Payload.Length;
         buffer = buffer[1..];
         Payload.CopyTo(buffer);
         buffer = buffer[Payload.Length..];

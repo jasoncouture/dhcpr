@@ -31,7 +31,7 @@ public static class AppConfigurationExtensions
             {
                 Directory.CreateDirectory(basePath);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Console.WriteLine($"Configuration path {basePath} could not be created.");
                 Console.WriteLine(

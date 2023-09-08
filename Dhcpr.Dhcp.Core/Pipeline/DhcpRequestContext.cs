@@ -6,5 +6,6 @@ public class DhcpRequestContext
 {
     public required DhcpNetworkInformation NetworkInformation { get; init; }
     public required DhcpMessage Message { get; init; }
-    public DhcpMessage? Response { get; init; }
+    public bool Cancel { get; set; }
+    public DhcpMessage? Response { get; set; }
 }

@@ -23,13 +23,13 @@ public abstract class MultiResolver : IMultiResolver
     }
     public void AddResolvers(params IRequestResolver[] resolvers)
     {
-        foreach(var resolver in resolvers)
+        foreach (var resolver in resolvers)
             AddResolver(resolver);
     }
 
     public void AddResolver(IRequestResolver resolver)
     {
-        lock(_innerResolvers)
+        lock (_innerResolvers)
             _innerResolvers.Add(resolver);
     }
 
@@ -48,4 +48,3 @@ public abstract class MultiResolver : IMultiResolver
         }
     }
 }
-

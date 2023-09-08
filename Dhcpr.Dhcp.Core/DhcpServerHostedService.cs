@@ -66,7 +66,9 @@ public class DhcpServerHostedService : BackgroundService
                 receiveResult.PacketInformation.Interface);
             var context = new DhcpRequestContext()
             {
-                Message = dhcpMessage, NetworkInformation = networkInfo, Response = null
+                Message = dhcpMessage,
+                NetworkInformation = networkInfo,
+                Response = null
             };
 
 

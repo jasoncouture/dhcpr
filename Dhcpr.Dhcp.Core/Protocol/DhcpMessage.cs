@@ -61,16 +61,16 @@ public record DhcpMessage(
         if (hardwareAddressLength > 16) return false;
         if (hardwareAddressLength == 0) return false;
         var hops = span[3];
-        
+
         span = span[4..];
         var transactionId = BitConverter.ToInt32(span[..4]).ToHostByteOrder();
-        
+
         span = span[4..];
         ushort seconds = BitConverter.ToUInt16(span[..2]).ToHostByteOrder();
-        
+
         span = span[2..];
         var flags = (DhcpFlags)BitConverter.ToUInt16(span[..2]).ToHostByteOrder();
-        
+
         span = span[2..];
         var addresses = new IPAddress[4];
         for (var i = 0; i < 4; i++)
@@ -82,10 +82,10 @@ public record DhcpMessage(
 
         var clientHardwareAddress = span[..ClientHardwareAddressMaxLength];
         span = span[ClientHardwareAddressMaxLength..];
-        
+
         var serverNameBytes = span[..ServerNameMaxLength];
         span = span[ServerNameMaxLength..];
-        
+
         var bootFileNameBytes = span[..BootFileNameMaxLength];
         span = span[BootFileNameMaxLength..];
 
@@ -172,24 +172,24 @@ public record DhcpMessage(
         WriteAndAdvance(ref buffer, (byte)HardwareAddressType);
         WriteAndAdvance(ref buffer, HardwareAddressLength);
         WriteAndAdvance(ref buffer, Hops);
-        
+
         WriteAndAdvance(ref buffer, TransactionId);
-        
+
         WriteAndAdvance(ref buffer, Seconds);
         WriteAndAdvance(ref buffer, (ushort)Flags);
-        
-        
+
+
         WriteAndAdvance(ref buffer, ClientAddress);
         WriteAndAdvance(ref buffer, YourAddress);
         WriteAndAdvance(ref buffer, ServerAddress);
         WriteAndAdvance(ref buffer, RelayAddress);
-        
+
         ClientHardwareAddress.WriteAndAdvance(ref buffer);
-        
+
         WriteAndAdvance(ref buffer, ServerName, ServerNameMaxLength);
-        
+
         WriteAndAdvance(ref buffer, BootFileName, BootFileNameMaxLength);
-        
+
         WriteAndAdvance(ref buffer, MagicCookie);
         foreach (var option in Options)
         {

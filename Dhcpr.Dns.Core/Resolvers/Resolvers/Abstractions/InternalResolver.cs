@@ -20,7 +20,7 @@ public sealed class InternalResolver : IRequestResolver
         _rootContainer.CollectGarbage(domain, (int)recordType);
     }
 
-    private RootDnsRecordContainer _rootContainer = new RootDnsRecordContainer();
+    private readonly RootDnsRecordContainer _rootContainer = new RootDnsRecordContainer();
 
     public Task<IResponse> Resolve(IRequest request, CancellationToken cancellationToken = new CancellationToken())
     {

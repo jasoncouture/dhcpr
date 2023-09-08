@@ -23,7 +23,7 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
             .Select(
                 [SuppressMessage("ReSharper", "AccessToDisposedClosure",
                     Justification = "Enumerable is enumerated immediately.")]
-                async (i) =>
+        async (i) =>
                 {
                     try
                     {

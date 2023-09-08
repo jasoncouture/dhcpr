@@ -10,7 +10,7 @@ public class UnitTest1
     public void ValidationFailsWhenAddressIsNotMulticast(string addressOrEndPoint)
     {
         var config = new MulticastConfiguration() { Address = addressOrEndPoint };
-        
+
         Assert.False(config.Validate());
     }
 
@@ -32,7 +32,7 @@ public class UnitTest1
                 {
                     $"{firstOctet}.{secondOctet}.{secondOctet}.{secondOctet}"
                 };
-                
+
                 yield return new object[]
                 {
                     $"{firstOctet}.{secondOctet}.{secondOctet}.{secondOctet}:1234"

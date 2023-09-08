@@ -100,7 +100,7 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                 currentRequest.Id = Random.Shared.Next(1, int.MaxValue);
                 currentRequest.Questions.Clear();
                 currentRequest.Questions.Add(new Question(new Domain(queryNameBuilder.ToString()), RecordType.NS,
-                    RecordClass.ANY));;
+                    RecordClass.ANY)); ;
 
                 _logger.LogDebug("Looking for nameservers for {fragment}", queryNameBuilder);
 
@@ -138,7 +138,7 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                                         .OfType<IPAddressResourceRecord>());
                             }
                         }).ConfigureAwait(false);
-                    
+
                     await Parallel.ForEachAsync(
                         currentResponse.AuthorityRecords.OfType<StartOfAuthorityResourceRecord>(),
                         cancellationToken,

@@ -63,10 +63,10 @@ public enum DhcpOptionCode : byte
     ParameterRequestList = 55,
     DhcpErrorMessage = 56,
     DhcpMaxMessageSize = 57,
-    DhcpRenewalTime=58,
-    DhcpRebindingTime=59,
-    ClassIdentifier=60,
-    ClientIdentifier=61,
+    DhcpRenewalTime = 58,
+    DhcpRebindingTime = 59,
+    ClassIdentifier = 60,
+    ClientIdentifier = 61,
     NetwareIPDomain = 62,
     NetwareIPOption = 63,
     NisDomainName = 64,
@@ -88,6 +88,5 @@ public enum DhcpOptionCode : byte
     RapidCommit = 80, // This one also does not have a length.
     ClientFullyQualifiedDomainName = 81,
     // TODO: Complete this list.
-    
     End = 255
 }

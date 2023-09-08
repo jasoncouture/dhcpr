@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Core.Linq;
 
-internal class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T>>
+internal sealed class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T>>
 {
     private readonly int _maxCapacity;
 

@@ -30,7 +30,7 @@ public abstract class TypedSubscriber<TData> : ISubscriber
         if (data is not TData typedData)
             return;
         if (!FilterMessage(sender, typedData)) return;
-        await OnMessageAsync(sender, typedData, cancellationToken);
+        await OnMessageAsync(sender, typedData, cancellationToken).ConfigureAwait(false);
     }
 
     private bool FilterMessage(object sender, TData typedData)

@@ -19,6 +19,7 @@ public class DnsCache : IDnsCache
     private readonly IMemoryCache _memoryCache;
     private readonly IDataContext _dataContext;
     private readonly ILogger<DnsCache> _logger;
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
 
     public DnsCache(IMemoryCache memoryCache, IDataContext dataContext, ILogger<DnsCache> logger)
     {
@@ -39,7 +40,8 @@ public class DnsCache : IDnsCache
             data = await TryGetDatabaseCachedDnsRecordAsync(key, cancellationToken).ConfigureAwait(false);
             if (data is not null)
             {
-                await TryAddCacheEntryAsync(request, data.Response, addToDatabase: false, cancellationToken).ConfigureAwait(false);
+                await TryAddCacheEntryAsync(request, data.Response, addToDatabase: false, cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
 
@@ -75,8 +77,10 @@ public class DnsCache : IDnsCache
 
     private async Task DeleteCacheEntryAsync(QueryCacheKey key, CancellationToken cancellationToken)
     {
+        await _dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            
             await using var transaction = await _dataContext
                 .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
             await _dataContext.CacheEntries.Where(i =>
@@ -91,6 +95,7 @@ public class DnsCache : IDnsCache
         }
         catch
         {
+            _dbLock.Release();
             // Ignored.
         }
     }
@@ -101,6 +106,7 @@ public class DnsCache : IDnsCache
         var name = key.Domain;
         var type = (ResourceRecordType)key.Type;
         var @class = (ResourceRecordClass)key.Class;
+        await _dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await using var transaction = await
@@ -127,6 +133,10 @@ public class DnsCache : IDnsCache
         catch
         {
             return null;
+        }
+        finally
+        {
+            _dbLock.Release();
         }
     }
 
@@ -191,27 +201,40 @@ public class DnsCache : IDnsCache
         if (cacheTimeToLive <= TimeSpan.Zero) return;
         if (addToDatabase)
         {
+            await _dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var dbCacheEntry = new DnsCacheEntry()
-                {
-                    Name = request.Questions[0].Name.ToString()!.ToLower(),
-                    TimeToLive = cacheTimeToLive,
-                    Class = (ResourceRecordClass)request.Questions[0].Class,
-                    Type = (ResourceRecordType)request.Questions[0].Type,
-                    Payload = request.ToArray(),
-                    Expires = DateTimeOffset.Now.Add(cacheTimeToLive)
-                };
+                var name = request.Questions[0].Name.ToString()!.ToLower();
+                var @class = (ResourceRecordClass)request.Questions[0].Class;
+                var type = (ResourceRecordType)request.Questions[0].Type;
                 await using var transaction = await _dataContext
                     .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
+                if (!await _dataContext.CacheEntries.AnyAsync(
+                        i => i.Name == name && i.Type == type && i.Class == @class,
+                        cancellationToken: cancellationToken).ConfigureAwait(false))
+                {
+                    var dbCacheEntry = new DnsCacheEntry()
+                    {
+                        Name = name,
+                        TimeToLive = cacheTimeToLive,
+                        Class = @class,
+                        Type = type,
+                        Payload = request.ToArray(),
+                        Expires = DateTimeOffset.Now.Add(cacheTimeToLive)
+                    };
 
-                _dataContext.CacheEntries.Add(dbCacheEntry);
-                await _dataContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                    _dataContext.CacheEntries.Add(dbCacheEntry);
+                    await _dataContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
             }
             catch
             {
                 // Ignored.
+            }
+            finally
+            {
+                _dbLock.Release();
             }
         }
 

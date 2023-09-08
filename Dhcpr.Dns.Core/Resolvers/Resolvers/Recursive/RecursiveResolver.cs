@@ -43,10 +43,10 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
     {
         var resolver = _resolverCache.GetResolver(endPoints, CreateParallelResolver,
             CreateUdpResolver);
-        return _resolverCache.GetCacheForResolver(resolver);
+        return resolver;
     }
 
-    private static readonly RecordType[] _nameServerRecordTypes = new[] { RecordType.A, RecordType.AAAA };
+    private static readonly RecordType[] NameServerRecordTypes = new[] { RecordType.A, RecordType.AAAA };
 
     [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
     public override async Task<IResponse?> Resolve(IRequest request,
@@ -161,7 +161,7 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
             async (authority, ctx) =>
             {
                 var newRequest = new Request();
-                foreach (var recordType in _nameServerRecordTypes)
+                foreach (var recordType in NameServerRecordTypes)
                 {
                     newRequest.Questions.Add(new Question(authority.NSDomainName, recordType));
                     var nameServerResponse = await dnsResolver.Resolve(newRequest, cancellationToken)
@@ -179,7 +179,7 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
             async (authority, ctx) =>
             {
                 var newRequest = new Request();
-                foreach (var recordType in _nameServerRecordTypes)
+                foreach (var recordType in NameServerRecordTypes)
                 {
                     newRequest.Questions.Add(new Question(authority.MasterDomainName, recordType));
                     var nameServerResponse = await dnsResolver.Resolve(newRequest, cancellationToken)

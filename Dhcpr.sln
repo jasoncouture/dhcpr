@@ -19,6 +19,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Storage", "Dhcpr.Stor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dhcp.Core.UnitTests", "Dhcpr.Dhcp.Core.UnitTests\Dhcpr.Dhcp.Core.UnitTests.csproj", "{1D1DA9B3-7326-41AE-BDCC-2B19B54DE97D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Abstractions", "Dhcpr.Abstractions\Dhcpr.Abstractions.csproj", "{CD243B5F-8AD7-4821-818A-EC6864DF60D6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Data", "Dhcpr.Data\Dhcpr.Data.csproj", "{678C7277-8446-47D7-AC4F-61F6F2AFB725}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

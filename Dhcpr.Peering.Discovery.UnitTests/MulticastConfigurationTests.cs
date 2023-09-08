@@ -1,6 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Dhcpr.Peering.Discovery.UnitTests;
 
-public class UnitTest1
+[SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
+public class MulticastConfigurationTests
 {
     [Theory]
     [InlineData("0.0.0.0")]

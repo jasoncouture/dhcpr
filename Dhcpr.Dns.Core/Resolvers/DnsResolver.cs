@@ -161,10 +161,10 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
 
             using var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var tasks = new List<Task<IResponse?>>();
-            tasks.Add(_databaseResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(SelectedMethod(request, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(_forwardResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(_rootResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull().ConvertExceptionsToNull());
+            tasks.Add(_databaseResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(SelectedMethod(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(_forwardResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(_rootResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull().ConvertExceptionsToNull());
 
             for (var x = 0; x < tasks.Count; x++)
             {
@@ -173,8 +173,8 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                 _logger.LogDebug("DNS resolver task returned {response}", nextResponse);
                 if (nextResponse is null)
                     continue;
-                
-                if ((x == 0 || x == 3)) 
+                nextResponse = new Response(nextResponse) { Id = request.Id };
+                if (x == 0) 
                     return nextResponse;
 
                 if (nextResponse.ResponseCode != ResponseCode.NoError)
@@ -194,7 +194,9 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                 return nextResponse;
             }
 
-            return result;
+            var nxdomain = Response.FromRequest(request);
+            nxdomain.ResponseCode = ResponseCode.NameError;
+            return nxdomain;
         }
         catch (Exception ex)
         {

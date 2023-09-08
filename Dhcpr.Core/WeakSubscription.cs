@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Core;
 
-class WeakSubscription : IDisposable
+sealed class WeakSubscription : IDisposable
 {
     private bool _dead = false;
 
@@ -42,7 +42,7 @@ class WeakSubscription : IDisposable
     public async ValueTask<bool> SendAsync(object sender, object data, CancellationToken cancellationToken)
     {
         if (!TryGetSubscriber(out var subscriber)) return false;
-        await subscriber.OnMessageAsync(sender, data, cancellationToken);
+        await subscriber.OnMessageAsync(sender, data, cancellationToken).ConfigureAwait(false);
         return true;
     }
 }

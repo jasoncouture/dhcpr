@@ -41,7 +41,7 @@ public class SimpleMessenger : ISimpleMessenger
         await Parallel.ForEachAsync(broadcastSubscribers, cancellationToken, async (subscription, token) =>
         {
             if (DestroyIfDead(subscription)) return;
-            if (!await subscription.SendAsync(sender, data, token))
+            if (!await subscription.SendAsync(sender, data, token).ConfigureAwait(false))
             {
                 lock (_subscribers)
                     _subscribers.Remove(subscription);
@@ -70,7 +70,7 @@ public class SimpleMessenger : ISimpleMessenger
         {
             if (DestroyIfDead(subscription)) continue;
             if (!subscription.IsSubscriber(subscriber)) continue;
-            if (!await subscription.SendAsync(sender, data, cancellationToken))
+            if (!await subscription.SendAsync(sender, data, cancellationToken).ConfigureAwait(false))
             {
                 RemoveSubscription(subscription);
             }

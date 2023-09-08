@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Dhcpr.Core.Queue;
 
 [SuppressMessage("ReSharper", "StaticMemberInGenericType")]
-public class MessageQueue<T> : IMessageQueue<T> where T : class
+public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
 {
     private TaskCompletionSource _queueWaitTask = new();
 
@@ -17,7 +17,7 @@ public class MessageQueue<T> : IMessageQueue<T> where T : class
 
     public void Enqueue(T item, CancellationToken cancellationToken = default)
     {
-        _queue.Enqueue(new QueueItem<T> { Item = item, CancellationToken = cancellationToken });
+        _queue.Enqueue(new QueueItem<T>(item, cancellationToken));
         UpdateSignalState();
     }
 
@@ -31,7 +31,7 @@ public class MessageQueue<T> : IMessageQueue<T> where T : class
             {
                 UpdateSignalState();
                 var waitTask = _queueWaitTask.Task;
-                await waitTask.WaitAsync(Constants.GetPollWaitTimeoutWithJitter(), cancellationToken);
+                await waitTask.WaitAsync(Constants.GetPollWaitTimeoutWithJitter(), cancellationToken).ConfigureAwait(false);
 
                 return;
             }
@@ -106,7 +106,7 @@ public class MessageQueue<T> : IMessageQueue<T> where T : class
         while (!_queue.TryDequeue(out item))
         {
             UpdateSignalState();
-            await WaitForSignalAsync(cancellationToken);
+            await WaitForSignalAsync(cancellationToken).ConfigureAwait(false);
         }
 
         return item;

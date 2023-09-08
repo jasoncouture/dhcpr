@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dhcp.Core.Pipeline;
 
-public class DhcpMessageTypeValidatorRequestHandler : IDhcpRequestHandler
+public sealed class DhcpMessageTypeValidatorRequestHandler : IDhcpRequestHandler
 {
     private static readonly HashSet<DhcpMessageType> ValidMessageTypes = Enum.GetValues<DhcpMessageType>().ToHashSet();
     private readonly ILogger<DhcpMessageTypeValidatorRequestHandler> _logger;

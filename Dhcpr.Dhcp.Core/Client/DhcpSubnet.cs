@@ -5,7 +5,7 @@ using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Dhcp.Core.Client;
 
-public record DhcpSubnet(
+public sealed record DhcpSubnet(
     IPNetwork Network,
     ImmutableArray<IPAddressRange> AddressRanges
 ) : IDhcpSubnet

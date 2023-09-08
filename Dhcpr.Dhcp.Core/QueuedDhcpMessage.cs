@@ -4,4 +4,4 @@ using Dhcpr.Dhcp.Core.Pipeline;
 
 namespace Dhcpr.Dhcp.Core;
 
-public record QueuedDhcpMessage(UdpClient Socket, DhcpRequestContext Context);
+public sealed record QueuedDhcpMessage(UdpClient Socket, DhcpRequestContext Context);

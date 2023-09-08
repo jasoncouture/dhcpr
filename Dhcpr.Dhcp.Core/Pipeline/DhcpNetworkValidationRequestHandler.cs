@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dhcp.Core.Pipeline;
 
-public class DhcpNetworkValidationRequestHandler : IDhcpRequestHandler
+public sealed class DhcpNetworkValidationRequestHandler : IDhcpRequestHandler
 {
     private readonly ILogger<DhcpNetworkValidationRequestHandler> _logger;
     private readonly IPNetwork[] _networks;

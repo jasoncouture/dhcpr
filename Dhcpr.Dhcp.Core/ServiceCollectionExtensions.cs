@@ -1,6 +1,8 @@
 ﻿using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Core;
+using Dhcpr.Core.Queue;
 using Dhcpr.Dhcp.Core.Client;
 using Dhcpr.Dhcp.Core.Pipeline;
 
@@ -33,7 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDhcpRequestHandler, DhcpSelectRequestHandler>();
 
         services.AddHostedService<DhcpServerHostedService>();
-        services.AddHostedService<DhcpMessageQueueProcessor>();
+        services.AddQueueProcessor<QueuedDhcpMessage, DhcpMessageQueueProcessor>();
         return services;
     }
 }

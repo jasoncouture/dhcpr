@@ -20,7 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContextPool<DataContext>(b =>
 {
-    b.UseSqlite(builder.Configuration.GetConnectionString("Default"));
+    var connectionString = builder.Configuration.GetConnectionString("Default");
+    b.UseSqlite(connectionString);
 });
 // Add services to the container.
 builder.Services.AddRazorPages();

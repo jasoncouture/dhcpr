@@ -1,8 +1,20 @@
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
+using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
+Console.WriteLine("DHCPR Server - Starting...");
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddPlatformConfigurationLocations(args);
+// These must be re-added, otherwise config files overwrite them. But env and cli should take precedence over files.
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Configure(builder.Configuration.GetSection("Kestrel"), true);
+});
 
 // Add services to the container.
 builder.Services.AddRazorPages();
@@ -22,8 +34,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -31,4 +41,5 @@ app.UseRouting();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
+Console.WriteLine("Application configuration complete, starting services.");
 app.Run();

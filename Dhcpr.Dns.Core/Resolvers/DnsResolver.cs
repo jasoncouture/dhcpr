@@ -109,7 +109,39 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             }
         }
 
+        response = new Response(response);
+        OrderResourceRecords(response);
+
         return response;
+    }
+
+    private void OrderResourceRecords(IResponse response)
+    {
+        OrderResourceRecords(response.AnswerRecords);
+        OrderResourceRecords(response.AdditionalRecords);
+        OrderResourceRecords(response.AuthorityRecords);
+    }
+
+    // This function will shuffle IP records,  
+    private void OrderResourceRecords(IList<IResourceRecord> records)
+    {
+        // No point in wasting time here, there's no addresses to shuffle.
+        using var ipRecords = records.OfType<IPAddressResourceRecord>().ToPooledList();
+        if (ipRecords.Count < 2) return;
+        using var otherRecords = records.Where(i => i is not IPAddressResourceRecord)
+            .ToPooledList();
+        records.Clear();
+        foreach (
+            var addressRecord in ipRecords
+                .OrderBy(i => i.IPAddress.IsInLocalSubnet() ? 0 : 1)
+                .ThenShuffle()
+        )
+            records.Add(addressRecord);
+
+        foreach (
+            var otherRecord in otherRecords
+        )
+            records.Add(otherRecord);
     }
 
     public async Task<IResponse> InnerResolver(IRequest request,
@@ -173,7 +205,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                 .OperationCancelledToNull().ConvertExceptionsToNull();
             var dbResolverTask = Task.FromResult(
                 (IResponse?)null); //_databaseResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
-            
+
             var forwardResolverTask = _forwardResolver
                 .Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token)
                 .OperationCancelledToNull();

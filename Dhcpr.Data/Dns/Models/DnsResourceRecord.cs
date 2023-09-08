@@ -13,6 +13,7 @@ public abstract class DnsResourceRecord : IDataRecord<DnsResourceRecord>
     public string Id { get; set; } = string.Empty;
     public string OwnerId { get; set; } = string.Empty;
     public required string ParentId { get; set; }
+    public virtual required DnsNameRecord Parent { get; set; }
 
 
     public virtual ResourceRecordType RecordType { get; set; }
@@ -29,7 +30,7 @@ public abstract class DnsResourceRecord : IDataRecord<DnsResourceRecord>
         EntityTypeBuilder<DnsResourceRecord> entityBuilder)
     {
         entityBuilder.AddDataRecordValueGenerators();
-        entityBuilder.HasOne<DnsNameRecord>()
+        entityBuilder.HasOne<DnsNameRecord>(i => i.Parent)
             .WithMany()
             .HasForeignKey(i => i.ParentId)
             .HasPrincipalKey(i => i.Id);

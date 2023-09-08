@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dhcpr.Data.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20230906031325_Initial")]
+    [Migration("20230906033501_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -253,11 +253,13 @@ namespace Dhcpr.Data.Migrations
 
             modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsResourceRecord", b =>
                 {
-                    b.HasOne("Dhcpr.Data.Dns.Models.DnsNameRecord", null)
+                    b.HasOne("Dhcpr.Data.Dns.Models.DnsNameRecord", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Parent");
                 });
 #pragma warning restore 612, 618
         }

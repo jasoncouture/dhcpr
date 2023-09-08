@@ -250,11 +250,13 @@ namespace Dhcpr.Data.Migrations
 
             modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsResourceRecord", b =>
                 {
-                    b.HasOne("Dhcpr.Data.Dns.Models.DnsNameRecord", null)
+                    b.HasOne("Dhcpr.Data.Dns.Models.DnsNameRecord", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Parent");
                 });
 #pragma warning restore 612, 618
         }

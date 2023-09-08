@@ -205,7 +205,8 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
         var start = Stopwatch.GetTimestamp();
         try
         {
-            if (_dnsCache.TryGetCachedResponse(request, out var result))
+            var result = await _dnsCache.TryGetCachedResponseAsync(request, cancellationToken).ConfigureAwait(false);
+            if (result is not null)
             {
                 _logger.LogInformation("DNS Questions answered by cache: {status}",
                     result.ResponseCode);
@@ -241,7 +242,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is { ResponseCode: ResponseCode.NoError })
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntry(request, response);
+                _dnsCache.TryAddCacheEntryAsync(request, response);
                 return response;
             }
 
@@ -249,7 +250,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is { ResponseCode: ResponseCode.NoError })
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntry(request, response);
+                _dnsCache.TryAddCacheEntryAsync(request, response);
                 return response;
             }
 
@@ -257,7 +258,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             if (response is not null)
             {
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntry(request, response);
+                _dnsCache.TryAddCacheEntryAsync(request, response);
                 return response;
             }
 

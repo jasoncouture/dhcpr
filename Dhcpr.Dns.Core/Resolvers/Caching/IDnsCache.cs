@@ -6,6 +6,10 @@ namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public interface IDnsCache
 {
-    bool TryGetCachedResponse(IRequest request, [NotNullWhen(true)] out IResponse? response);
-    void TryAddCacheEntry(IRequest request, IResponse response);
+    ValueTask<IResponse?> TryGetCachedResponseAsync(
+        IRequest request, 
+        CancellationToken cancellationToken
+        );
+
+    ValueTask TryAddCacheEntryAsync(IRequest request, IResponse response, CancellationToken cancellationToken = default);
 }

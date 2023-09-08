@@ -19,7 +19,8 @@ public class CachedResolver : ICachedResolver
     }
     public async Task<IResponse> Resolve(IRequest request, CancellationToken cancellationToken = new CancellationToken())
     {
-        if (_dnsCache.TryGetCachedResponse(request, out var result))
+        var result = await _dnsCache.TryGetCachedResponseAsync(request, cancellationToken).ConfigureAwait(false);
+        if (result is not null)
         {
             _logger.LogInformation("DNS Questions answered by cache: {status}",
                 result.ResponseCode);
@@ -27,7 +28,7 @@ public class CachedResolver : ICachedResolver
         }
 
         result = await _innerResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
-        _dnsCache.TryAddCacheEntry(request, result);
+        await _dnsCache.TryAddCacheEntryAsync(request, result).ConfigureAwait(false);
         return result;
     }
 }

@@ -1,10 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Data;
+using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Data;
+using Dhcpr.Data.Dns.Models;
 
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -13,46 +17,117 @@ namespace Dhcpr.Dns.Core.Resolvers.Caching;
 public class DnsCache : IDnsCache
 {
     private readonly IMemoryCache _memoryCache;
+    private readonly IDataContext _dataContext;
     private readonly ILogger<DnsCache> _logger;
 
-    public DnsCache(IMemoryCache memoryCache, ILogger<DnsCache> logger)
+    public DnsCache(IMemoryCache memoryCache, IDataContext dataContext, ILogger<DnsCache> logger)
     {
         _memoryCache = memoryCache;
+        _dataContext = dataContext;
         _logger = logger;
     }
 
-    public bool TryGetCachedResponse(IRequest request, [NotNullWhen(true)] out IResponse? response)
+    public async ValueTask<IResponse?> TryGetCachedResponseAsync(IRequest request,
+        CancellationToken cancellationToken)
     {
-        response = null;
-        if (request.Questions.Count != 1) return false;
+        IResponse? response = null;
+        if (request.Questions.Count != 1) return null;
         var key = new QueryCacheKey(request, request.Questions[0]);
-        if (_memoryCache.TryGetValue(key, out QueryCacheData? data) && data is not null)
+        _memoryCache.TryGetValue(key, out QueryCacheData? data);
+        if (data is null)
         {
-            try
+            data = await TryGetDatabaseCachedDnsRecordAsync(key, cancellationToken).ConfigureAwait(false);
+            if (data is not null)
             {
-                response = WithUpdatedTimeToLive(data.Response, DateTimeOffset.Now - data.Created);
-                if (
-                    response.AuthorityRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
-                    response.AnswerRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
-                    response.AdditionalRecords.Any(i => i.TimeToLive <= TimeSpan.Zero)
-                )
-                {
-                    // This is expired, but somehow still in cache. Evict it and lie that we didn't find it.
-                    _memoryCache.Remove(key);
-                    return false;
-                }
-
-                response.Id = request.Id;
-                return true;
-            }
-            catch
-            {
-                _memoryCache.Remove(key);
-                return false;
+                await TryAddCacheEntryAsync(request, data.Response, addToDatabase: false, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        return false;
+        if (data is null)
+            return null;
+
+        try
+        {
+            response = WithUpdatedTimeToLive(data.Response, DateTimeOffset.Now - data.Created);
+            if (
+                response.AuthorityRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
+                response.AnswerRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
+                response.AdditionalRecords.Any(i => i.TimeToLive <= TimeSpan.Zero)
+            )
+            {
+                // This is expired, but somehow still in cache. Evict it and lie that we didn't find it.
+                await DeleteCacheEntryAsync(key, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                response.Id = request.Id;
+                return response;
+            }
+        }
+        catch
+        {
+            await DeleteCacheEntryAsync(key, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
+        return null;
+    }
+
+    private async Task DeleteCacheEntryAsync(QueryCacheKey key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var transaction = await _dataContext
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
+            await _dataContext.CacheEntries.Where(i =>
+                    i.Name == key.Domain &&
+                    i.Type == (ResourceRecordType)key.Type &&
+                    i.Class == (ResourceRecordClass)key.Class
+                )
+                .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            _memoryCache.Remove(key);
+        }
+        catch
+        {
+            // Ignored.
+        }
+    }
+
+    private async Task<QueryCacheData?> TryGetDatabaseCachedDnsRecordAsync(QueryCacheKey key,
+        CancellationToken cancellationToken)
+    {
+        var name = key.Domain;
+        var type = (ResourceRecordType)key.Type;
+        var @class = (ResourceRecordClass)key.Class;
+        try
+        {
+            await using var transaction = await
+                _dataContext.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
+                    .ConfigureAwait(false);
+
+            var result = await _dataContext.CacheEntries.AsNoTracking()
+                .Where(i => i.Name == name && i.Type == type && i.Class == @class)
+                .SingleOrDefaultAsync(cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result is null) return null;
+
+            if (result.Expires <= DateTimeOffset.Now)
+            {
+                await _dataContext.CacheEntries.Where(i => i.Id == result.Id).ExecuteDeleteAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return null;
+            }
+
+            return new QueryCacheData(Response.FromArray(result.Payload), result.Created, result.TimeToLive);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private IResponse WithUpdatedTimeToLive(IResponse response, TimeSpan currentAge)
@@ -83,11 +158,16 @@ public class DnsCache : IDnsCache
         if (ttl < TimeSpan.Zero) ttl = TimeSpan.FromSeconds(0);
         // We re-create this this way, because something may want to use a specific record type to detect things
         // And we don't want to break that.
-        var recordBytes = new ResourceRecord(resourceRecord.Name, resourceRecord.Data, resourceRecord.Type, resourceRecord.Class, ttl).ToArray();
+        var recordBytes = new ResourceRecord(resourceRecord.Name, resourceRecord.Data, resourceRecord.Type,
+            resourceRecord.Class, ttl).ToArray();
         return ResourceRecordFactory.FromArray(recordBytes, 0);
     }
 
-    public void TryAddCacheEntry(IRequest request, IResponse response)
+    public ValueTask TryAddCacheEntryAsync(IRequest request, IResponse response, CancellationToken cancellationToken)
+        => TryAddCacheEntryAsync(request, response, true, cancellationToken);
+
+    public async ValueTask TryAddCacheEntryAsync(IRequest request, IResponse response, bool addToDatabase,
+        CancellationToken cancellationToken)
     {
         if (response is NoCacheResponse) return;
         if (request.Questions.Count != 1) return;
@@ -109,6 +189,31 @@ public class DnsCache : IDnsCache
 
         var cacheTimeToLive = timeToLivePooledList.First();
         if (cacheTimeToLive <= TimeSpan.Zero) return;
+        if (addToDatabase)
+        {
+            try
+            {
+                var dbCacheEntry = new DnsCacheEntry()
+                {
+                    Name = request.Questions[0].Name.ToString()!.ToLower(),
+                    TimeToLive = cacheTimeToLive,
+                    Class = (ResourceRecordClass)request.Questions[0].Class,
+                    Type = (ResourceRecordType)request.Questions[0].Type,
+                    Payload = request.ToArray(),
+                    Expires = DateTimeOffset.Now.Add(cacheTimeToLive)
+                };
+                await using var transaction = await _dataContext
+                    .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
+
+                _dataContext.CacheEntries.Add(dbCacheEntry);
+                await _dataContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Ignored.
+            }
+        }
 
         var cacheSlidingExpiration =
             TimeSpan.FromSeconds(Math.Floor(Math.Max((cacheTimeToLive / 4).TotalSeconds, 10.0)));
@@ -116,7 +221,7 @@ public class DnsCache : IDnsCache
 
         var key = new QueryCacheKey(request, request.Questions[0]);
         var cacheEntry = _memoryCache.CreateEntry(key);
-        var cacheData = new QueryCacheData(response);
+        var cacheData = new QueryCacheData(response, cacheTimeToLive);
         cacheEntry.Value = cacheData;
         cacheEntry.AbsoluteExpirationRelativeToNow = cacheTimeToLive;
         if (cacheSlidingExpiration < cacheTimeToLive)

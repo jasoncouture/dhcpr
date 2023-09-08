@@ -42,14 +42,15 @@ public class DatabaseResolver : IDatabaseResolver
         
         if (dbNameRecord is null) 
             return null;
+
+        var response = Response.FromRequest(request);
+        
         var resourceRecords = _dataContext.ResourceRecords
             .Include(i => i.Parent)
             .Where(i => i.Parent.Id == dbNameRecord.Id)
             .Where(i => dbRecordTypes.Count == 0 || dbRecordTypes.Contains(i.RecordType))
             .Where(i => requestedRecordClass == ResourceRecordClass.Any || i.Class == requestedRecordClass)
             .AsAsyncEnumerable();
-
-        var response = Response.FromRequest(request);
 
         if(await resourceRecords.ToResourceRecords(response, cancellationToken).ConfigureAwait(false))
             return new NoCacheResponse(response);

@@ -12,12 +12,16 @@ public static class DnsServiceProviderExtensions
     public static IServiceCollection AddDns(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHostedService<DnsServerHostedService>();
-        services.Configure<DnsConfiguration>(configuration).AddValidation<DnsConfiguration>();
+        
         services.AddSingleton<IDnsResolver, DnsResolver>();
         services.AddSingleton<IParallelDnsResolver, ParallelResolver>();
         services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
         services.AddSingleton<IRequestResolver, InternalResolver>();
+        services.AddSingleton<IRootResolver, RootResolver>();
+        services.AddSingleton<IResolverCache, ResolverCache>();
+        
         services.Configure<DnsConfiguration>(configuration).AddValidation<DnsConfiguration>();
+        services.Configure<RootServerConfiguration>(configuration.GetSection(nameof(DnsConfiguration.RootServers))).AddValidation<RootServerConfiguration>();
         return services;
     }
 }

@@ -12,10 +12,10 @@ public sealed class SequentialDnsResolver : MultiResolver, ISequentialDnsResolve
         using var resolvers = Resolvers;
         foreach (var resolver in resolvers)
         {
-            var result = await resolver.Resolve(request, cancellationTokenSource.Token).OperationCancelledToNull().ConfigureAwait(false);
+            var result = await resolver.Resolve(request, cancellationTokenSource.Token).OperationCancelledToNull().ConvertExceptionsToNull().ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (result != null) return result;
+            if (result is not null and { ResponseCode: ResponseCode.NameError or ResponseCode.NoError }) return result;
         }
 
         return null;

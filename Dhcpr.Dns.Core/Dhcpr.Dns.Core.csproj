@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Dhcpr.Core/Dhcpr.Core.csproj" />
+    <ProjectReference Include="..\Dhcpr.Data\Dhcpr.Data.csproj" />
   </ItemGroup>
 
 </Project>

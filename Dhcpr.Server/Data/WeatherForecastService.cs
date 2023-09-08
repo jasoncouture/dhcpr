@@ -1,6 +1,6 @@
 namespace Dhcpr.Server.Data;
 
-public class WeatherForecastService
+public sealed class WeatherForecastService
 {
     private static readonly string[] Summaries = new[]
     {

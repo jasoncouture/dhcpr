@@ -1,6 +1,6 @@
 namespace Dhcpr.Server.Data;
 
-public class WeatherForecast
+public sealed class WeatherForecast
 {
     public DateOnly Date { get; set; }
 

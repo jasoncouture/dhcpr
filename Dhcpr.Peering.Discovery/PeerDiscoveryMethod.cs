@@ -4,6 +4,5 @@ public enum PeerDiscoveryMethod
 {
     None,
     Multicast,
-    Consul,
     Config
 }

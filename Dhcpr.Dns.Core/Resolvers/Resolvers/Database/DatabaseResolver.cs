@@ -3,7 +3,6 @@
 using Dhcpr.Data;
 using Dhcpr.Data.Dns.Models;
 
-using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
@@ -14,7 +13,7 @@ using Riok.Mapperly.Abstractions;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
-public class DatabaseResolver : IRequestResolver
+public class DatabaseResolver : IDatabaseResolver
 {
     private readonly IServiceProvider _serviceProvider;
 

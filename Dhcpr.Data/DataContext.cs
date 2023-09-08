@@ -1,4 +1,5 @@
 ﻿using Dhcpr.Data.Dns;
+using Dhcpr.Data.Dns.Models;
 using Dhcpr.Data.ValueConverters;
 
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Dhcpr.Data;
 
-public class DataContext : DbContext
+public class DataContext : DbContext, IDataContext
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
@@ -51,4 +52,7 @@ public class DataContext : DbContext
             .Property(property.Name)
             .HasConversion(UnixTimestampValueConverter.Instance);
     }
+
+    public DbSet<DnsResourceRecord> ResourceRecords { get; init; }
+    public DbSet<DnsNameRecord> NameRecords { get; init; }
 }

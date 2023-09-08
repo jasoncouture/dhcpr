@@ -5,6 +5,9 @@ using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
 Console.WriteLine("DHCPR Server - Starting...");
+Console.WriteLine("Initializing SQLite libraries");
+SQLitePCL.Batteries_V2.Init();
+Console.WriteLine("Continuing startup");
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddPlatformConfigurationLocations(args);

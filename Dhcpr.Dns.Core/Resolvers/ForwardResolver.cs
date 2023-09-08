@@ -33,7 +33,7 @@ public class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
 
     private IRequestResolver GetForwardResolvers()
     {
-        return _resolverCache.GetMultiResolver(
+        return _resolverCache.GetResolver(
             _currentConfiguration.GetForwarderEndpoints(),
             CreateMultiResolver,
             CreateInnerResolver

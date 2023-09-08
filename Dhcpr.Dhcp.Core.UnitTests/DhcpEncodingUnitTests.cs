@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Dhcp.Core.Protocol;
 
 namespace Dhcpr.Dhcp.Core.UnitTests;
 
+[SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
 public class DhcpEncodingUnitTests
 {
     private static DhcpMessage TestMessage { get; } = DhcpMessage.Template with

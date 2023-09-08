@@ -11,6 +11,7 @@ public sealed class SubnetConfiguration : IValidateSelf
     public required string CIDR { get; set; }
     public int TimeToLiveSeconds { get; set; }
     public bool Enabled { get; set; }
+
     public bool Validate()
     {
         if (TimeToLiveSeconds < 300) return false;

@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
         // TODO: Add DHCP components and configuration.
         
         services.Configure<DhcpConfiguration>(configuration);
+        services.AddHostedService<DhcpServerHostedService>();
         return services;
     }
 }

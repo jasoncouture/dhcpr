@@ -6,14 +6,36 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
+using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers;
 
+public interface IScopedResolverWrapper<T> : IRequestResolver where T : IRequestResolver
+{
+    
+}
+public class ScopedResolverWrapper<T> : IScopedResolverWrapper<T> where T : IRequestResolver
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public ScopedResolverWrapper(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
+    public async Task<IResponse> Resolve(IRequest request, CancellationToken cancellationToken = new CancellationToken())
+    {
+        await using var scope = _serviceProvider.CreateAsyncScope();
+        var resolver = scope.ServiceProvider.GetRequiredService<T>();
+        return await resolver.Resolve(request, cancellationToken).ConfigureAwait(false);
+    }
+}
 public sealed class DnsResolver : IDnsResolver, IDisposable
 {
     private readonly IDatabaseResolver _databaseResolver;

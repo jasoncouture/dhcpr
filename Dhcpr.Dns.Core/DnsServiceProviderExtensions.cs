@@ -21,8 +21,9 @@ public static class DnsServiceProviderExtensions
     {
         services.AddHostedService<DnsServerHostedService>();
 
-        services.AddSingleton<IDatabaseResolver, DatabaseResolver>();
-        services.AddSingleton<IDnsResolver, DnsResolver>();
+        services.AddSingleton(typeof(IScopedResolverWrapper<>), typeof(ScopedResolverWrapper<>));
+        services.AddScoped<IDatabaseResolver, DatabaseResolver>();
+        services.AddScoped<IDnsResolver, DnsResolver>();
         services.AddSingleton<IParallelDnsResolver, ParallelResolver>();
         services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
         services.AddSingleton<IRootResolver, RootResolver>();

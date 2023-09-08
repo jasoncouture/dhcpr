@@ -1,34 +1,34 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
-using Dhcpr.Server;
+using Dhcpr.Server.Data;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+var builder = WebApplication.CreateBuilder(args);
 
-var builder = Host.CreateApplicationBuilder(args);
-
-// Handle SIGINT and shutdown gracefully.
-var shutdownTokenSource = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) =>
-{
-    e.Cancel = false;
-    shutdownTokenSource.Cancel();
-};
-
-
-var dnsConfiguration = builder.Configuration.GetDnsConfiguration();
-builder.Services.AddDns(dnsConfiguration);
+// Add services to the container.
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddSingleton<WeatherForecastService>();
 builder.Services.AddMemoryCache();
+builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
+builder.Services.AddDhcp(builder.Configuration.GetSection("DHCP"));
 
 var app = builder.Build();
 
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
 
-await app.StartAsync(shutdownTokenSource.Token);
-Console.WriteLine("Server started, press ctrl+c to shutdown");
+app.UseHttpsRedirection();
 
-await app.WaitForShutdownAsync(shutdownTokenSource.Token);
+app.UseStaticFiles();
 
+app.UseRouting();
+
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+app.Run();

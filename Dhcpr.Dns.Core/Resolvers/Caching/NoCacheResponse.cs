@@ -3,7 +3,7 @@ using DNS.Protocol.ResourceRecords;
 
 namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
-public class NoCacheResponse : IResponse
+public sealed class NoCacheResponse : IResponse
 {
     private readonly IResponse _responseImplementation;
 

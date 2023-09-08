@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core;
 
-public class DnsServerHostedService : IHostedService
+public sealed class DnsServerHostedService : IHostedService
 {
     private readonly ILogger<DnsServer> _logger;
     private readonly DnsServer[] _servers;

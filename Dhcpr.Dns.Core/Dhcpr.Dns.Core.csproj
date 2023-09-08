@@ -14,7 +14,7 @@
 
 
   <ItemGroup>
-    <ProjectReference Include="..\Dhcpr.Core\Dhcpr.Core.csproj" />
+    <ProjectReference Include="../Dhcpr.Core/Dhcpr.Core.csproj" />
   </ItemGroup>
 
 </Project>

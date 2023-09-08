@@ -194,11 +194,15 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
 
             var otherResolverTask = SelectedMethod(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) },
                 tokenSource.Token).OperationCancelledToNull();
+
             var rootResolverTask = _rootResolver
                 .Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token)
                 .OperationCancelledToNull().ConvertExceptionsToNull();
-            var dbResolverTask = Task.FromResult(
-                (IResponse?)null); //_databaseResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
+
+            var dbResolverTask = _databaseResolver.Resolve(
+                new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token
+            ).OperationCancelledToNull();
+
 
             var forwardResolverTask = _forwardResolver
                 .Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token)

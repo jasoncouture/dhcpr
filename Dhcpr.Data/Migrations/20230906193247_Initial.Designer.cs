@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dhcpr.Data.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20230906181940_DbCache")]
-    partial class DbCache
+    [Migration("20230906193247_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -19,13 +19,51 @@ namespace Dhcpr.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.10");
 
-            modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsNameRecord", b =>
+            modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsCacheEntry", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("CacheEntry")
+                    b.Property<int>("Class")
                         .HasColumnType("INTEGER");
+
+                    b.Property<long>("Created")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Expires")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Modified")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("BLOB");
+
+                    b.Property<double>("TimeToLive")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name", "Type", "Class")
+                        .IsUnique();
+
+                    b.ToTable("CacheEntries");
+                });
+
+            modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsNameRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Created")
                         .HasColumnType("INTEGER");
@@ -47,7 +85,7 @@ namespace Dhcpr.Data.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("DnsNameRecord");
+                    b.ToTable("NameRecords");
                 });
 
             modelBuilder.Entity("Dhcpr.Data.Dns.Models.DnsResourceRecord", b =>
@@ -85,7 +123,7 @@ namespace Dhcpr.Data.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.ToTable("DnsResourceRecord");
+                    b.ToTable("ResourceRecords");
 
                     b.HasDiscriminator<int>("RecordType");
 

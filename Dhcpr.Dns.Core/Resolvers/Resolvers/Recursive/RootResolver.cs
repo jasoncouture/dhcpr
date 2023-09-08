@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-public class RootResolver : IRootResolver, IDisposable
+public sealed class RootResolver : IRootResolver, IDisposable
 {
     // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
     private readonly IOptionsMonitor<RootServerConfiguration> _rootServerConfigurationOptions;

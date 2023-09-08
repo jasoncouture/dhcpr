@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 
-public class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
+public sealed class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
 {
     private readonly IDisposable? _subscription;
     private readonly IOptionsMonitor<DnsConfiguration> _options;

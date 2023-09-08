@@ -5,7 +5,7 @@ using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core;
 
-public class DnsConfiguration : IValidateSelf
+public sealed class DnsConfiguration : IValidateSelf
 {
     public RootServerConfiguration RootServers { get; set; } = new();
 

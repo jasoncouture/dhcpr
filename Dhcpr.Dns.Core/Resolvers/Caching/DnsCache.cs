@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
-public class DnsCache : IDnsCache
+public sealed class DnsCache : IDnsCache
 {
     private readonly IMemoryCache _memoryCache;
     private readonly IDataContext _dataContext;

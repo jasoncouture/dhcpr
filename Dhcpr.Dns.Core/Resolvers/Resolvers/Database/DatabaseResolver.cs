@@ -14,7 +14,7 @@ using Riok.Mapperly.Abstractions;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
-public class DatabaseResolver : IDatabaseResolver
+public sealed class DatabaseResolver : IDatabaseResolver
 {
     private readonly IDataContext _dataContext;
 

@@ -20,7 +20,7 @@ public interface IScopedResolverWrapper<T> : IRequestResolver where T : IRequest
 {
     
 }
-public class ScopedResolverWrapper<T> : IScopedResolverWrapper<T> where T : IRequestResolver
+public sealed class ScopedResolverWrapper<T> : IScopedResolverWrapper<T> where T : IRequestResolver
 {
     private readonly IServiceProvider _serviceProvider;
 

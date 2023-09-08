@@ -195,4 +195,7 @@ public static partial class NetworkExtensions
 
     public static ushort ToNetworkByteOrder(this ushort i) => (ushort)IPAddress.HostToNetworkOrder((short)i);
     public static ushort ToHostByteOrder(this ushort i) => (ushort)IPAddress.NetworkToHostOrder((short)i);
+
+    public static uint ToHostByteOrder(this uint u) => (uint)IPAddress.NetworkToHostOrder((int)u);
+    public static uint ToNetworkByteOrder(this uint u) => (uint)IPAddress.HostToNetworkOrder((int)u);
 }

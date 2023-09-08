@@ -9,7 +9,7 @@ public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
     {
         if (IsFixedSize(Code))
             return $"{Code:G}";
-        
+
         return $"{Code:G}: {{ {BitConverter.ToString(Payload.ToArray()).Replace("-", " ")} }}";
     }
 

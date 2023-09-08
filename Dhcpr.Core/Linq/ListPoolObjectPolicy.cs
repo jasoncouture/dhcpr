@@ -4,7 +4,7 @@ namespace Dhcpr.Core.Linq;
 
 internal class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T>>
 {
-    private int _maxCapacity;
+    private readonly int _maxCapacity;
 
     public ListPoolObjectPolicy(int maxCapacity)
     {

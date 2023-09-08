@@ -37,7 +37,7 @@ public class DnsRecordContainer
 
     private Dictionary<(string fragment, int recordType), DnsRecordContainer> Containers { get; } = new();
 
-    private PooledList<IResourceRecord> _records = ListPool<IResourceRecord>.Default.Get();
+    private readonly PooledList<IResourceRecord> _records = ListPool<IResourceRecord>.Default.Get();
 
     public PooledList<IResourceRecord> GetRecords()
     {

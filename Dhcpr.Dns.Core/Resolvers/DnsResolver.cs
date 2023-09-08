@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
 
+using Dhcpr.Core;
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
@@ -14,6 +16,7 @@ namespace Dhcpr.Dns.Core.Resolvers;
 
 public sealed class DnsResolver : IDnsResolver, IDisposable
 {
+    private readonly IDatabaseResolver _databaseResolver;
     private readonly IRootResolver _rootResolver;
     private readonly IDnsCache _dnsCache;
     private readonly IForwardResolver _forwardResolver;
@@ -28,6 +31,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
 
     public DnsResolver(
         IOptionsMonitor<DnsConfiguration> configuration,
+        IDatabaseResolver databaseResolver,
         IParallelDnsResolver parallelDnsResolver,
         ISequentialDnsResolver sequentialDnsResolver,
         IRootResolver rootResolver,
@@ -36,6 +40,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
         ILogger<DnsResolver> logger
     )
     {
+        _databaseResolver = databaseResolver;
         _rootResolver = rootResolver;
         _dnsCache = dnsCache;
         _forwardResolver = forwardResolver;
@@ -59,12 +64,6 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
     public async Task<IResponse> Resolve(IRequest request, CancellationToken cancellationToken)
     {
         var response = await InnerResolver(request, cancellationToken).ConfigureAwait(false);
-        if (response is null)
-        {
-            response = Response.FromRequest(request);
-            response.ResponseCode = ResponseCode.ServerFailure;
-            return response;
-        }
 
         if (response.Id != request.Id)
         {
@@ -107,18 +106,45 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
         }
         return response;
     }
-    public async Task<IResponse?> InnerResolver(IRequest request,
+    public async Task<IResponse> InnerResolver(IRequest request,
         CancellationToken cancellationToken = new CancellationToken())
     {
-        if (request.Questions.Count is > 1 or 0)
+        if (request.Questions.Count == 0)
         {
-            _logger.LogWarning(
-                "Rejecting request with NotImplemented, this server only supports a single question per request, but this request has {count} questions",
-                request.Questions.Count
-            );
             var response = Response.FromRequest(request);
-            response.ResponseCode = ResponseCode.NotImplemented;
+            response.ResponseCode = ResponseCode.FormatError;
             return response;
+        }
+
+        if (request.Questions.Count > 1)
+        {
+            var questions = request.Questions;
+            var innerResolveTasks = new List<Task<IResponse>>();
+            foreach (var question in questions)
+            {
+                var nextRequest = new Request(request);
+                nextRequest.Id = Random.Shared.Next(0, int.MaxValue);
+                nextRequest.Questions.Clear();
+                nextRequest.Questions.Add(question);
+                innerResolveTasks.Add(InnerResolver(nextRequest, cancellationToken));
+            }
+
+            var allResponses = await Task.WhenAll(innerResolveTasks).ConfigureAwait(false);
+            var response = Response.FromRequest(request);
+            response.ResponseCode = allResponses.Select(i => i.ResponseCode).Max();
+
+            foreach (var innerResponse in allResponses)
+            {
+                foreach(var record in innerResponse.AnswerRecords)
+                    response.AnswerRecords.Add(record);
+                foreach(var record in innerResponse.AuthorityRecords)
+                    response.AuthorityRecords.Add(record);
+                foreach(var record in innerResponse.AdditionalRecords)
+                    response.AdditionalRecords.Add(record);
+            }
+
+            return response;
+
         }
 
         _logger.LogInformation("Query: {query}", request.Questions[0]);
@@ -133,29 +159,39 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                 return result;
             }
 
-            result = await SelectedMethod(request, cancellationToken).ConfigureAwait(false);
-            if (result is not null and not { ResponseCode: ResponseCode.NameError })
-            {
-                _logger.LogInformation("DNS Questions answered by internal resolver: {status}",
-                    result.ResponseCode);
-                _dnsCache.TryAddCacheEntry(request, result);
-                return result;
-            }
+            using var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var tasks = new List<Task<IResponse?>>();
+            tasks.Add(_databaseResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(SelectedMethod(request, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(_forwardResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull());
+            tasks.Add(_rootResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull().ConvertExceptionsToNull());
 
-            result = await _forwardResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
-            if (result is not null and not { ResponseCode: ResponseCode.NameError })
+            for (var x = 0; x < tasks.Count; x++)
             {
-                _logger.LogInformation("DNS Questions answered by forward resolver: {status}", result.ResponseCode);
-                _dnsCache.TryAddCacheEntry(request, result);
-                return result;
-            }
+                _logger.LogDebug("Waiting for DNS Resolver task {index}", x);
+                var nextResponse = await tasks[x].ConfigureAwait(false);
+                _logger.LogDebug("DNS resolver task returned {response}", nextResponse);
+                if (nextResponse is null)
+                    continue;
+                
+                if ((x == 0 || x == 3)) 
+                    return nextResponse;
 
-            result = await _rootResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
-            if (result is not null)
-            {
-                _logger.LogInformation("DNS Questions answered by recursive root resolver: {status}",
-                    result.ResponseCode);
-                _dnsCache.TryAddCacheEntry(request, result);
+                if (nextResponse.ResponseCode != ResponseCode.NoError)
+                    continue;
+
+                tokenSource.Cancel();
+                _dnsCache.TryAddCacheEntry(request, nextResponse);
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored.
+                }
+
+                return nextResponse;
             }
 
             return result;

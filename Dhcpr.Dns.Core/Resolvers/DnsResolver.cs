@@ -67,7 +67,8 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
 
         if (response.Id != request.Id)
         {
-            _logger.LogWarning("Request ID was {requestId}, but we tried to respond with ID {responseId}, fixing it", request.Id, response.Id);
+            _logger.LogWarning("Request ID was {requestId}, but we tried to respond with ID {responseId}, fixing it",
+                request.Id, response.Id);
             response = new Response(response);
             response.Id = request.Id;
         }
@@ -76,14 +77,16 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             response.AnswerRecords.Any(i => i.Type == RecordType.CNAME) &&
             !response.AnswerRecords.Any(i => i.Type is RecordType.A or RecordType.AAAA))
         {
-            _logger.LogInformation("Canonical name did not provide addresses, and recursion is requested. Looking up A and AAAA records for the target.");
+            _logger.LogInformation(
+                "Canonical name did not provide addresses, and recursion is requested. Looking up A and AAAA records for the target.");
             response = new Response(response);
             using var cnames = response.AnswerRecords.OfType<CanonicalNameResourceRecord>().ToPooledList();
             foreach (var recordType in RecordTypes)
             {
                 foreach (var cname in cnames)
                 {
-                    _logger.LogInformation("Resolving canonical name: {recordType}:{cname}", recordType, cname.CanonicalDomainName);
+                    _logger.LogInformation("Resolving canonical name: {recordType}:{cname}", recordType,
+                        cname.CanonicalDomainName);
 
                     var innerRequest = new Request()
                     {
@@ -97,15 +100,18 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                         return response;
                     }
 
-                    foreach (var answer in innerResponse.AnswerRecords.OfType<IPAddressResourceRecord>().Where(i => i.Type == recordType))
+                    foreach (var answer in innerResponse.AnswerRecords.OfType<IPAddressResourceRecord>()
+                                 .Where(i => i.Type == recordType))
                     {
                         response.AnswerRecords.Add(answer);
                     }
                 }
             }
         }
+
         return response;
     }
+
     public async Task<IResponse> InnerResolver(IRequest request,
         CancellationToken cancellationToken = new CancellationToken())
     {
@@ -135,16 +141,15 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
 
             foreach (var innerResponse in allResponses)
             {
-                foreach(var record in innerResponse.AnswerRecords)
+                foreach (var record in innerResponse.AnswerRecords)
                     response.AnswerRecords.Add(record);
-                foreach(var record in innerResponse.AuthorityRecords)
+                foreach (var record in innerResponse.AuthorityRecords)
                     response.AuthorityRecords.Add(record);
-                foreach(var record in innerResponse.AdditionalRecords)
+                foreach (var record in innerResponse.AdditionalRecords)
                     response.AdditionalRecords.Add(record);
             }
 
             return response;
-
         }
 
         _logger.LogInformation("Query: {query}", request.Questions[0]);
@@ -160,38 +165,48 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             }
 
             using var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var tasks = new List<Task<IResponse?>>();
-            tasks.Add(_databaseResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(SelectedMethod(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(_forwardResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
-            tasks.Add(_rootResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull().ConvertExceptionsToNull());
 
-            for (var x = 0; x < tasks.Count; x++)
+            var otherResolverTask = SelectedMethod(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) },
+                tokenSource.Token).OperationCancelledToNull();
+            var rootResolverTask = _rootResolver
+                .Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token)
+                .OperationCancelledToNull().ConvertExceptionsToNull();
+            var dbResolverTask = Task.FromResult(
+                (IResponse?)null); //_databaseResolver.Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue)}, tokenSource.Token).OperationCancelledToNull());
+            
+            var forwardResolverTask = _forwardResolver
+                .Resolve(new Request(request) { Id = Random.Shared.Next(0, int.MaxValue) }, tokenSource.Token)
+                .OperationCancelledToNull();
+
+            var response = await dbResolverTask.ConfigureAwait(false);
+            if (response is not null)
             {
-                _logger.LogDebug("Waiting for DNS Resolver task {index}", x);
-                var nextResponse = await tasks[x].ConfigureAwait(false);
-                _logger.LogDebug("DNS resolver task returned {response}", nextResponse);
-                if (nextResponse is null)
-                    continue;
-                nextResponse = new Response(nextResponse) { Id = request.Id };
-                if (x == 0) 
-                    return nextResponse;
-
-                if (nextResponse.ResponseCode != ResponseCode.NoError)
-                    continue;
-
                 tokenSource.Cancel();
-                _dnsCache.TryAddCacheEntry(request, nextResponse);
-                try
-                {
-                    await Task.WhenAll(tasks).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // ignored.
-                }
+                return response;
+            }
 
-                return nextResponse;
+            response = await otherResolverTask.ConfigureAwait(false);
+            if (response is { ResponseCode: ResponseCode.NoError })
+            {
+                tokenSource.Cancel();
+                _dnsCache.TryAddCacheEntry(request, response);
+                return response;
+            }
+
+            response = await forwardResolverTask.ConfigureAwait(false);
+            if (response is { ResponseCode: ResponseCode.NoError })
+            {
+                tokenSource.Cancel();
+                _dnsCache.TryAddCacheEntry(request, response);
+                return response;
+            }
+
+            response = await rootResolverTask.ConfigureAwait(false);
+            if (response is not null)
+            {
+                tokenSource.Cancel();
+                _dnsCache.TryAddCacheEntry(request, response);
+                return response;
             }
 
             var nxdomain = Response.FromRequest(request);

@@ -15,5 +15,11 @@
     <ProjectReference Include="..\Dhcpr.Dhcp.Core\Dhcpr.Dhcp.Core.csproj" />
     <ProjectReference Include="..\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <None Update="**/*.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>

@@ -5,6 +5,8 @@ using Dhcpr.Dns.Core;
 using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
+using Microsoft.EntityFrameworkCore;
+
 Console.WriteLine("DHCPR Server - Starting...");
 Console.WriteLine("Initializing SQLite libraries");
 SQLitePCL.Batteries_V2.Init();
@@ -36,6 +38,13 @@ builder.WebHost.ConfigureKestrel(options =>
 
 
 var app = builder.Build();
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    scope.ServiceProvider.GetRequiredService<ILogger<Program>>()
+        .LogInformation("Updating internal database, if necessary");
+    var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+    await db.Database.MigrateAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

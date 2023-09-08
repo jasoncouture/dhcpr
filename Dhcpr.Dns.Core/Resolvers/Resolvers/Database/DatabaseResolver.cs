@@ -16,9 +16,9 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 
 public class DatabaseResolver : IDatabaseResolver
 {
-    private readonly DataContext _dataContext;
+    private readonly IDataContext _dataContext;
 
-    public DatabaseResolver(DataContext dataContext)
+    public DatabaseResolver(IDataContext dataContext)
     {
         _dataContext = dataContext;
     }
@@ -37,12 +37,12 @@ public class DatabaseResolver : IDatabaseResolver
             .Select(i => (ResourceRecordType)i)
             .ToHashSet();
         var dbNameRecord =
-            await _dataContext.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
+            await _dataContext.NameRecords.FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         
         if (dbNameRecord is null || dbNameRecord.CacheEntry) 
             return null;
-        var resourceRecords = _dataContext.Set<DnsResourceRecord>()
+        var resourceRecords = _dataContext.ResourceRecords
             .Include(i => i.Parent)
             .Where(i => i.Parent.Id == dbNameRecord.Id)
             .Where(i => dbRecordTypes.Count == 0 || dbRecordTypes.Contains(i.RecordType))

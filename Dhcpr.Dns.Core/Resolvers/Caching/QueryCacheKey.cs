@@ -1,6 +1,6 @@
 ﻿using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public record struct QueryCacheKey(string Domain, RecordType Type, RecordClass Class, OperationCode OperationCode)
 {

@@ -2,11 +2,12 @@
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
 
 public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
 {

@@ -3,7 +3,7 @@
 using DNS.Client.RequestResolver;
 using DNS.Protocol;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 public abstract class MultiResolver : IMultiResolver
 {

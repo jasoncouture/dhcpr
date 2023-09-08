@@ -3,7 +3,7 @@ using DNS.Protocol;
 
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core.Resolvers;
+namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public class CachedResolver : ICachedResolver
 {

@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Dns.Core.Resolvers;
 
-public record class QueryCacheData(byte[] Payload, DateTimeOffset Created)
+public record class QueryCacheData(IResponse Response, DateTimeOffset Created)
 {
-    public QueryCacheData(IResponse response) : this(response.ToArray(), DateTimeOffset.Now) { }
+    public QueryCacheData(IResponse response) : this(response, DateTimeOffset.Now) { }
 }

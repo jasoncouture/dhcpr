@@ -52,19 +52,34 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
     public async Task<IResponse?> Resolve(IRequest request,
         CancellationToken cancellationToken = new CancellationToken())
     {
+        if (request.Questions.Count is > 1 or 0)
+        {
+            _logger.LogWarning(
+                "Rejecting request with NotImplemented, this server only supports a single question per request, but this request has {count} questions",
+                request.Questions.Count
+            );
+            var response = Response.FromRequest(request);
+            response.ResponseCode = ResponseCode.NotImplemented;
+            return response;
+        }
+
+        _logger.LogInformation("Query: {query}", request.Questions[0]);
+
         var start = Stopwatch.GetTimestamp();
         try
         {
             if (_dnsCache.TryGetCachedResponse(request, out var result))
             {
-                _logger.LogInformation("DNS Questions answered by cache");
+                _logger.LogInformation("DNS Questions answered by cache: {status}",
+                    result.ResponseCode);
                 return result;
             }
 
             result = await SelectedMethod(request, cancellationToken).ConfigureAwait(false);
             if (result is not null and not { ResponseCode: ResponseCode.NameError })
             {
-                _logger.LogInformation("DNS Questions answered by internal resolver");
+                _logger.LogInformation("DNS Questions answered by internal resolver: {status}",
+                    result.ResponseCode);
                 _dnsCache.TryAddCacheEntry(request, result);
                 return result;
             }
@@ -72,7 +87,7 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             result = await _forwardResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
             if (result is not null and not { ResponseCode: ResponseCode.NameError })
             {
-                _logger.LogInformation("DNS Questions answered by forward resolver");
+                _logger.LogInformation("DNS Questions answered by forward resolver: {status}", result.ResponseCode);
                 _dnsCache.TryAddCacheEntry(request, result);
                 return result;
             }
@@ -80,12 +95,19 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
             result = await _rootResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
             if (result is not null)
             {
-                _logger.LogInformation("DNS Questions answered by recursive root resolver");
+                _logger.LogInformation("DNS Questions answered by recursive root resolver: {status}",
+                    result.ResponseCode);
                 _dnsCache.TryAddCacheEntry(request, result);
             }
 
             return result;
-
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Unhandled exception, returning SRVFAIL to client");
+            var response = Response.FromRequest(request);
+            response.ResponseCode = ResponseCode.ServerFailure;
+            return response;
         }
         finally
         {

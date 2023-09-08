@@ -90,7 +90,7 @@ public class DhcpServerHostedService : BackgroundService
             using (_logger.BeginScope("{macAddress}", requestContext.Message.ClientHardwareAddress))
             using (_logger.BeginScope("{network}", requestContext.NetworkInformation))
             {
-                _logger.LogInformation("Processing DHCP message");
+                _logger.LogInformation("Processing DHCP message, network information {network}", requestContext.NetworkInformation);
                 foreach (var processingModule in _interceptors)
                 {
                     try

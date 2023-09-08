@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 
 using Dhcpr.Core.Linq;
 
@@ -6,6 +7,7 @@ using DNS.Client.RequestResolver;
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Resolvers;
@@ -14,91 +16,82 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
 {
     private readonly IResolverCache _resolverCache;
     private readonly ILogger<RecursiveResolver> _logger;
+    private readonly IServiceProvider _serviceProvider;
     private readonly IEnumerable<IPEndPoint> _servers;
 
     public RecursiveResolver(IEnumerable<IPEndPoint> servers, IResolverCache resolverCache,
-        ILogger<RecursiveResolver> logger)
+        ILogger<RecursiveResolver> logger, IServiceProvider serviceProvider)
     {
         _servers = servers;
         _resolverCache = resolverCache;
         _logger = logger;
+        _serviceProvider = serviceProvider;
         AddResolvers(servers.Select(i => _resolverCache.GetResolver(i, CreateUdpResolver)).Cast<IRequestResolver>()
             .ToArray());
         _logger.LogDebug("Recursive resolver created for {server}", servers);
     }
 
+    private IRequestResolver GetResolver(IEnumerable<IPEndPoint> endPoints)
+    {
+        return _resolverCache.GetMultiResolver<ParallelResolver, UdpRequestResolver>(endPoints, CreateParallelResolver,
+            CreateUdpResolver);
+    }
+
+    private static readonly RecordType[] _nameServerRecordTypes = new[] { RecordType.A, RecordType.AAAA };
+    [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
     public override async Task<IResponse?> Resolve(IRequest request,
         CancellationToken cancellationToken = new CancellationToken())
     {
         using var pooledAnswers = ListPool<IResourceRecord>.Default.Get();
         using var pooledAuthorityRecords = ListPool<IResourceRecord>.Default.Get();
         using var pooledAdditionalAnswerRecords = ListPool<IResourceRecord>.Default.Get();
-
-        foreach (var question in request.Questions)
+        using var endPoints = _servers.ToPooledList();
+        while (true)
         {
-            var lookupName = question.Name.ToString()!;
-
-            using var lookupNameParts = lookupName.Split('.').Reverse().ToPooledList();
-            var innerResolver =
-                _resolverCache.GetMultiResolver<ParallelResolver, UdpRequestResolver>(_servers, CreateParallelResolver,
-                    CreateUdpResolver) as IRequestResolver;
-            for (var x = 0; x < lookupNameParts.Count; x++)
+            var currentResolver = GetResolver(endPoints);
+            var currentResponse = await currentResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
+            if (currentResponse.ResponseCode == ResponseCode.NoError && (currentResponse.AuthorityRecords.Any() || currentResponse.AdditionalRecords.Any()) && currentResponse.AnswerRecords.Count == 0)
             {
-                var currentLookup = string.Join('.', lookupNameParts.Take(x + 1).Reverse());
-                if (currentLookup == lookupName)
+                using var additionalRecords = currentResponse.AdditionalRecords.OfType<IPAddressResourceRecord>().ToPooledList();
+                if (additionalRecords.Count == 0)
                 {
-                    _logger.LogDebug("Reached the final nameserver for {name}", lookupName);
-                    var lookupResult = await innerResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
-                    pooledAnswers.AddRange(lookupResult.AnswerRecords);
-                    pooledAuthorityRecords.AddRange(lookupResult.AuthorityRecords);
-                    pooledAdditionalAnswerRecords.AddRange(lookupResult.AdditionalRecords);
-                    break;
+                    var dnsResolver = _serviceProvider.GetRequiredService<IDnsResolver>();
+                    additionalRecords.Clear();
+                    await Parallel.ForEachAsync(
+                        currentResponse.AuthorityRecords.OfType<NameServerResourceRecord>(),
+                        cancellationToken,
+                        async (authority, ctx) =>
+                        {
+                            var newRequest = new Request(request);
+                            foreach(var recordType in _nameServerRecordTypes) {
+                                newRequest.Id = Random.Shared.Next();
+                                newRequest.Questions.Clear();
+                                newRequest.Questions.Add(new Question(authority.NSDomainName, recordType));
+                                var nameServerResponse = await dnsResolver.Resolve(newRequest, cancellationToken)
+                                    .ConfigureAwait(false);
+                                if (nameServerResponse.ResponseCode != ResponseCode.NoError) continue;
+                                lock (additionalRecords)
+                                    additionalRecords.AddRange(nameServerResponse.AnswerRecords
+                                        .OfType<IPAddressResourceRecord>());
+                            }
+                        }).ConfigureAwait(false);
+                    if (additionalRecords.Count == 0)
+                    {
+                        var response = Response.FromRequest(request);
+                        response.ResponseCode = ResponseCode.NameError;
+                        return response;
+                    }
                 }
 
-                var clientRequest = new Request();
-                clientRequest.Questions.Add(new Question(new Domain(lookupName), RecordType.SRV));
-                clientRequest.RecursionDesired = true;
-                clientRequest.OperationCode = OperationCode.Query;
-                var results = await innerResolver.Resolve(clientRequest, cancellationToken).ConfigureAwait(false);
-                if (results is null or not { ResponseCode: ResponseCode.NoError or ResponseCode.NameError })
-                {
-                    _logger.LogDebug(
-                        "Recursive lookup for part {currentName} got a response with an error: {responseCode}: {results}",
-                        currentLookup, results.ResponseCode, results);
-                    break;
-                }
-
-                using var nameServerRecords =
-                    results.AdditionalRecords.OfType<IPAddressResourceRecord>().ToPooledList();
-                if (nameServerRecords.Count == 0)
-                {
-                    _logger.LogDebug(
-                        "Recursive lookup for part {currentName} got a response without error, but gave no answers, will try to continue with current nameservers",
-                        currentLookup);
-                    continue;
-                }
-
-                using var endpoints = nameServerRecords
-                    .Where(i => i.Type is RecordType.A or RecordType.AAAA)
-                    .Select(answer => new IPEndPoint(GetAddress(answer.Data), 53))
-                    .ToPooledList();
-
-                innerResolver = _resolverCache.GetMultiResolver(endpoints, CreateParallelResolver, CreateUdpResolver);
+                endPoints.Clear();
+                endPoints.AddRange(
+                    additionalRecords.Select(i => new IPEndPoint(i.IPAddress, 53)));
+            }
+            else
+            {
+                return currentResponse;
             }
         }
-
-        var response = Response.FromRequest(request);
-        foreach (var answer in pooledAnswers)
-            response.AnswerRecords.Add(answer);
-        foreach (var answer in pooledAuthorityRecords)
-            response.AuthorityRecords.Add(answer);
-        foreach (var answer in pooledAdditionalAnswerRecords)
-            response.AdditionalRecords.Add(answer);
-        response.ResponseCode =
-            pooledAnswers.Count + pooledAuthorityRecords.Count + pooledAdditionalAnswerRecords.Count == 0
-                ? ResponseCode.NameError
-                : ResponseCode.NoError;
-        return response;
     }
 
     private ParallelResolver CreateParallelResolver(IEnumerable<IRequestResolver> resolvers)

@@ -2,6 +2,7 @@
 using Dhcpr.Dns.Core.Resolvers;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
@@ -20,6 +21,7 @@ public static class DnsServiceProviderExtensions
     {
         services.AddHostedService<DnsServerHostedService>();
 
+        services.AddSingleton<IDatabaseResolver, DatabaseResolver>();
         services.AddSingleton<IDnsResolver, DnsResolver>();
         services.AddSingleton<IParallelDnsResolver, ParallelResolver>();
         services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
@@ -31,7 +33,8 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
 
         services.Configure<DnsConfiguration>(configuration).AddValidation<DnsConfiguration>();
-        services.Configure<RootServerConfiguration>(configuration.GetSection(nameof(DnsConfiguration.RootServers))).AddValidation<RootServerConfiguration>();
+        services.Configure<RootServerConfiguration>(configuration.GetSection(nameof(DnsConfiguration.RootServers)))
+            .AddValidation<RootServerConfiguration>();
         return services;
     }
 }

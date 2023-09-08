@@ -39,8 +39,10 @@ public class DatabaseResolver : IDatabaseResolver
             .Select(i => (ResourceRecordType)i)
             .ToHashSet();
         var dbNameRecord =
-            await context.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (dbNameRecord is null) 
+            await context.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        
+        if (dbNameRecord is null || dbNameRecord.CacheEntry) 
             return null;
         var resourceRecords = context.Set<DnsResourceRecord>()
             .Include(i => i.Parent)

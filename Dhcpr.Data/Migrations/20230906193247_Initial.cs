@@ -11,7 +11,26 @@ namespace Dhcpr.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "DnsNameRecord",
+                name: "CacheEntries",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
+                    Type = table.Column<int>(type: "INTEGER", nullable: false),
+                    Class = table.Column<int>(type: "INTEGER", nullable: false),
+                    Payload = table.Column<byte[]>(type: "BLOB", maxLength: 2048, nullable: false),
+                    TimeToLive = table.Column<double>(type: "REAL", nullable: false),
+                    Created = table.Column<long>(type: "INTEGER", nullable: false),
+                    Modified = table.Column<long>(type: "INTEGER", nullable: false),
+                    Expires = table.Column<long>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CacheEntries", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "NameRecords",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
@@ -22,11 +41,11 @@ namespace Dhcpr.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_DnsNameRecord", x => x.Id);
+                    table.PrimaryKey("PK_NameRecords", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
-                name: "DnsResourceRecord",
+                name: "ResourceRecords",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
@@ -57,24 +76,30 @@ namespace Dhcpr.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_DnsResourceRecord", x => x.Id);
+                    table.PrimaryKey("PK_ResourceRecords", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_DnsResourceRecord_DnsNameRecord_ParentId",
+                        name: "FK_ResourceRecords_NameRecords_ParentId",
                         column: x => x.ParentId,
-                        principalTable: "DnsNameRecord",
+                        principalTable: "NameRecords",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_DnsNameRecord_Name",
-                table: "DnsNameRecord",
+                name: "IX_CacheEntries_Name_Type_Class",
+                table: "CacheEntries",
+                columns: new[] { "Name", "Type", "Class" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NameRecords_Name",
+                table: "NameRecords",
                 column: "Name",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_DnsResourceRecord_ParentId",
-                table: "DnsResourceRecord",
+                name: "IX_ResourceRecords_ParentId",
+                table: "ResourceRecords",
                 column: "ParentId");
         }
 
@@ -82,10 +107,13 @@ namespace Dhcpr.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "DnsResourceRecord");
+                name: "CacheEntries");
 
             migrationBuilder.DropTable(
-                name: "DnsNameRecord");
+                name: "ResourceRecords");
+
+            migrationBuilder.DropTable(
+                name: "NameRecords");
         }
     }
 }

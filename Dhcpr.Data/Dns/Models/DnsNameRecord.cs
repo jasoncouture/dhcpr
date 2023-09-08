@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.CompilerServices;
 
 using Dhcpr.Data.Abstractions;
 using Dhcpr.Data.Extensions;
@@ -19,7 +20,6 @@ public class DnsNameRecord : IDataRecord<DnsNameRecord>
 
     public DateTimeOffset Created { get; set; } = DateTimeOffset.Now;
     public DateTimeOffset Modified { get; set; } = DateTimeOffset.Now;
-    public bool CacheEntry { get; set; }
 
     static void ISelfBuildingModel<DnsNameRecord>.OnModelCreating(EntityTypeBuilder<DnsNameRecord> entityBuilder)
     {

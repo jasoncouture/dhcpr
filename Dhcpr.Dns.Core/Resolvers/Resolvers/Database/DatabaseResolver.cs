@@ -40,7 +40,7 @@ public class DatabaseResolver : IDatabaseResolver
             await _dataContext.NameRecords.FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         
-        if (dbNameRecord is null || dbNameRecord.CacheEntry) 
+        if (dbNameRecord is null) 
             return null;
         var resourceRecords = _dataContext.ResourceRecords
             .Include(i => i.Parent)

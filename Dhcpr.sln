@@ -9,10 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dns.Core", "Dhcpr.Dns
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Core", "Dhcpr.Core\Dhcpr.Core.csproj", "{EFB54D10-1A2A-428B-97C0-8D78EBA78589}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dhcp.Server", "Dhcpr.Dhcp.Server\Dhcpr.Dhcp.Server.csproj", "{5489627C-9FA5-4B7C-A108-AE779FE049F8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dns.Server", "Dhcpr.Dns.Server\Dhcpr.Dns.Server.csproj", "{AB7D7260-3854-493C-97A7-9ABC9AEF1410}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Peering.Discovery", "Dhcpr.Peering.Discovery\Dhcpr.Peering.Discovery.csproj", "{49F3507D-60A0-48DE-8231-ED9A578335CA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Peering.Discovery.UnitTests", "Dhcpr.Peering.Discovery.UnitTests\Dhcpr.Peering.Discovery.UnitTests.csproj", "{AECD5643-CCE1-465A-842F-A741389E8BFE}"
@@ -40,14 +36,6 @@ Global
 		{EFB54D10-1A2A-428B-97C0-8D78EBA78589}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EFB54D10-1A2A-428B-97C0-8D78EBA78589}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EFB54D10-1A2A-428B-97C0-8D78EBA78589}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5489627C-9FA5-4B7C-A108-AE779FE049F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5489627C-9FA5-4B7C-A108-AE779FE049F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5489627C-9FA5-4B7C-A108-AE779FE049F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5489627C-9FA5-4B7C-A108-AE779FE049F8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AB7D7260-3854-493C-97A7-9ABC9AEF1410}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AB7D7260-3854-493C-97A7-9ABC9AEF1410}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AB7D7260-3854-493C-97A7-9ABC9AEF1410}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AB7D7260-3854-493C-97A7-9ABC9AEF1410}.Release|Any CPU.Build.0 = Release|Any CPU
 		{49F3507D-60A0-48DE-8231-ED9A578335CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{49F3507D-60A0-48DE-8231-ED9A578335CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49F3507D-60A0-48DE-8231-ED9A578335CA}.Release|Any CPU.ActiveCfg = Release|Any CPU

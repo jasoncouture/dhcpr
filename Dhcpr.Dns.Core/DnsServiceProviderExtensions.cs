@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-using Dhcpr.Core;
+﻿using Dhcpr.Core;
 using Dhcpr.Dns.Core.Resolvers;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;

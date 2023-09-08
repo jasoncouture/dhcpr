@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Dhcpr.Dhcp.Core.Protocol;

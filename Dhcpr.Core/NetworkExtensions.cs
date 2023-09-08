@@ -1,13 +1,35 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+
+using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Core;
 
 public static partial class NetworkExtensions
 {
-    [GeneratedRegex(@"(?isn)^(?<name>(([a-z]{1}[a-z0-9\-]*[a-z0-9])\.)*([a-z]{1}[a-z0-9\-]*[a-z0-9]))\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
+    public static bool IsInLocalSubnet(this IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address)) return false;
+        using var unicastAddresses = NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()).SelectMany(i => i.UnicastAddresses).ToPooledList().ToPooledList();
+        using var possibleNetworks = unicastAddresses.Where(i => i.Address.AddressFamily == address.AddressFamily).ToPooledList();
+        
+        foreach (var network in possibleNetworks)
+        {
+
+            if (address.AddressFamily == AddressFamily.InterNetwork &&
+                address.IsInNetwork(network.Address, network.IPv4Mask))
+                return true;
+            if (address.AddressFamily == AddressFamily.InterNetworkV6 &&
+                address.IsInNetwork(network.Address, network.PrefixLength))
+                return true;
+        }
+
+        return false;
+    }
+    [GeneratedRegex(@"(?isn)^(?<name>(([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,63}\.)*([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,63})\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
     public static partial Regex GetDnsRegularExpression();
 
     public static IPAddress GetNetwork(this IPAddress address, IPAddress netmask)
@@ -78,7 +100,8 @@ public static partial class NetworkExtensions
         {
             var currentBits = bitCount > 8 ? 8 : bitCount;
             bitCount -= currentBits;
-            var currentValue = (byte)(byte.MaxValue << 8 - currentBits);
+            var currentValue = (byte)(byte.MaxValue << (8 - currentBits));
+            netmaskBytes[x] = currentValue;
         }
 
         return new IPAddress(netmaskBytes);

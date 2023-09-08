@@ -2,15 +2,15 @@ using Dhcpr.Core;
 using Dhcpr.Data;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
-using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
 using Microsoft.EntityFrameworkCore;
 
-Console.WriteLine("DHCPR Server - Starting...");
-Console.WriteLine("Initializing SQLite libraries");
 SQLitePCL.Batteries_V2.Init();
-Console.WriteLine("Continuing startup");
+ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
+ThreadPool.GetMinThreads(out var workerMinThreads, out _);
+ThreadPool.SetMaxThreads(workerMaxThreads, 16384);
+ThreadPool.SetMinThreads(workerMinThreads, 256);
 var builder = WebApplication.CreateBuilder(args);
 
 // builder.Configuration.AddPlatformConfigurationLocations(args);
@@ -23,7 +23,11 @@ builder.Services.AddDatabaseServices();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();
-builder.Services.AddMemoryCache();
+builder.Services.AddMemoryCache(o =>
+{
+    o.TrackStatistics = true;
+    o.ExpirationScanFrequency = TimeSpan.FromMinutes(5);
+});
 builder.Services.AddCoreServices();
 builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
 builder.Services.AddDhcp(builder.Configuration.GetSection("DHCP"));

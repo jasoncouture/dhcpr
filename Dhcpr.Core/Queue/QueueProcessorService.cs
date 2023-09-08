@@ -78,13 +78,13 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
                 async () => await Task.WhenAll(
                         messageProcessors.Select(async i =>
                             await i.ProcessMessageAsync(message, token)
-                                .ConfigureAwait(false)
+                                
                         )
                     ).OperationCancelledToBoolean()
-                    .ConfigureAwait(false),
+                    ,
                 token)
             .OperationCancelledToBoolean()
-            .ConfigureAwait(false);
+            ;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,13 +98,13 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
                 {
                     while (tasks.Count >= _options.MaximumConcurrency && tasks.Count > 0)
                     {
-                        if (await RemoveCompletedTasks(tasks).ConfigureAwait(false))
+                        if (await RemoveCompletedTasks(tasks))
                             continue;
-                        await Task.WhenAny(tasks).ConfigureAwait(false);
+                        await Task.WhenAny(tasks);
                     }
 
                     var (message, cancellationToken) =
-                        await _messageQueue.DequeueAsync(stoppingToken).ConfigureAwait(false);
+                        await _messageQueue.DequeueAsync(stoppingToken);
                     // We do it this way to avoid re-allocating the cancellation token source.
                     tasks.Add(ProcessNextMessageAsync(message, cancellationToken, stoppingToken));
                 }
@@ -122,7 +122,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
             {
                 try
                 {
-                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                    await Task.WhenAll(tasks);
                 }
                 catch
                 {
@@ -144,7 +144,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         {
             any = true;
             tasks.RemoveAt(item.Index);
-            await item.Task.ConfigureAwait(false);
+            await item.Task;
         }
 
         return any;

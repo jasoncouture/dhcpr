@@ -1,9 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-using Dhcpr.Core;
+﻿using Dhcpr.Core;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddQueueProcessor<HeartBeatMessage, DatabaseExpirationScannerService>();
         services.AddDbContextPool<IDataContext, DataContext>(ConfigureDataContext);
         services.AddSingleton<IInterceptor, DataRecordAutomaticFieldsSaveChangesInterceptor>();
+        services.AddSingleton<IDatabaseExpirationTracker, DatabaseExpirationTracker>();
         return services;
     }
 

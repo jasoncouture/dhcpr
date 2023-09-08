@@ -6,7 +6,6 @@ using Dhcpr.Core.Queue;
 using Dhcpr.Dhcp.Core.Pipeline;
 using Dhcpr.Dhcp.Core.Protocol;
 
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dhcp.Core;

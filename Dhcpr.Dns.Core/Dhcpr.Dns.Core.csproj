@@ -12,12 +12,20 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
     <PackageReference Include="Riok.Mapperly" Version="3.1.0" />
+    <PackageReference Include="Scrutor" Version="4.2.2" />
   </ItemGroup>
 
 
   <ItemGroup>
     <ProjectReference Include="../Dhcpr.Core/Dhcpr.Core.csproj" />
     <ProjectReference Include="..\Dhcpr.Data\Dhcpr.Data.csproj" />
+  </ItemGroup>
+
+
+
+
+  <ItemGroup>
+    <Folder Include="Container\" />
   </ItemGroup>
 
 </Project>

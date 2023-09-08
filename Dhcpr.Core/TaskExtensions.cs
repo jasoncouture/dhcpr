@@ -10,8 +10,8 @@ public static class TaskExtensions
         {
             task = task.WaitAsync(cancellationToken ?? CancellationToken.None);
             if (cancellationToken is not null)
-                task = task.ContinueWith(async t => await t.IgnoreExceptionsAsync().ConfigureAwait(false));
-            await task.WaitAsync(cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+                task = task.ContinueWith(async t => await t.IgnoreExceptionsAsync());
+            await task.WaitAsync(cancellationToken ?? CancellationToken.None);
         }
         catch (Exception)
         {
@@ -23,7 +23,7 @@ public static class TaskExtensions
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
             return true;
         }
         catch (OperationCanceledException)
@@ -36,7 +36,7 @@ public static class TaskExtensions
     {
         try
         {
-            return await task.ConfigureAwait(false);
+            return await task;
         }
         catch
         {
@@ -48,7 +48,7 @@ public static class TaskExtensions
     {
         try
         {
-            return await task.ConfigureAwait(false);
+            return await task;
         }
         catch (OperationCanceledException)
         {

@@ -11,36 +11,38 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
 
 public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
 {
+    private const int ConcurrencyLimit = 4;
+
     public ParallelResolver(IEnumerable<IRequestResolver> resolvers)
     {
         AddResolvers(resolvers.ToArray());
     }
 
-    private PooledList<Task<IResponse?>> GetResolverTasks(IRequest request, CancellationToken cancellationToken)
+    private async Task<IResponse?> ExecuteResolversWithConcurrencyLimitAsync(IRequest request,
+        CancellationToken cancellationToken)
     {
         using var resolvers = Resolvers;
-        return resolvers
-            .Select(
-                [SuppressMessage("ReSharper", "AccessToDisposedClosure",
-                    Justification = "Enumerable is enumerated immediately.")]
-        async (i) =>
-                {
-                    try
-                    {
-                        return await i.Resolve(request, cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return null;
-                    }
-                })
-            .Select(async i =>
-                // Make 100% sure the cancellation token is respected
-                await i.WaitAsync(cancellationToken)
-                    .ConvertExceptionsToNull()
-                    .ConfigureAwait(false))
-            .ToPooledList();
+        using var tasks = ListPool<Task<IResponse?>>.Default.Get();
+        using var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        while (true)
+        {
+            if (Resolvers.Count == 0 || tasks.Count >= ConcurrencyLimit || tasks.Any(i => i.IsCompleted))
+            {
+                if (tasks.Count == 0) return null;
+                var completed = await Task.WhenAny(tasks);
+                tasks.Remove(completed);
+                var result = await completed;
+                if (result is null) continue;
+                tokenSource.Cancel();
+                await Task.WhenAll(tasks);
+                return result;
+            }
+
+            var nextResolver = Resolvers[^1];
+            Resolvers.RemoveAt(Resolvers.Count - 1);
+            tasks.Add(nextResolver.Resolve(request, tokenSource.Token).OperationCancelledToNull()
+                .ConvertExceptionsToNull());
+        }
     }
 
     public override async Task<IResponse?> Resolve(IRequest request,
@@ -48,19 +50,10 @@ public sealed class ParallelResolver : MultiResolver, IParallelDnsResolver
     {
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        using var tasks = GetResolverTasks(request, cancellationTokenSource.Token);
+        var result = await ExecuteResolversWithConcurrencyLimitAsync(request, cancellationTokenSource.Token);
 
-        while (tasks.Count > 0)
-        {
-            var completed = await Task.WhenAny(tasks).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            tasks.Remove(completed);
-            var response = await completed.ConfigureAwait(false);
-            if (response is null or not { ResponseCode: ResponseCode.NameError or ResponseCode.NoError })
-                continue;
-            cancellationTokenSource.Cancel();
-            return response;
-        }
+        if (result is not null)
+            return result;
 
         var nxDomainResponse = Response.FromRequest(request);
         nxDomainResponse.ResponseCode = ResponseCode.NameError;

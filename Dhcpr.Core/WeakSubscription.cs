@@ -42,7 +42,7 @@ sealed class WeakSubscription : IDisposable
     public async ValueTask<bool> SendAsync(object sender, object data, CancellationToken cancellationToken)
     {
         if (!TryGetSubscriber(out var subscriber)) return false;
-        await subscriber.OnMessageAsync(sender, data, cancellationToken).ConfigureAwait(false);
+        await subscriber.OnMessageAsync(sender, data, cancellationToken);
         return true;
     }
 }

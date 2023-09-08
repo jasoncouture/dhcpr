@@ -15,21 +15,20 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 public sealed class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
 {
     private readonly IDisposable? _subscription;
-    private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly IResolverCache _resolverCache;
     private readonly ILogger<ForwardResolver> _logger;
     private DnsConfiguration _currentConfiguration;
 
-    public ForwardResolver(IOptionsMonitor<DnsConfiguration> options, IResolverCache resolverCache, ILogger<ForwardResolver> logger)
+    public ForwardResolver(IOptionsMonitor<DnsConfiguration> options, IResolverCache resolverCache,
+        ILogger<ForwardResolver> logger)
     {
-        _options = options;
         _resolverCache = resolverCache;
         _logger = logger;
         _currentConfiguration = options.CurrentValue;
         _subscription = options.OnChange(OptionsChanged);
     }
 
-    private void OptionsChanged(DnsConfiguration configuration, string? name)
+    private void OptionsChanged(DnsConfiguration configuration)
     {
         _currentConfiguration = configuration;
         _logger.LogDebug("Configuration changed applied");
@@ -37,28 +36,40 @@ public sealed class ForwardResolver : MultiResolver, IForwardResolver, IDisposab
 
     private IRequestResolver GetForwardResolvers()
     {
+        if (_currentConfiguration.Forwarders.Parallel)
+            return _resolverCache.GetResolver(
+                _currentConfiguration.Forwarders.GetForwarderEndpoints(),
+                CreateParallelMultiResolver,
+                CreateInnerResolver
+            );
+        
         return _resolverCache.GetResolver(
-            _currentConfiguration.GetForwarderEndpoints(),
-            CreateMultiResolver,
+            _currentConfiguration.Forwarders.GetForwarderEndpoints(),
+            CreateSequentialMultiResolver,
             CreateInnerResolver
         );
     }
 
     private UdpRequestResolver CreateInnerResolver(IPEndPoint resolvers)
     {
-        return new UdpRequestResolver(resolvers, new TcpRequestResolver(resolvers));
+        return new UdpRequestResolver(resolvers, new TcpRequestResolver(resolvers), timeout: 500);
     }
 
-    private ParallelResolver CreateMultiResolver(IEnumerable<IRequestResolver> resolvers)
+    private ParallelResolver CreateParallelMultiResolver(IEnumerable<IRequestResolver> resolvers)
     {
         return new ParallelResolver(resolvers);
+    }
+    
+    private SequentialDnsResolver CreateSequentialMultiResolver(IEnumerable<IRequestResolver> resolvers)
+    {
+        return new SequentialDnsResolver(resolvers);
     }
 
     public override async Task<IResponse?> Resolve(IRequest request,
         CancellationToken cancellationToken = new())
     {
         var forwardResolver = GetForwardResolvers();
-        return await forwardResolver.Resolve(request, cancellationToken).ConfigureAwait(false);
+        return await forwardResolver.Resolve(request, cancellationToken);
     }
 
     public void Dispose()

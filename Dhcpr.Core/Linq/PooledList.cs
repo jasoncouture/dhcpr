@@ -28,13 +28,10 @@ public sealed class PooledList<T> : List<T>, IDisposable
                 0,
                 1) != 0
         ) return;
-        if (!disposing)
+        if (disposing)
         {
-            // We're still in the pool, re-register for finalize and return to the pool.
-            GC.ReRegisterForFinalize(this);
+            ListPool<T>.Default.Return(this);
         }
-
-        ListPool<T>.Default.Return(this);
     }
 
     ~PooledList()

@@ -19,13 +19,13 @@ public static class RootHints
     public static async ValueTask<IEnumerable<IPAddress>> GetRootServers(CancellationToken cancellationToken)
     {
         if (TimeSinceLastRefresh.TotalHours < 4)
-            await RefreshAsync(cancellationToken).ConfigureAwait(false);
+            await RefreshAsync(cancellationToken);
 
         lock (_rootServerAddresses)
             if (_rootServerAddresses.Count > 0)
                 return _rootServerAddresses.ToPooledList();
 
-        await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        await RefreshAsync(cancellationToken);
 
         // Don't save the cache file.
         lock (_rootServerAddresses)
@@ -55,12 +55,12 @@ public static class RootHints
         {
             try
             {
-                await File.WriteAllTextAsync(tempFile, output.ToString(), cancellationToken).ConfigureAwait(false);
+                await File.WriteAllTextAsync(tempFile, output.ToString(), cancellationToken);
                 File.Move(tempFile, RootServerCacheFile, true);
             }
             catch
             {
-                await Task.Delay(5000, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(5000, cancellationToken);
             }
         }
     }
@@ -69,7 +69,7 @@ public static class RootHints
 
     public static async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        await _refreshSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _refreshSemaphore.WaitAsync(cancellationToken);
         try
         {
             var addresses = ListPool<IPAddress>.Default.Get();
@@ -78,7 +78,7 @@ public static class RootHints
                 if ((DateTime.Now - File.GetCreationTime(RootServerCacheFile)).TotalDays < 1)
                 {
                     ;
-                    addresses.AddRange(await LoadRootServersFromFile(cancellationToken).ConfigureAwait(false));
+                    addresses.AddRange(await LoadRootServersFromFile(cancellationToken));
                     Debug.WriteLine($"Loaded {addresses.Count} entries from dns cache file");
                 }
             }
@@ -87,16 +87,16 @@ public static class RootHints
 
             // Try getting it from internic, if this is successful, we can avoid making a bunch of DNS requests.
             if (addresses.Count == 0)
-                addresses.AddRange(await LoadRootServersFromInternicAsync(cancellationToken).ConfigureAwait(false));
+                addresses.AddRange(await LoadRootServersFromInternicAsync(cancellationToken));
 
             // Try to use DNS to discover the root servers.
             if (addresses.Count == 0)
-                addresses.AddRange(await LoadRootServersFromDns(cancellationToken).ConfigureAwait(false));
+                addresses.AddRange(await LoadRootServersFromDns(cancellationToken));
 
 
             // Try the local file if DNS lookup failed, we may have skipped trying to load it if it was too old
             if (addresses.Count == 0)
-                addresses.AddRange(await LoadRootServersFromFile(cancellationToken).ConfigureAwait(false));
+                addresses.AddRange(await LoadRootServersFromFile(cancellationToken));
             lock (_rootServerAddresses)
             {
                 _rootServerAddresses.Clear();
@@ -107,7 +107,7 @@ public static class RootHints
                 }
             }
 
-            await SaveRootServersAsync(addresses, cancellationToken).ConfigureAwait(false);
+            await SaveRootServersAsync(addresses, cancellationToken);
         }
         finally
         {
@@ -123,7 +123,7 @@ public static class RootHints
                 return ListPool<IPAddress>.Default.Get();
 
             var addressStrings =
-                await File.ReadAllLinesAsync(RootServerCacheFile, cancellationToken).ConfigureAwait(false);
+                await File.ReadAllLinesAsync(RootServerCacheFile, cancellationToken);
             var addresses = addressStrings.Where(i => !i.Trim().StartsWith(';'))
                 .Select(i => IPAddress.TryParse(i, out var address) ? address : null)
                 .Where(i => i is not null)
@@ -160,7 +160,7 @@ public static class RootHints
             Debug.WriteLine($"Trying to load root servers from internic, URL: {url}");
             try
             {
-                var bindConfig = await _httpClient.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
+                var bindConfig = await _httpClient.GetStringAsync(url, cancellationToken);
                 var lines = bindConfig.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var line in lines.Select(i => i.Trim()))
                 {
@@ -190,7 +190,7 @@ public static class RootHints
     {
         var results = await Task
             .WhenAll("abcdefghijklm".Select(async i =>
-                await GetRootServerAddresses(i, cancellationToken).ConfigureAwait(false))).ConfigureAwait(false);
+                await GetRootServerAddresses(i, cancellationToken)));
 
         return results.SelectMany(i => i).ToPooledList();
     }
@@ -202,7 +202,7 @@ public static class RootHints
         {
             Debug.WriteLine($"Getting root server {rootServerId}.root-servers.net addresses from DNS");
             return await System.Net.Dns.GetHostAddressesAsync($"{rootServerId}.root-servers.net", cancellationToken)
-                .ConfigureAwait(false);
+                ;
         }
         catch
         {

@@ -1,6 +1,4 @@
-﻿using System.Data;
-
-using Dhcpr.Core;
+﻿using Dhcpr.Core;
 using Dhcpr.Core.Queue;
 
 using Microsoft.EntityFrameworkCore;
@@ -25,30 +23,29 @@ internal class DatabaseExpirationScannerService : IQueueMessageProcessor<HeartBe
     public async Task ProcessMessageAsync(HeartBeatMessage message, CancellationToken cancellationToken)
     {
         if (!_tracker.ShouldScanForExpirations(message.Sent)) return;
-        int deleted = 0;
-        for (var x = 0; x < 5000; x++)
+        while (true)
         {
             await using var transaction = await _context
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
-                .ConfigureAwait(false);
-            var next = await _context.CacheEntries
-                .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Expires <= message.Sent, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-            if (next is null)
+                .BeginTransactionAsync(cancellationToken)
+                ;
+
+            var deleted = await _context.CacheEntries
+                .Where(i => i.Expires <= message.Sent)
+                .OrderBy(i => i.Id)
+                .Take(100)
+                .ExecuteDeleteAsync(cancellationToken)
+                ;
+
+            await transaction.CommitAsync(cancellationToken);
+            
+            if (deleted == 0)
             {
-                deleted = x;
                 break;
             }
 
-            await _context.CacheEntries.Where(i => i.Id == next.Id)
-                .ExecuteDeleteAsync(cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.CommitAsync(cancellationToken);
+            // ReSharper disable once StringLiteralTypo
+            _logger.LogDebug("Deleted {count} dns cache entr{suffix}", deleted, deleted == 1 ? "y" : "ies");
         }
-
-        // ReSharper disable once StringLiteralTypo
-        _logger.LogDebug("Deleted {count} dns cache entr{suffix}", deleted, deleted == 1 ? "y" : "ies");
+        _tracker.ScanForExpirationComplete(message.Sent);
     }
 }

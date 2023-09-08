@@ -8,7 +8,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 using DNS.Client.RequestResolver;
 using DNS.Server;
 
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -114,8 +113,8 @@ public sealed class DnsServerHostedService : IHostedService
         await Task.WhenAll(
                 _runningServers
                     .Where(i => i.IsCompletedSuccessfully == false)
-                    .Select(async x => await x.IgnoreExceptionsAsync().ConfigureAwait(false))
+                    .Select(async x => await x.IgnoreExceptionsAsync())
             )
-            .ConfigureAwait(false);
+            ;
     }
 }

@@ -4,23 +4,21 @@ using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
 using DNS.Client.RequestResolver;
+using DNS.Protocol;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
 public sealed class ResolverCache : IResolverCache
 {
     private readonly IMemoryCache _memoryCache;
-    private readonly ILogger<ResolverCache> _logger;
     private readonly IServiceProvider _serviceProvider;
 
-    public ResolverCache(IMemoryCache memoryCache, ILogger<ResolverCache> logger, IServiceProvider serviceProvider)
+    public ResolverCache(IMemoryCache memoryCache, IServiceProvider serviceProvider)
     {
         _memoryCache = memoryCache;
-        _logger = logger;
         _serviceProvider = serviceProvider;
     }
 
@@ -28,6 +26,11 @@ public sealed class ResolverCache : IResolverCache
     {
         var key = ResolverCacheKey.Create<T>(endPoint);
         return GetFromCache<ResolverCacheKey, T>(key) ?? AddToCache(key, createResolverCallback.Invoke(endPoint));
+    }
+
+    public IRequestResolver WrapWithCache(IRequestResolver requestResolver)
+    {
+        return ActivatorUtilities.CreateInstance<CachingRequestResolver>(_serviceProvider, requestResolver);
     }
 
     private T? GetFromCache<TKey, T>(TKey key) where TKey : notnull
@@ -64,5 +67,27 @@ public sealed class ResolverCache : IResolverCache
         return GetFromCache<MultiResolverCacheKey, TOuter>(cacheKey) ?? AddToCache(cacheKey,
             createMultiResolver.Invoke(orderedEndPoints.Select(i => GetResolver<TInner>(i, createInnerResolver))
                 .Cast<IRequestResolver>()));
+    }
+}
+
+public sealed class CachingRequestResolver : IRequestResolver
+{
+    private readonly IRequestResolver _requestResolverImplementation;
+    private readonly IDnsCache _dnsCache;
+
+    public CachingRequestResolver(IRequestResolver requestResolverImplementation, IDnsCache dnsCache)
+    {
+        _requestResolverImplementation = requestResolverImplementation;
+        _dnsCache = dnsCache;
+    }
+
+    public async Task<IResponse?> Resolve(IRequest request, CancellationToken cancellationToken = new CancellationToken())
+    {
+        var response = _dnsCache.TryGetCachedResponse(request);
+        if (response is not null)
+            return response;
+        response = await _requestResolverImplementation.Resolve(request, cancellationToken);
+        _dnsCache.TryAddCacheEntry(request, response);
+        return response;
     }
 }

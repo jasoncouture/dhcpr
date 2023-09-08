@@ -23,7 +23,6 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsResolver, DnsResolver>();
         services.AddSingleton<IParallelDnsResolver, ParallelResolver>();
         services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
-        services.AddSingleton<IRequestResolver, InternalResolver>();
         services.AddSingleton<IRootResolver, RootResolver>();
         services.AddSingleton<IResolverCache, ResolverCache>();
         services.AddSingleton<IDnsCache, DnsCache>();

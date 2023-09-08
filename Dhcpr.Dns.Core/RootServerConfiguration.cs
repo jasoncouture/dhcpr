@@ -4,7 +4,7 @@ using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core;
 
-public class RootServerConfiguration : IValidateSelf
+public sealed class RootServerConfiguration : IValidateSelf
 {
     public string CacheFilePath { get; set; } = "root-servers.txt";
     public bool Download { get; set; } = true;

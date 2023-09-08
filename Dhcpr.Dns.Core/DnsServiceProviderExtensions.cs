@@ -21,6 +21,9 @@ public static class DnsServiceProviderExtensions
     {
         services.AddHostedService<DnsServerHostedService>();
 
+        services.AddQueueProcessor<DnsCacheMessage, DnsCacheMessageProcessor>();
+        services.AddSingleton<IDnsDatabaseCache, DnsDatabaseCache>();
+
         services.AddSingleton(typeof(IScopedResolverWrapper<>), typeof(ScopedResolverWrapper<>));
         services.AddScoped<IDatabaseResolver, DatabaseResolver>();
         services.AddScoped<IDnsResolver, DnsResolver>();

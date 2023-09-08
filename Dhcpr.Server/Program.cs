@@ -18,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 // builder.Configuration.AddEnvironmentVariables();
 // builder.Configuration.AddCommandLine(args);
 
-builder.Services.AddDbContextPool<DataContext>(b =>
+builder.Services.AddDbContextPool<IDataContext, DataContext>(b =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Default");
     b.UseSqlite(connectionString);

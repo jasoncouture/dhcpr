@@ -49,8 +49,10 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
     private static readonly RecordType[] NameServerRecordTypes = new[] { RecordType.A, RecordType.AAAA };
 
     [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
-    public override async Task<IResponse?> Resolve(IRequest request,
-        CancellationToken cancellationToken = new CancellationToken())
+    public override async Task<IResponse?> Resolve(
+        IRequest request,
+        CancellationToken cancellationToken = default
+    )
     {
         if (_servers.Length == 0) return null;
         using var pooledAnswers = ListPool<IResourceRecord>.Default.Get();

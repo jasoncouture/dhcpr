@@ -36,6 +36,10 @@ public sealed class InternalResolver : IRequestResolver
             }
         }
 
+        if (response.AnswerRecords.Count == 0)
+        {
+            response.ResponseCode = ResponseCode.NameError;
+        }
         return Task.FromResult((IResponse)response);
     }
 

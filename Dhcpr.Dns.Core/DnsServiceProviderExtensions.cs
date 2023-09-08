@@ -24,12 +24,12 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton(typeof(IScopedResolverWrapper<>), typeof(ScopedResolverWrapper<>));
         services.AddScoped<IDatabaseResolver, DatabaseResolver>();
         services.AddScoped<IDnsResolver, DnsResolver>();
-        services.AddSingleton<IParallelDnsResolver, ParallelResolver>();
-        services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
-        services.AddSingleton<IRootResolver, RootResolver>();
-        services.AddSingleton<IResolverCache, ResolverCache>();
-        services.AddSingleton<IDnsCache, DnsCache>();
-        services.AddSingleton<IForwardResolver, ForwardResolver>();
+        services.AddScoped<IParallelDnsResolver, ParallelResolver>();
+        services.AddScoped<ISequentialDnsResolver, SequentialDnsResolver>();
+        services.AddScoped<IRootResolver, RootResolver>();
+        services.AddScoped<IResolverCache, ResolverCache>();
+        services.AddScoped<IDnsCache, DnsCache>();
+        services.AddScoped<IForwardResolver, ForwardResolver>();
 
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
 

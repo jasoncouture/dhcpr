@@ -80,6 +80,7 @@ public class DnsCache : IDnsCache
 
     public void TryAddCacheEntry(IRequest request, IResponse response)
     {
+        if (response is NoCacheResponse) return;
         if (request.Questions.Count != 1) return;
         if (request.Questions[0].Type is RecordType.A or RecordType.AAAA &&
             response.ResponseCode == ResponseCode.NoError && response.AnswerRecords.Count == 0)

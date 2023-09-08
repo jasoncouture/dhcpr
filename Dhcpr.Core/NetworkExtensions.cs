@@ -184,4 +184,10 @@ public static partial class NetworkExtensions
 
         return false;
     }
+
+    public static int ToNetworkByteOrder(this int i) => IPAddress.HostToNetworkOrder(i);
+    public static int ToHostByteOrder(this int i) => IPAddress.NetworkToHostOrder(i);
+
+    public static ushort ToNetworkByteOrder(this ushort i) => (ushort)IPAddress.HostToNetworkOrder((short)i);
+    public static ushort ToHostByteOrder(this ushort i) => (ushort)IPAddress.NetworkToHostOrder((short)i);
 }

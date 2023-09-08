@@ -96,7 +96,11 @@ public static partial class NetworkExtensions
         return maskedAddress.Equals(maskedNetwork);
     }
 
-    public static bool TryGetDnsEndPoint(this string str, int defaultPort, [NotNullWhen(true)] out DnsEndPoint? endPoint)
+    public static bool TryGetDnsEndPoint(
+        this string str,
+        int defaultPort,
+        [NotNullWhen(true)] out DnsEndPoint? endPoint
+    )
     {
         endPoint = null;
         var match = GetDnsRegularExpression().Match(str);
@@ -116,6 +120,7 @@ public static partial class NetworkExtensions
 
         return endPoint;
     }
+
     public static bool TryGetEndPoint(this string str, int defaultPort, [NotNullWhen(true)] out EndPoint? endPoint)
     {
         if (str.TryGetIPEndPoint(defaultPort, out var ipEndPoint))
@@ -133,7 +138,7 @@ public static partial class NetworkExtensions
         endPoint = null;
         return false;
     }
-    
+
     public static IPEndPoint GetIPEndPoint(this string address, int defaultPort)
     {
         if (!address.TryGetIPEndPoint(defaultPort, out var endPoint))

@@ -1,4 +1,5 @@
 using Dhcpr.Core;
+using Dhcpr.Data;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
 using Dhcpr.Server;
@@ -10,16 +11,15 @@ SQLitePCL.Batteries_V2.Init();
 Console.WriteLine("Continuing startup");
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddPlatformConfigurationLocations(args);
-// These must be re-added, otherwise config files overwrite them. But env and cli should take precedence over files.
-builder.Configuration.AddEnvironmentVariables();
-builder.Configuration.AddCommandLine(args);
+// builder.Configuration.AddPlatformConfigurationLocations(args);
+// // These must be re-added, otherwise config files overwrite them. But env and cli should take precedence over files.
+// builder.Configuration.AddEnvironmentVariables();
+// builder.Configuration.AddCommandLine(args);
 
-builder.WebHost.ConfigureKestrel(options =>
+builder.Services.AddDbContextPool<DataContext>(b =>
 {
-    options.Configure(builder.Configuration.GetSection("Kestrel"), true);
+    b.UseSqlite(builder.Configuration.GetConnectionString("Default"));
 });
-
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
@@ -28,6 +28,12 @@ builder.Services.AddMemoryCache();
 builder.Services.AddCoreServices();
 builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
 builder.Services.AddDhcp(builder.Configuration.GetSection("DHCP"));
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Configure(builder.Configuration.GetSection("Kestrel"), true);
+});
+
 
 var app = builder.Build();
 

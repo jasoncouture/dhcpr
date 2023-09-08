@@ -93,12 +93,6 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
                         Questions = { new Question(new Domain(cname.CanonicalDomainName.ToString())) }
                     };
                     var innerResponse = await InnerResolver(innerRequest, cancellationToken).ConfigureAwait(false);
-                    if (innerResponse is null)
-                    {
-                        response = Response.FromRequest(request);
-                        response.ResponseCode = ResponseCode.ServerFailure;
-                        return response;
-                    }
 
                     foreach (var answer in innerResponse.AnswerRecords.OfType<IPAddressResourceRecord>()
                                  .Where(i => i.Type == recordType))

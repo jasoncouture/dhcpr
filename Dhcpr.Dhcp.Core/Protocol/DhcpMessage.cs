@@ -11,8 +11,6 @@ namespace Dhcpr.Dhcp.Core.Protocol;
 
 public record DhcpMessage(
     BootOperationCode OperationCode,
-    HardwareAddressType HardwareAddressType,
-    byte HardwareAddressLength,
     byte Hops,
     int TransactionId,
     ushort Seconds,
@@ -21,12 +19,22 @@ public record DhcpMessage(
     IPAddress YourAddress,
     IPAddress ServerAddress,
     IPAddress RelayAddress,
-    HardwareAddress ClientHardwareAddress,
+    HardwareAddress HardwareAddress,
     string ServerName,
     string BootFileName,
     DhcpOptionCollection Options
 )
 {
+    static DhcpMessage()
+    {
+        Template = new DhcpMessage(BootOperationCode.Response, 0, 0, 0, DhcpFlags.None,
+            IPAddress.Any, IPAddress.Any, IPAddress.Any, IPAddress.Any,
+            new HardwareAddress(ImmutableArray<byte>.Empty, HardwareAddressType.Reserved, 0), string.Empty,
+            string.Empty,
+            DhcpOptionCollection.Empty);
+    }
+
+    public static DhcpMessage Template { get; }
     private const int ClientHardwareAddressMaxLength = 16;
     private const int ServerNameMaxLength = 64;
     private const int BootFileNameMaxLength = 128;
@@ -48,7 +56,7 @@ public record DhcpMessage(
     private int? _optionsSize;
     private const int MagicCookie = 0x63825363;
     public int OptionsSize => _optionsSize ??= Options.Select(i => i.Length).DefaultIfEmpty(0).Sum();
-    public int Size => BaseSize + OptionsSize;
+    public int Size => BaseSize + Options.Length;
 
 
     public static bool TryParse(ReadOnlySpan<byte> span, [NotNullWhen(true)] out DhcpMessage? message)
@@ -80,8 +88,8 @@ public record DhcpMessage(
             addresses[i] = nextAddress;
         }
 
-        var clientHardwareAddress = span[..ClientHardwareAddressMaxLength];
-        span = span[ClientHardwareAddressMaxLength..];
+        var hardwareAddressSpan = span;
+        span = span[HardwareAddress.HardwareAddressMaxLength..];
 
         var serverNameBytes = span[..ServerNameMaxLength];
         span = span[ServerNameMaxLength..];
@@ -89,25 +97,28 @@ public record DhcpMessage(
         var bootFileNameBytes = span[..BootFileNameMaxLength];
         span = span[BootFileNameMaxLength..];
 
-        var magicCookie = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(span[..sizeof(int)]));
+        var magicCookie = BitConverter.ToInt32(span[..sizeof(int)]).ToHostByteOrder();
         if (magicCookie != MagicCookie) return false; // Maybe it's BOOTP?
         span = span[sizeof(int)..];
 
         using var pooledList = EnumerateOptions(span).ToPooledList();
         if (pooledList.Any(i => i.Item1 == false)) return false;
-
+        // We avoid allocating heap memory when we fail to parse by waiting until all validation passes to create
+        // any objects we can defer until now.
         var serverName = ParseFixedLengthString(serverNameBytes);
         var bootFileName = ParseFixedLengthString(bootFileNameBytes);
+        var clientHardwareAddress =
+            HardwareAddress.ReadAndAdvance(ref hardwareAddressSpan, hardwareAddressType, hardwareAddressLength);
 
         message = new DhcpMessage(
-            opCode, hardwareAddressType, hardwareAddressLength, hops,
+            opCode, hops,
             transactionId,
             seconds, flags,
             addresses[0],
             addresses[1],
             addresses[2],
             addresses[3],
-            new HardwareAddress(clientHardwareAddress.ToImmutableArray(), hardwareAddressLength),
+            clientHardwareAddress,
             serverName,
             bootFileName,
             new DhcpOptionCollection(pooledList.Select(i => i.Item2!).ToImmutableArray()));
@@ -144,7 +155,9 @@ public record DhcpMessage(
 
     public void EncodeTo(byte[] buffer)
     {
-        EncodeTo(buffer[..Size].AsSpan());
+        Span<byte> internalBuffer = stackalloc byte[Size];
+        EncodeTo(internalBuffer);
+        internalBuffer.CopyTo(buffer);
     }
 
     public void EncodeTo(Span<byte> buffer)
@@ -169,8 +182,8 @@ public record DhcpMessage(
 
         if (buffer.Length < Size) throw new ArgumentException("Insufficient buffer size", nameof(buffer));
         WriteAndAdvance(ref buffer, (byte)OperationCode);
-        WriteAndAdvance(ref buffer, (byte)HardwareAddressType);
-        WriteAndAdvance(ref buffer, HardwareAddressLength);
+        WriteAndAdvance(ref buffer, (byte)HardwareAddress.Type);
+        WriteAndAdvance(ref buffer, (byte)HardwareAddress.Length);
         WriteAndAdvance(ref buffer, Hops);
 
         WriteAndAdvance(ref buffer, TransactionId);
@@ -184,17 +197,14 @@ public record DhcpMessage(
         WriteAndAdvance(ref buffer, ServerAddress);
         WriteAndAdvance(ref buffer, RelayAddress);
 
-        ClientHardwareAddress.WriteAndAdvance(ref buffer);
+        HardwareAddress.WriteAndAdvance(ref buffer);
 
         WriteAndAdvance(ref buffer, ServerName, ServerNameMaxLength);
 
         WriteAndAdvance(ref buffer, BootFileName, BootFileNameMaxLength);
 
         WriteAndAdvance(ref buffer, MagicCookie);
-        foreach (var option in Options)
-        {
-            option.WriteAndAdvance(ref buffer);
-        }
+        Options.WriteAndAdvance(ref buffer, includeEndMarker: true);
     }
 
     private void WriteAndAdvance(ref Span<byte> buffer, IPAddress address)
@@ -202,6 +212,7 @@ public record DhcpMessage(
         address.TryWriteBytes(buffer, out _);
         buffer = buffer[IPAddressSize..];
     }
+
     private void WriteAndAdvance(ref Span<byte> buffer, string str, int fixedLength)
     {
         Span<byte> stringBuffer = stackalloc byte[fixedLength];
@@ -209,6 +220,7 @@ public record DhcpMessage(
         stringBuffer.CopyTo(buffer);
         buffer = buffer[fixedLength..];
     }
+
     private void WriteAndAdvance(ref Span<byte> buffer, ushort u)
     {
         BitConverter.TryWriteBytes(buffer, u.ToNetworkByteOrder());

@@ -3,13 +3,13 @@ using System.Collections.Immutable;
 
 namespace Dhcpr.Dhcp.Core.Protocol;
 
-public sealed record HardwareAddress(ImmutableArray<byte> Bytes, int Length)
+public sealed record HardwareAddress(ImmutableArray<byte> Bytes, HardwareAddressType Type, int Length)
 {
     internal const int HardwareAddressMaxLength = 16;
 
-    public static HardwareAddress ReadAndAdvance(ref ReadOnlySpan<byte> bytes, int length)
+    public static HardwareAddress ReadAndAdvance(ref ReadOnlySpan<byte> bytes, HardwareAddressType type, int length)
     {
-        var ret = new HardwareAddress(bytes[..HardwareAddressMaxLength].ToImmutableArray(), length);
+        var ret = new HardwareAddress(bytes[..HardwareAddressMaxLength].ToImmutableArray(), type, length);
         bytes = bytes[HardwareAddressMaxLength..];
         return ret;
     }

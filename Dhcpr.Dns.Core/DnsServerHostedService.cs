@@ -2,8 +2,10 @@
 using System.Runtime.CompilerServices;
 
 using Dhcpr.Core;
+using Dhcpr.Dns.Core.Resolvers;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 
+using DNS.Client.RequestResolver;
 using DNS.Server;
 
 using Microsoft.Extensions.Hosting;
@@ -20,8 +22,8 @@ public class DnsServerHostedService : IHostedService
 
     private static readonly ConditionalWeakTable<object, Tuple<ILogger<DnsServer>, IPEndPoint>> ServerData = new();
 
-    public DnsServerHostedService(IDnsResolver resolver, IOptions<DnsConfiguration> dnsConfiguration,
-        ILogger<DnsServer> logger)
+    public DnsServerHostedService(IOptions<DnsConfiguration> dnsConfiguration,
+        ILogger<DnsServer> logger, IScopedResolverWrapper<IDnsResolver> dnsResolverScopedWrapper)
     {
         _logger = logger;
         _servers = new DnsServer[dnsConfiguration.Value.ListenAddresses.Length];
@@ -32,12 +34,12 @@ public class DnsServerHostedService : IHostedService
         for (var x = 0; x < dnsConfiguration.Value.ListenAddresses.Length; x++)
         {
             var endPoint = dnsConfiguration.Value.ListenAddresses[x].GetIPEndPoint(53);
-            var server = CreateServer(endPoint, resolver);
+            var server = CreateServer(endPoint, dnsResolverScopedWrapper);
             _servers[x] = server;
         }
     }
 
-    private DnsServer CreateServer(IPEndPoint endPoint, IDnsResolver resolver)
+    private DnsServer CreateServer(IPEndPoint endPoint, IRequestResolver resolver)
     {
         var server = new DnsServer(resolver);
         server.Listening += OnListening;

@@ -2,7 +2,6 @@
 using System.Net;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Queue;
 using Dhcpr.Dhcp.Core.Client;
 using Dhcpr.Dhcp.Core.Pipeline;
 

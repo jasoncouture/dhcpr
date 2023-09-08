@@ -41,7 +41,7 @@ public sealed class DhcpServerHostedService : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             var receiveResult = await dhcpServerSocket.Client.ReceiveMessageFromAsync(buffer, Constants.ServerEndpoint)
-                .ConfigureAwait(false);
+                ;
             var bufferSlice = buffer[..receiveResult.ReceivedBytes];
             if (!DhcpMessage.TryParse(bufferSlice, out var dhcpMessage))
             {

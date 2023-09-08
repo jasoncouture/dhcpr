@@ -20,14 +20,14 @@ public sealed class HeartBeatPublisherService : BackgroundService
         DateTimeOffset lastMessageSent = DateTimeOffset.Now;
         try
         {
-            while (await periodicTimer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+            while (await periodicTimer.WaitForNextTickAsync(stoppingToken))
             {
                 var now = DateTimeOffset.Now;
                 var message = new HeartBeatMessage(now - lastMessageSent, now, start);
                 lastMessageSent = DateTimeOffset.Now;
                 _heartBeatQueue.Enqueue(message, stoppingToken);
                 // Wait for the message to complete processing.
-                await message.Task.WaitAsync(stoppingToken).ConfigureAwait(false);
+                await message.Task.WaitAsync(stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

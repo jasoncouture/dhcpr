@@ -5,12 +5,12 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Database;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.SystemResolver;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
-
-using DNS.Client.RequestResolver;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.ObjectPool;
 
 namespace Dhcpr.Dns.Core;
@@ -20,19 +20,26 @@ public static class DnsServiceProviderExtensions
     public static IServiceCollection AddDns(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHostedService<DnsServerHostedService>();
+        services.AddHostedService<DatabaseCacheItemLoader>();
 
+        services.AddSingleton<IDnsMemoryCacheWriter, DnsMemoryCacheWriter>();
+        services.AddSingleton<IDnsOutputFilter, DnsOutputFilter>();
+        
         services.AddQueueProcessor<DnsCacheMessage, DnsCacheMessageProcessor>();
-        services.AddSingleton<IDnsDatabaseCache, DnsDatabaseCache>();
+        
+        
+        services.AddScoped<ISystemNameResolver, SystemNameResolver>();
+        
 
         services.AddSingleton(typeof(IScopedResolverWrapper<>), typeof(ScopedResolverWrapper<>));
         services.AddScoped<IDatabaseResolver, DatabaseResolver>();
         services.AddScoped<IDnsResolver, DnsResolver>();
-        services.AddScoped<IParallelDnsResolver, ParallelResolver>();
-        services.AddScoped<ISequentialDnsResolver, SequentialDnsResolver>();
-        services.AddScoped<IRootResolver, RootResolver>();
-        services.AddScoped<IResolverCache, ResolverCache>();
-        services.AddScoped<IDnsCache, DnsCache>();
-        services.AddScoped<IForwardResolver, ForwardResolver>();
+        services.AddSingleton<ISequentialDnsResolver, SequentialDnsResolver>();
+        services.AddSingleton<IRootResolver, RootResolver>();
+        services.AddSingleton<IResolverCache, ResolverCache>();
+        services.AddSingleton<IDnsCache, DnsCache>();
+        services.Decorate<IDnsResolver, CachedDnsResolver>();
+        services.AddSingleton<IForwardResolver, ForwardResolver>();
 
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
 

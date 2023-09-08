@@ -31,7 +31,8 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
             {
                 UpdateSignalState();
                 var waitTask = _queueWaitTask.Task;
-                await waitTask.WaitAsync(Constants.GetPollWaitTimeoutWithJitter(), cancellationToken).ConfigureAwait(false);
+                await waitTask.WaitAsync(Constants.GetPollWaitTimeoutWithJitter(), cancellationToken)
+                    ;
 
                 return;
             }
@@ -97,18 +98,14 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
         }
     }
 
-    public bool TryDequeue(out QueueItem<T> item) => _queue.TryDequeue(out item);
-    public bool IsEmpty => _queue.IsEmpty;
-
     public async ValueTask<QueueItem<T>> DequeueAsync(CancellationToken cancellationToken = default)
     {
-        QueueItem<T> item;
-        while (!_queue.TryDequeue(out item))
+        while (true)
         {
+            if (_queue.TryDequeue(out var item))
+                return item;
             UpdateSignalState();
-            await WaitForSignalAsync(cancellationToken).ConfigureAwait(false);
+            await WaitForSignalAsync(cancellationToken);
         }
-
-        return item;
     }
 }

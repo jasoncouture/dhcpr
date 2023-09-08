@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.CompilerServices;
 
 using Dhcpr.Data.Abstractions;
 using Dhcpr.Data.Extensions;

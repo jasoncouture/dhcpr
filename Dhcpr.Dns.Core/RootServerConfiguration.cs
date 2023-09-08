@@ -6,6 +6,7 @@ namespace Dhcpr.Dns.Core;
 
 public sealed class RootServerConfiguration : IValidateSelf
 {
+    public bool Enabled { get; set; } = true;
     public string CacheFilePath { get; set; } = "root-servers.txt";
     public bool Download { get; set; } = true;
     public bool LoadFromSystem { get; set; } = true;

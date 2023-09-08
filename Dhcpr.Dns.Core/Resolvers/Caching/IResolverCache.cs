@@ -17,4 +17,6 @@ public interface IResolverCache
     )
         where TOuter : MultiResolver
         where TInner : IRequestResolver;
+
+    IRequestResolver WrapWithCache(IRequestResolver requestResolver);
 }

@@ -14,16 +14,12 @@ public class DataContext : DbContext, IDataContext
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
-        
     }
 
-    public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+    public async Task<IDbContextTransaction> BeginTransactionAsync(IsolationLevel isolationLevel,
+        CancellationToken cancellationToken)
     {
-        return await Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-    }
-    public async Task<IDbContextTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken)
-    {
-        return await Database.BeginTransactionAsync(isolationLevel, cancellationToken).ConfigureAwait(false);
+        return await Database.BeginTransactionAsync(isolationLevel, cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -58,7 +54,7 @@ public class DataContext : DbContext, IDataContext
     {
         if (property.ClrType != typeof(DateTimeOffset))
             return;
-        
+
         modelBuilder
             .Entity(entity.Name)
             .Property(property.Name)

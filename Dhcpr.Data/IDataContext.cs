@@ -16,5 +16,7 @@ public interface IDataContext
 
     Task<IDbContextTransaction> BeginTransactionAsync(IsolationLevel isolationLevel,
         CancellationToken cancellationToken);
-    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
+
+    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+        => BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 }

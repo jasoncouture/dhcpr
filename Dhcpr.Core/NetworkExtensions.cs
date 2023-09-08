@@ -1,11 +1,15 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 namespace Dhcpr.Core;
 
-public static class NetworkExtensions
+public static partial class NetworkExtensions
 {
+    [GeneratedRegex(@"(?isn)^(?<name>(([a-z]{1}[a-z0-9\-]*[a-z0-9])\.)*([a-z]{1}[a-z0-9\-]*[a-z0-9]))\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
+    public static partial Regex GetDnsRegularExpression();
+
     public static IPAddress GetNetwork(this IPAddress address, IPAddress netmask)
     {
         if (address.AddressFamily != netmask.AddressFamily)
@@ -27,7 +31,14 @@ public static class NetworkExtensions
         return new IPAddress(networkBytes);
     }
 
-    public static bool TryParseClasslessInterDomainRouting(this string input, [NotNullWhen(true)] out IPAddress? address, [NotNullWhen(true)] out IPAddress? subnet)
+    public static bool IsValidHostName(this string str) => GetDnsRegularExpression().IsMatch(str);
+
+    public static bool IsFullyQualifiedName(this string str)
+        => GetDnsRegularExpression().IsMatch(str) && // It will match the DNS name
+           (!str.Contains('.') || str.IndexOf('.') == str.Length - 1);
+
+    public static bool TryParseClasslessInterDomainRouting(this string input,
+        [NotNullWhen(true)] out IPAddress? address, [NotNullWhen(true)] out IPAddress? subnet)
     {
         address = default;
         subnet = default;
@@ -85,15 +96,53 @@ public static class NetworkExtensions
         return maskedAddress.Equals(maskedNetwork);
     }
 
-    public static IPEndPoint GetEndpoint(this string address, int defaultPort)
+    public static bool TryGetDnsEndPoint(this string str, int defaultPort, [NotNullWhen(true)] out DnsEndPoint? endPoint)
     {
-        if (!address.TryGetEndpoint(defaultPort, out var endPoint))
+        endPoint = null;
+        var match = GetDnsRegularExpression().Match(str);
+        if (!match.Success) return false;
+        var port = defaultPort;
+        if (match.Groups["port"].Success)
+            port = int.Parse(match.Groups["port"].ValueSpan);
+
+        endPoint = new DnsEndPoint(match.Groups["name"].Value, port);
+        return true;
+    }
+
+    public static EndPoint GetEndPoint(this string str, int defaultPort)
+    {
+        if (!str.TryGetEndPoint(defaultPort, out var endPoint))
+            throw new ArgumentException("Value is not a valid IP or DNS value", nameof(str));
+
+        return endPoint;
+    }
+    public static bool TryGetEndPoint(this string str, int defaultPort, [NotNullWhen(true)] out EndPoint? endPoint)
+    {
+        if (str.TryGetIPEndPoint(defaultPort, out var ipEndPoint))
+        {
+            endPoint = ipEndPoint;
+            return true;
+        }
+
+        if (str.TryGetDnsEndPoint(defaultPort, out var dnsEndPoint))
+        {
+            endPoint = dnsEndPoint;
+            return true;
+        }
+
+        endPoint = null;
+        return false;
+    }
+    
+    public static IPEndPoint GetIPEndPoint(this string address, int defaultPort)
+    {
+        if (!address.TryGetIPEndPoint(defaultPort, out var endPoint))
             throw new InvalidOperationException("String is not a valid address or endpoint!");
 
         return endPoint;
     }
 
-    public static bool TryGetEndpoint(this string addressOrEndPoint, int defaultPort,
+    public static bool TryGetIPEndPoint(this string addressOrEndPoint, int defaultPort,
         [NotNullWhen(true)] out IPEndPoint? endPoint)
     {
         endPoint = null;
@@ -103,7 +152,7 @@ public static class NetworkExtensions
             endPoint = new IPEndPoint(ipAddress, defaultPort);
             return true;
         }
-        
+
         if (IPEndPoint.TryParse(addressOrEndPoint, out endPoint))
             return true;
 
@@ -112,12 +161,12 @@ public static class NetworkExtensions
 
     public static bool IsValidMulticastAddress(this string address)
     {
-        return address.TryGetEndpoint(123, out var endPoint) &&
+        return address.TryGetIPEndPoint(123, out var endPoint) &&
                endPoint.Address.IsValidMulticastAddress();
     }
 
     public static bool IsValidIPAddress(this string address)
-        => address.TryGetEndpoint(1, out _);
+        => address.TryGetIPEndPoint(1, out _);
 
     public static bool IsValidMulticastAddress(this IPAddress address)
     {

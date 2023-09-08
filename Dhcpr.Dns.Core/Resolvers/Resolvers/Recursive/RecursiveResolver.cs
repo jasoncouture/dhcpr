@@ -58,8 +58,7 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
         using var endPoints = _servers.ToPooledList();
         using var domainParts = request.Questions[0].Name.ToString(Encoding.ASCII).Split('.').Reverse().ToPooledList();
         var queryNameBuilder = _stringBuilderPool.Get();
-        var currentRequest = new Request(request);
-        IResponse? lastResponse = null;
+        var currentRequest = new Request(request) { RecursionDesired = true };
         int maxIteration = domainParts.Count + 10;
         try
         {
@@ -72,7 +71,28 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                     response.ResponseCode = ResponseCode.ServerFailure;
                     return response;
                 }
+
                 var resolver = GetResolver(endPoints);
+
+                if (domainParts.Count == 0)
+                {
+                    _logger.LogDebug("Sending client request to final nameservers: {nameservers} {request}", endPoints,
+                        request);
+                    var response = await resolver.Resolve(request, cancellationToken).ConfigureAwait(false);
+                    ;
+                    _logger.LogDebug("Response from {nameservers} is {response}", endPoints, response);
+                    if (response.AnswerRecords.Count != 0 || response.ResponseCode == ResponseCode.NameError)
+                    {
+                        return response;
+                    }
+
+                    if (response is { AuthorityRecords.Count: 0, AdditionalRecords.Count: 0 } or not
+                        { ResponseCode: ResponseCode.NoError })
+                        return response;
+                    _logger.LogDebug(
+                        "Nameservers didn't give an error, and provided authority records. Recursing one more time.");
+                }
+
                 if (domainParts.Count > 0)
                 {
                     if (queryNameBuilder.Length != 0)
@@ -81,26 +101,10 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                     domainParts.RemoveAt(0);
                 }
 
-                if (domainParts.Count == 0)
-                {
-                    _logger.LogDebug("Sending client request to final nameservers: {nameservers} {request}", endPoints, request);
-                    var response = await resolver.Resolve(request, cancellationToken).ConfigureAwait(false); ;
-                    _logger.LogDebug("Response from {nameservers} is {response}", endPoints, response);
-                    if (response.AnswerRecords.Count != 0 || response.ResponseCode == ResponseCode.NameError)
-                    {
-                        return response;
-                    }
-                    if (response is { AuthorityRecords.Count: 0, AdditionalRecords.Count: 0 } or not { ResponseCode: ResponseCode.NoError })
-                        return response;
-                    _logger.LogDebug("Nameservers didn't give an error, and provided authority records. Recursing one more time.");
-                    //lastResponse = response;
-                }
-
-
                 currentRequest.Id = Random.Shared.Next(1, int.MaxValue);
                 currentRequest.Questions.Clear();
                 currentRequest.Questions.Add(new Question(new Domain(queryNameBuilder.ToString()), RecordType.NS,
-                    RecordClass.ANY)); ;
+                    RecordClass.ANY));
 
                 _logger.LogDebug("Looking for nameservers for {fragment}", queryNameBuilder);
 
@@ -112,6 +116,13 @@ public sealed class RecursiveResolver : MultiResolver, IRecursiveResolver
                         queryNameBuilder);
                     var response = Response.FromRequest(request);
                     response.ResponseCode = ResponseCode.NameError;
+                    return response;
+                }
+
+                if (currentResponse.AnswerRecords.Count > 0)
+                {
+                    var response = new Response(currentResponse);
+                    response.Id = request.Id;
                     return response;
                 }
 

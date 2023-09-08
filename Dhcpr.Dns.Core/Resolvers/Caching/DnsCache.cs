@@ -28,19 +28,28 @@ public class DnsCache : IDnsCache
         var key = new QueryCacheKey(request, request.Questions[0]);
         if (_memoryCache.TryGetValue(key, out QueryCacheData? data) && data is not null)
         {
-            response = WithUpdatedTimeToLive(data.Response, DateTimeOffset.Now - data.Created);
-            if (
-                response.AuthorityRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
-                response.AnswerRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
-                response.AdditionalRecords.Any(i => i.TimeToLive <= TimeSpan.Zero)
-                )
+            try
             {
-                // This is expired, but somehow still in cache. Evict it and lie that we didn't find it.
+                response = WithUpdatedTimeToLive(data.Response, DateTimeOffset.Now - data.Created);
+                if (
+                    response.AuthorityRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
+                    response.AnswerRecords.Any(i => i.TimeToLive <= TimeSpan.Zero) ||
+                    response.AdditionalRecords.Any(i => i.TimeToLive <= TimeSpan.Zero)
+                )
+                {
+                    // This is expired, but somehow still in cache. Evict it and lie that we didn't find it.
+                    _memoryCache.Remove(key);
+                    return false;
+                }
+
+                response.Id = request.Id;
+                return true;
+            }
+            catch
+            {
                 _memoryCache.Remove(key);
                 return false;
             }
-            response.Id = request.Id;
-            return true;
         }
 
         return false;

@@ -2,6 +2,7 @@
 
 using Dhcpr.Data;
 using Dhcpr.Data.Dns.Models;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 
 using DNS.Protocol;
 using DNS.Protocol.ResourceRecords;
@@ -38,8 +39,9 @@ public class DatabaseResolver : IDatabaseResolver
             .Select(i => (ResourceRecordType)i)
             .ToHashSet();
         var dbNameRecord =
-            await context.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain);
-        if (dbNameRecord is null) return null;
+            await context.Set<DnsNameRecord>().FirstOrDefaultAsync(i => i.Name.ToLower() == questionDomain, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (dbNameRecord is null) 
+            return null;
         var resourceRecords = context.Set<DnsResourceRecord>()
             .Include(i => i.Parent)
             .Where(i => i.Parent.Id == dbNameRecord.Id)
@@ -50,7 +52,8 @@ public class DatabaseResolver : IDatabaseResolver
         var response = Response.FromRequest(request);
 
         if(await resourceRecords.ToResourceRecords(response, cancellationToken).ConfigureAwait(false))
-            return response;
+            return new NoCacheResponse(response);
+        
         return null;
     }
 }

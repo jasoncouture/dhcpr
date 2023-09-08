@@ -1,9 +1,12 @@
-﻿using Dhcpr.Data.Dns;
+﻿using System.Data;
+
+using Dhcpr.Data.Dns;
 using Dhcpr.Data.Dns.Models;
 using Dhcpr.Data.ValueConverters;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Dhcpr.Data;
 
@@ -11,6 +14,16 @@ public class DataContext : DbContext, IDataContext
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
+        
+    }
+
+    public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+    {
+        return await Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+    }
+    public async Task<IDbContextTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken)
+    {
+        return await Database.BeginTransactionAsync(isolationLevel, cancellationToken).ConfigureAwait(false);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -45,8 +58,7 @@ public class DataContext : DbContext, IDataContext
     {
         if (property.ClrType != typeof(DateTimeOffset))
             return;
-
-
+        
         modelBuilder
             .Entity(entity.Name)
             .Property(property.Name)
@@ -55,4 +67,5 @@ public class DataContext : DbContext, IDataContext
 
     public DbSet<DnsResourceRecord> ResourceRecords { get; init; }
     public DbSet<DnsNameRecord> NameRecords { get; init; }
+    public DbSet<DnsCacheEntry> CacheEntries { get; init; }
 }

@@ -24,5 +24,6 @@ static class DnsDataModel
         OnModelCreating<InterNetworkVersion4AddressResourceRecord>(modelBuilder);
         OnModelCreating<InterNetworkVersion6AddressDnsResourceRecord>(modelBuilder);
         OnModelCreating<StartOfAuthorityDnsResourceRecord>(modelBuilder);
+        OnModelCreating<DnsCacheEntry>(modelBuilder);
     }
 }

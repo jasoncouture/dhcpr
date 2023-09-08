@@ -7,8 +7,8 @@ namespace Dhcpr.Dns.Core.Resolvers;
 public interface IResolverCache
 {
     T GetResolver<T>(IPEndPoint endPoint, Func<IPEndPoint, T> createResolverCallback) where T : IRequestResolver;
-
-    public TOuter GetMultiResolver<TOuter, TInner>
+    ICachedResolver GetCacheForResolver(IRequestResolver resolver);
+    public TOuter GetResolver<TOuter, TInner>
     (
         IEnumerable<IPEndPoint> endPoints,
         Func<IEnumerable<IRequestResolver>, TOuter> createMultiResolver,

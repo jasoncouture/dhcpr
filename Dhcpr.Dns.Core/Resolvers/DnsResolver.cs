@@ -1,6 +1,9 @@
 ﻿using System.Diagnostics;
 
+using Dhcpr.Core.Linq;
+
 using DNS.Protocol;
+using DNS.Protocol.ResourceRecords;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -49,7 +52,60 @@ public sealed class DnsResolver : IDnsResolver, IDisposable
         _logger.LogDebug("Configuration changed applied");
     }
 
-    public async Task<IResponse?> Resolve(IRequest request,
+    private static readonly RecordType[] RecordTypes = { RecordType.A, RecordType.AAAA };
+
+    public async Task<IResponse> Resolve(IRequest request, CancellationToken cancellationToken)
+    {
+        var response = await InnerResolver(request, cancellationToken).ConfigureAwait(false);
+        if (response is null)
+        {
+            response = Response.FromRequest(request);
+            response.ResponseCode = ResponseCode.ServerFailure;
+            return response;
+        }
+
+        if (response.Id != request.Id)
+        {
+            _logger.LogWarning("Request ID was {requestId}, but we tried to respond with ID {responseId}, fixing it", request.Id, response.Id);
+            response = new Response(response);
+            response.Id = request.Id;
+        }
+        
+        if (request.Questions[0].Type is RecordType.CNAME or RecordType.A or RecordType.AAAA &&
+            response.AnswerRecords.Any(i => i.Type == RecordType.CNAME) &&
+            !response.AnswerRecords.Any(i => i.Type is RecordType.A or RecordType.AAAA))
+        {
+            _logger.LogInformation("Canonical name did not provide addresses, and recursion is requested. Looking up A and AAAA records for the target.");
+            response = new Response(response);
+            using var cnames = response.AnswerRecords.OfType<CanonicalNameResourceRecord>().ToPooledList();
+            foreach (var recordType in RecordTypes)
+            {
+                foreach (var cname in cnames)
+                {
+                    _logger.LogInformation("Resolving canonical name: {recordType}:{cname}", recordType, cname.CanonicalDomainName);
+
+                    var innerRequest = new Request()
+                    {
+                        Questions = { new Question(new Domain(cname.CanonicalDomainName.ToString())) }
+                    };
+                    var innerResponse = await InnerResolver(innerRequest, cancellationToken).ConfigureAwait(false);
+                    if (innerResponse is null)
+                    {
+                        response = Response.FromRequest(request);
+                        response.ResponseCode = ResponseCode.ServerFailure;
+                        return response;
+                    }
+
+                    foreach (var answer in innerResponse.AnswerRecords.OfType<IPAddressResourceRecord>().Where(i => i.Type == recordType))
+                    {
+                        response.AnswerRecords.Add(answer);
+                    }
+                }
+            }
+        }
+        return response;
+    }
+    public async Task<IResponse?> InnerResolver(IRequest request,
         CancellationToken cancellationToken = new CancellationToken())
     {
         if (request.Questions.Count is > 1 or 0)

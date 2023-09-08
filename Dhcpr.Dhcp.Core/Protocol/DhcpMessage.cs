@@ -9,7 +9,7 @@ using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Dhcp.Core.Protocol;
 
-public record DhcpMessage(
+public sealed record DhcpMessage(
     BootOperationCode OperationCode,
     byte Hops,
     int TransactionId,

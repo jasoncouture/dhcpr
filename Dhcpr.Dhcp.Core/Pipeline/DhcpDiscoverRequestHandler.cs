@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dhcp.Core.Pipeline;
 
-public class DhcpDiscoverRequestHandler : IDhcpRequestHandler
+public sealed class DhcpDiscoverRequestHandler : IDhcpRequestHandler
 {
     private readonly IDhcpLeasePool _leasePool;
     private readonly ILogger<DhcpDiscoverRequestHandler> _logger;

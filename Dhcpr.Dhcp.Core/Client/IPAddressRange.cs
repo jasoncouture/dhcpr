@@ -8,7 +8,7 @@ using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Dhcp.Core.Client;
 
-public record IPAddressRange(IPAddress StartAddress, IPAddress EndAddress)
+public sealed record IPAddressRange(IPAddress StartAddress, IPAddress EndAddress)
 {
     private IEnumerable<IPAddress>? _availableAddresses;
 

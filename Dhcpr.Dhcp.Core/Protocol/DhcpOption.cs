@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Dhcpr.Dhcp.Core.Protocol;
 
-public record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
+public sealed record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payload)
 {
     public DhcpOption(DhcpOptionCode code, string str) : this(code, EncodeString(str))
     {

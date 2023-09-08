@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Dhcp.Core.Pipeline;
 
-public class DhcpRequestContext
+public sealed class DhcpRequestContext
 {
     public required DhcpNetworkInformation NetworkInformation { get; init; }
     public required DhcpMessage Message { get; init; }

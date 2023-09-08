@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dhcp.Core;
 
-public class DhcpServerHostedService : BackgroundService
+public sealed class DhcpServerHostedService : BackgroundService
 {
     private readonly ILogger<DhcpServerHostedService> _logger;
     private readonly IMessageQueue<QueuedDhcpMessage> _processingQueue;

@@ -9,7 +9,7 @@ using Dhcpr.Dhcp.Core.Protocol;
 
 namespace Dhcpr.Dhcp.Core.Client;
 
-public record DhcpClientLease(
+public sealed record DhcpClientLease(
     HardwareAddress HardwareAddress,
     int TransactionId,
     IPNetwork Network,

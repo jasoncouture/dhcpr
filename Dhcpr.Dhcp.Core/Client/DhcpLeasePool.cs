@@ -9,7 +9,7 @@ using Dhcpr.Dhcp.Core.Protocol;
 
 namespace Dhcpr.Dhcp.Core.Client;
 
-public class DhcpLeasePool : IDhcpLeasePool
+public sealed class DhcpLeasePool : IDhcpLeasePool
 {
     private readonly ConcurrentBag<IDhcpSubnet> _subnets;
 

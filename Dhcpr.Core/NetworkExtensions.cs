@@ -2,7 +2,6 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text.RegularExpressions;
 
 using Dhcpr.Core.Linq;
 
@@ -29,8 +28,6 @@ public static partial class NetworkExtensions
 
         return false;
     }
-    [GeneratedRegex(@"(?isn)^(?<name>(([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,63}\.)*([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,63})\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
-    public static partial Regex GetDnsRegularExpression();
 
     public static IPAddress GetNetwork(this IPAddress address, IPAddress netmask)
     {
@@ -52,12 +49,6 @@ public static partial class NetworkExtensions
 
         return new IPAddress(networkBytes);
     }
-
-    public static bool IsValidHostName(this string str) => GetDnsRegularExpression().IsMatch(str);
-
-    public static bool IsFullyQualifiedName(this string str)
-        => GetDnsRegularExpression().IsMatch(str) && // It will match the DNS name
-           (!str.Contains('.') || str.IndexOf('.') == str.Length - 1);
 
     public static bool TryParseClasslessInterDomainRouting(this string input,
         [NotNullWhen(true)] out IPAddress? address, [NotNullWhen(true)] out IPAddress? subnet)
@@ -126,7 +117,7 @@ public static partial class NetworkExtensions
     )
     {
         endPoint = null;
-        var match = GetDnsRegularExpression().Match(str);
+        var match = DomainNameValidationExtensions.GetDnsRegularExpression().Match(str);
         if (!match.Success) return false;
         var port = defaultPort;
         if (match.Groups["port"].Success)

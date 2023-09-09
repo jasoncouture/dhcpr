@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Data", "Dhcpr.Data\Dh
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Dns.Core.UnitTests", "Dhcpr.Dns.Core.UnitTests\Dhcpr.Dns.Core.UnitTests.csproj", "{5A1EAA02-D869-429A-9EEF-BD546DAFE825}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dhcpr.Benchmarks", "Dhcpr.Benchmarks\Dhcpr.Benchmarks.csproj", "{4C7934E3-3590-41DF-8281-6A8AB3A27253}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,5 +80,9 @@ Global
 		{5A1EAA02-D869-429A-9EEF-BD546DAFE825}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A1EAA02-D869-429A-9EEF-BD546DAFE825}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A1EAA02-D869-429A-9EEF-BD546DAFE825}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C7934E3-3590-41DF-8281-6A8AB3A27253}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C7934E3-3590-41DF-8281-6A8AB3A27253}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C7934E3-3590-41DF-8281-6A8AB3A27253}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C7934E3-3590-41DF-8281-6A8AB3A27253}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

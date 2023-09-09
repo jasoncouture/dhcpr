@@ -21,11 +21,4 @@
     <ProjectReference Include="..\Dhcpr.Data\Dhcpr.Data.csproj" />
   </ItemGroup>
 
-
-
-
-  <ItemGroup>
-    <Folder Include="Container\" />
-  </ItemGroup>
-
 </Project>

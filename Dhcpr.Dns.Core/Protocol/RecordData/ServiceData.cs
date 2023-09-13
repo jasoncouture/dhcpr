@@ -1,9 +1,11 @@
-﻿namespace Dhcpr.Dns.Core.Protocol;
+﻿using Dhcpr.Dns.Core.Protocol.Parser;
+
+namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public record ServiceData(ushort Priority, ushort Weight, ushort Port, DomainLabels Name) : IDomainResourceRecordData
 {
     public int Size => (sizeof(ushort) * 3) + Name.Size;
-    public void WriteTo(ref Span<byte> span)
+    public void WriteTo(ref DnsParsingSpan span)
     {
         DomainMessageEncoder.EncodeAndAdvance(ref span, Priority);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Weight);
@@ -11,7 +13,7 @@ public record ServiceData(ushort Priority, ushort Weight, ushort Port, DomainLab
         DomainMessageEncoder.EncodeAndAdvance(ref span, Name);
     }
 
-    public static IDomainResourceRecordData ReadFrom(ReadOnlySpan<byte> bytes)
+    public static IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes)
     {
         var priority = DomainMessageEncoder.ReadUnsignedShortAndAdvance(ref bytes);
         var weight = DomainMessageEncoder.ReadUnsignedShortAndAdvance(ref bytes);

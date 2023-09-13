@@ -1,4 +1,5 @@
 ﻿using Dhcpr.Core;
+using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
@@ -21,6 +22,11 @@ public static class DnsServiceProviderExtensions
     {
         services.AddHostedService<DnsServerHostedService>();
         services.AddHostedService<DatabaseCacheItemLoader>();
+        services.AddHostedService<DnsServer>();
+        services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>();
+        services.AddSingleton<IDomainClient, DomainClient>();
+        services.AddSingleton<ISocketFactory, SocketFactory>();
+        
 
         services.AddSingleton<IDnsMemoryCacheWriter, DnsMemoryCacheWriter>();
         services.AddSingleton<IDnsOutputFilter, DnsOutputFilter>();

@@ -12,7 +12,13 @@ public record DomainResourceRecords
 {
     private int? _size;
     public int Size => _size ??= this.Select(i => i.Size).DefaultIfEmpty(0).Sum();
+    public static DomainResourceRecords Empty { get; } = new();
 
+    private DomainResourceRecords() : this(ImmutableArray<DomainResourceRecord>.Empty,
+        ImmutableArray<DomainResourceRecord>.Empty, ImmutableArray<DomainResourceRecord>.Empty)
+    {
+        
+    }
     public IEnumerator<DomainResourceRecord> GetEnumerator() =>
         Answers.Concat(Authorities)
             .Concat(Additional)

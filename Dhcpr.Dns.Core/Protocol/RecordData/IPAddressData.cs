@@ -1,18 +1,20 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Parser;
+
+namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record IPAddressData(IPAddress Address) : IDomainResourceRecordData
 {
     public int Size => Address.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
-    public void WriteTo(ref Span<byte> span)
+    public void WriteTo(ref DnsParsingSpan span)
     {
         Address.TryWriteBytes(span, out var bytesWritten);
         span = span[bytesWritten..];
     }
 
-    public static IDomainResourceRecordData ReadFrom(ReadOnlySpan<byte> bytes)
+    public static IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes)
     {
         return new IPAddressData(new IPAddress(bytes));
     }

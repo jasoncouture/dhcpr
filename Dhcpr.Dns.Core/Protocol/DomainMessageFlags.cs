@@ -10,7 +10,7 @@ public record DomainMessageFlags(
     bool Authentic,
     bool CheckingDisabled,
     DomainResponseCode ResponseCode
-) : ISelfComputeSize
+) : ISelfComputeEstimatedSize
 {
-    public int Size => 2;
+    public int EstimatedSize => 2;
 }

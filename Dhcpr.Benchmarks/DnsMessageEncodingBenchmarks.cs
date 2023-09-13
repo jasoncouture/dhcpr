@@ -55,7 +55,7 @@ public class DnsMessageEncodingBenchmarks
     [Benchmark]
     public void DomainMessageEncode()
     {
-        Span<byte> buffer = stackalloc byte[DomainMessage.Size];
+        Span<byte> buffer = stackalloc byte[DomainMessage.EstimatedSize];
         DomainMessageEncoder.Encode(buffer, DomainMessage);
     }
 }

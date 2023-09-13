@@ -369,7 +369,7 @@ public static class DomainMessageEncoder
 
     public static void EncodeAndAdvance(ref DnsParsingSpan buffer, DomainMessageFlags messageFlags)
     {
-        if (buffer.Count < messageFlags.Size)
+        if (buffer.Count < messageFlags.EstimatedSize)
             throw new ArgumentException("Buffer size is too small.");
 
         ushort flags = 0;

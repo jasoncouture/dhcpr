@@ -53,7 +53,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         CancellationToken cancellationToken
     )
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(response.Size);
+        var buffer = ArrayPool<byte>.Shared.Rent(response.EstimatedSize);
         try
         {
             var byteCount = TruncateAndEncodeMessage(

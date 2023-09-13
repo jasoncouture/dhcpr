@@ -5,7 +5,7 @@ using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core.Protocol;
 
-public record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeSize
+public record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeEstimatedSize
 {
     private static IEnumerable<DomainLabel> ValidateAndCreateLabelsFromStrings(IEnumerable<string> strings)
     {
@@ -26,7 +26,7 @@ public record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeSiz
 
     private string? _domainName;
     private int? _size;
-    public int Size => _size ??= Labels.Append(DomainLabel.Empty).Select(i => i.Size).Sum();
+    public int EstimatedSize => _size ??= Labels.Append(DomainLabel.Empty).Select(i => i.EstimatedSize).Sum();
     private string DomainName => _domainName ??= FormatDomainName(Labels);
 
     public static DomainLabels Empty { get; } = new DomainLabels(ImmutableArray<DomainLabel>.Empty);

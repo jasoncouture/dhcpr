@@ -8,10 +8,10 @@ public record DomainResourceRecords
     ImmutableArray<DomainResourceRecord> Answers,
     ImmutableArray<DomainResourceRecord> Authorities,
     ImmutableArray<DomainResourceRecord> Additional
-) : IEnumerable<DomainResourceRecord>, ISelfComputeSize
+) : IEnumerable<DomainResourceRecord>, ISelfComputeEstimatedSize
 {
     private int? _size;
-    public int Size => _size ??= this.Select(i => i.Size).DefaultIfEmpty(0).Sum();
+    public int EstimatedSize => _size ??= this.Select(i => i.EstimatedSize).DefaultIfEmpty(0).Sum();
     public static DomainResourceRecords Empty { get; } = new();
 
     private DomainResourceRecords() : this(ImmutableArray<DomainResourceRecord>.Empty,

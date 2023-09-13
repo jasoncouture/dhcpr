@@ -33,13 +33,13 @@ public class ParserTests
         Assert.Equal(libraryRequest.Questions.Count, decodedMessage.Questions.Length);
         foreach (var (left, right) in libraryRequest.Questions.Zip(decodedMessage.Questions))
         {
-            Assert.Equal(left.Size, right.Size);
+            Assert.Equal(left.Size, right.EstimatedSize);
             Assert.Equal(left.Name.ToString(), right.Name.ToString());
             Assert.Equal((int)left.Type, (int)right.Type);
             Assert.Equal((int)left.Class, (int)right.Class);
         }
 
-        Span<byte> requestBytes = stackalloc byte[decodedMessage.Size];
+        Span<byte> requestBytes = stackalloc byte[decodedMessage.EstimatedSize];
         DomainMessageEncoder.Encode(requestBytes, decodedMessage);
 
         Assert.Equal(libraryRequestBytes, requestBytes.ToArray());
@@ -61,9 +61,9 @@ public class ParserTests
             }.ToImmutableArray(),
             DomainResourceRecords.Empty
         );
-        Span<byte> data = stackalloc byte[message.Size];
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
         var bytesWritten = DomainMessageEncoder.Encode(data, message);
-        Assert.NotEqual(message.Size, bytesWritten);
+        Assert.NotEqual(message.EstimatedSize, bytesWritten);
     }
 
     [Fact]
@@ -83,11 +83,11 @@ public class ParserTests
             DomainResourceRecords.Empty
         );
         
-        Span<byte> data = stackalloc byte[message.Size];
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
         var bytesWritten = DomainMessageEncoder.Encode(data, message);
 
         var actualMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
-        Assert.Equal(message.Size, actualMessage.Size);
+        Assert.Equal(message.EstimatedSize, actualMessage.EstimatedSize);
         Assert.Equal(message.Id, actualMessage.Id);
         Assert.Equal(message.Questions.Length, actualMessage.Questions.Length);
     }

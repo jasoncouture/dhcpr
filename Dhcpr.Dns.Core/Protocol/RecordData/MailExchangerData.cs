@@ -18,5 +18,5 @@ public sealed record MailExchangerData(ushort Preference, DomainLabels Exchanger
         );
     }
 
-    public int Size => sizeof(ushort) + ExchangerName.Size;
+    public int EstimatedSize => sizeof(ushort) + ExchangerName.EstimatedSize;
 }

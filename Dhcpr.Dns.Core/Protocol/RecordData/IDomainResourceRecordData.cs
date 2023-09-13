@@ -2,7 +2,7 @@
 
 namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
-public interface IDomainResourceRecordData : ISelfComputeSize
+public interface IDomainResourceRecordData : ISelfComputeEstimatedSize
 {
     void WriteTo(ref DnsParsingSpan span);
     static abstract IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes);

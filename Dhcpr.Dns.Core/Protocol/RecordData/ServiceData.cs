@@ -4,7 +4,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public record ServiceData(ushort Priority, ushort Weight, ushort Port, DomainLabels Name) : IDomainResourceRecordData
 {
-    public int Size => (sizeof(ushort) * 3) + Name.Size;
+    public int EstimatedSize => (sizeof(ushort) * 3) + Name.EstimatedSize;
     public void WriteTo(ref DnsParsingSpan span)
     {
         DomainMessageEncoder.EncodeAndAdvance(ref span, Priority);

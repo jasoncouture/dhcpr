@@ -6,7 +6,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record TextData(string Text) : IDomainResourceRecordData
 {
-    public int Size => Text.Length + 1;
+    public int EstimatedSize => Text.Length + 1;
 
     public void WriteTo(ref DnsParsingSpan span)
     {

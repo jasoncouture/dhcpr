@@ -7,7 +7,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record IPAddressData(IPAddress Address) : IDomainResourceRecordData
 {
-    public int Size => Address.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
+    public int EstimatedSize => Address.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
     public void WriteTo(ref DnsParsingSpan span)
     {
         Address.TryWriteBytes(span, out var bytesWritten);

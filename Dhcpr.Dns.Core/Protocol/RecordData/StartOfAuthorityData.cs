@@ -10,7 +10,7 @@ public sealed record StartOfAuthorityData(
     TimeSpan MinimumTimeToLive
 ) : IDomainResourceRecordData
 {
-    public int Size => 5 * sizeof(int);
+    public int EstimatedSize => 5 * sizeof(int);
 
     public void WriteTo(ref DnsParsingSpan span)
     {

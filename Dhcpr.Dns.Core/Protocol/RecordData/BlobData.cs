@@ -6,7 +6,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record BlobData(ImmutableArray<byte> Blob) : IDomainResourceRecordData
 {
-    public int Size => Blob.Length;
+    public int EstimatedSize => Blob.Length;
 
     public void WriteTo(ref DnsParsingSpan span)
     {

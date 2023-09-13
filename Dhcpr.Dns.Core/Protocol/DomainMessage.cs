@@ -5,12 +5,12 @@ using Dhcpr.Core.Linq;
 namespace Dhcpr.Dns.Core.Protocol;
 
 public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<DomainQuestion> Questions,
-    DomainResourceRecords Records) : ISelfComputeSize
+    DomainResourceRecords Records) : ISelfComputeEstimatedSize
 {
     private int? _size;
 
     // The additional 4 ushorts are the counts for questions and answers.
-    public int Size => _size ??= Flags.Size + Records.Size + Questions.Select(i => i.Size).DefaultIfEmpty(0).Sum() +
+    public int EstimatedSize => _size ??= Flags.EstimatedSize + Records.EstimatedSize + Questions.Select(i => i.EstimatedSize).DefaultIfEmpty(0).Sum() +
                                  (sizeof(ushort) * 5); // Fields: Id, Counts:Questions, Answers, Authority, Additional)
 
     public static DomainMessage CreateRequest(string domain, DomainRecordType type = DomainRecordType.A,

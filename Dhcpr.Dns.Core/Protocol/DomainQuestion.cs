@@ -1,7 +1,7 @@
 ﻿namespace Dhcpr.Dns.Core.Protocol;
 
-public record DomainQuestion(DomainLabels Name, DomainRecordType Type, DomainRecordClass Class) : ISelfComputeSize
+public record DomainQuestion(DomainLabels Name, DomainRecordType Type, DomainRecordClass Class) : ISelfComputeEstimatedSize
 {
     private int? _size;
-    public int Size => _size ??= Name.Size + sizeof(DomainRecordType) + sizeof(DomainRecordClass);
+    public int EstimatedSize => _size ??= Name.EstimatedSize + sizeof(DomainRecordType) + sizeof(DomainRecordClass);
 }

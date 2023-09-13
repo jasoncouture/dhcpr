@@ -4,14 +4,13 @@ namespace Dhcpr.Core.Linq;
 
 internal sealed class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T>>
 {
-    private readonly int _maxCapacity;
+    private const int MaxCapacity = 4096;
 
-    public ListPoolObjectPolicy(int maxCapacity)
+    public ListPoolObjectPolicy()
     {
-        _maxCapacity = maxCapacity;
     }
 
-    public static ListPoolObjectPolicy<T> Default { get; } = new(4096);
+    public static ListPoolObjectPolicy<T> Default { get; } = new();
 
     public PooledList<T> Create()
     {
@@ -20,7 +19,7 @@ internal sealed class ListPoolObjectPolicy<T> : IPooledObjectPolicy<PooledList<T
 
     public bool Return(PooledList<T> obj)
     {
-        if (obj.Capacity > 4096)
+        if (obj.Capacity > MaxCapacity)
         {
             obj.Discard();
         }

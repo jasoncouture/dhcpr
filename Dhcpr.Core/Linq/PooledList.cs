@@ -17,25 +17,12 @@ public sealed class PooledList<T> : List<T>, IDisposable
 
     public void Dispose()
     {
-        Dispose(true);
-    }
-
-    private void Dispose(bool disposing)
-    {
         if (
             Interlocked.CompareExchange(
                 ref _token,
                 0,
                 1) != 0
         ) return;
-        if (disposing)
-        {
-            ListPool<T>.Default.Return(this);
-        }
-    }
-
-    ~PooledList()
-    {
-        Dispose(false);
+        ListPool<T>.Default.Return(this);
     }
 }

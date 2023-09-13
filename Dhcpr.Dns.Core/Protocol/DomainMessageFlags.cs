@@ -1,7 +1,6 @@
 ﻿namespace Dhcpr.Dns.Core.Protocol;
 
 public record DomainMessageFlags(
-    ushort Id,
     bool Response,
     DomainOperationCode Operation,
     bool Authorative,
@@ -13,5 +12,5 @@ public record DomainMessageFlags(
     DomainResponseCode ResponseCode
 ) : ISelfComputeSize
 {
-    public int Size => 4;
+    public int Size => 2;
 }

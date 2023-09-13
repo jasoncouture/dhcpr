@@ -6,7 +6,10 @@ public class ListPool<T>
 {
     static ListPool()
     {
-        Default = ObjectPool.Create(ListPoolObjectPolicy<T>.Default);
+        Default = new DefaultObjectPool<PooledList<T>>(
+            ListPoolObjectPolicy<T>.Default,
+            maximumRetained: 1024
+        );
     }
 
     public static ObjectPool<PooledList<T>> Default { get; }

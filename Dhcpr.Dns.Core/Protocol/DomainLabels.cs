@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 using Dhcpr.Core;
 
@@ -15,6 +16,8 @@ public record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeSiz
             yield return new DomainLabel(str);
         }
     }
+
+    public DomainLabels(string str) : this(str.Split('.')) { }
 
     public DomainLabels(IEnumerable<string> strings) : this(ValidateAndCreateLabelsFromStrings(strings)
         .ToImmutableArray())

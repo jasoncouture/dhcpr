@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.13.8" />
+    <PackageReference Include="DNS" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
   </ItemGroup>
 
 </Project>

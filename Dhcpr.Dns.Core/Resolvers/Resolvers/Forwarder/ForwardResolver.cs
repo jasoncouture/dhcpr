@@ -1,28 +1,29 @@
 ﻿using System.Net;
 
-using Dhcpr.Dns.Core.Resolvers.Caching;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
-
-using DNS.Client.RequestResolver;
-using DNS.Protocol;
+using Dhcpr.Core;
+using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 
-public sealed class ForwardResolver : MultiResolver, IForwardResolver, IDisposable
+public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
 {
     private readonly IDisposable? _subscription;
-    private readonly IResolverCache _resolverCache;
+    private readonly IDomainClientFactory _domainClientFactory;
     private readonly ILogger<ForwardResolver> _logger;
     private DnsConfiguration _currentConfiguration;
 
-    public ForwardResolver(IOptionsMonitor<DnsConfiguration> options, IResolverCache resolverCache,
-        ILogger<ForwardResolver> logger)
+    public ForwardResolver(
+        IOptionsMonitor<DnsConfiguration> options,
+        IDomainClientFactory domainClientFactory,
+        ILogger<ForwardResolver> logger
+    )
     {
-        _resolverCache = resolverCache;
+        _domainClientFactory = domainClientFactory;
         _logger = logger;
         _currentConfiguration = options.CurrentValue;
         _subscription = options.OnChange(OptionsChanged);
@@ -34,47 +35,31 @@ public sealed class ForwardResolver : MultiResolver, IForwardResolver, IDisposab
         _logger.LogDebug("Configuration changed applied");
     }
 
-    private IRequestResolver GetForwardResolvers()
-    {
-        if (_currentConfiguration.Forwarders.Parallel)
-            return _resolverCache.GetResolver(
-                _currentConfiguration.Forwarders.GetForwarderEndpoints(),
-                CreateParallelMultiResolver,
-                CreateInnerResolver
-            );
-        
-        return _resolverCache.GetResolver(
-            _currentConfiguration.Forwarders.GetForwarderEndpoints(),
-            CreateSequentialMultiResolver,
-            CreateInnerResolver
-        );
-    }
-
-    private UdpRequestResolver CreateInnerResolver(IPEndPoint resolvers)
-    {
-        return new UdpRequestResolver(resolvers, new TcpRequestResolver(resolvers), timeout: 500);
-    }
-
-    private ParallelResolver CreateParallelMultiResolver(IEnumerable<IRequestResolver> resolvers)
-    {
-        return new ParallelResolver(resolvers);
-    }
-    
-    private SequentialDnsResolver CreateSequentialMultiResolver(IEnumerable<IRequestResolver> resolvers)
-    {
-        return new SequentialDnsResolver(resolvers);
-    }
-
-    public override async Task<IResponse?> Resolve(IRequest request,
-        CancellationToken cancellationToken = new())
-    {
-        var forwardResolver = GetForwardResolvers();
-        return await forwardResolver.Resolve(request, cancellationToken);
-    }
-
     public void Dispose()
     {
         _subscription?.Dispose();
-        GC.SuppressFinalize(this);
     }
+
+    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
+    {
+        var endPoints = _currentConfiguration.Forwarders.GetForwarderEndpoints();
+        if (endPoints.Length == 0) return null;
+        
+        var clients = await Task.WhenAll(endPoints
+            .Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp })
+            .Select(i => _domainClientFactory.GetDomainClient(i, cancellationToken).AsTask()));
+
+        var udpTasks = clients.Select(i =>
+            i.SendAsync(context.DomainMessage, cancellationToken).AsTask()
+                .ConvertExceptionsToNull())
+            .ToPooledList();
+        var completed = await Task.WhenAny(udpTasks);
+
+        Task.WhenAll(udpTasks).IgnoreExceptionsAsync().Orphan();
+        
+        return await completed;
+    }
+
+    public string Name { get; } = "Forward Resolver";
+    public int Priority { get; } = 500;
 }

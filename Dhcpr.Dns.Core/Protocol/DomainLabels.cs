@@ -1,11 +1,10 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 
 using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core.Protocol;
 
-public record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeEstimatedSize
+public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeEstimatedSize
 {
     private static IEnumerable<DomainLabel> ValidateAndCreateLabelsFromStrings(IEnumerable<string> strings)
     {

@@ -4,6 +4,10 @@ namespace Dhcpr.Core;
 
 public static class TaskExtensions
 {
+    public static async void Orphan(this Task task)
+    {
+        await task.IgnoreExceptionsAsync().ConfigureAwait(false);
+    }
     public static async Task IgnoreExceptionsAsync(this Task task, CancellationToken? cancellationToken = default)
     {
         try

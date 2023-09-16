@@ -26,7 +26,10 @@ public sealed class DnsServer : BackgroundService
     {
         try
         {
-            await Task.WhenAll(ServeUdpDnsAsync(stoppingToken), ServeTcpDnsAsync(stoppingToken));
+            await ServeUdpDnsAsync(stoppingToken);
+            var udpTask = ServeUdpDnsAsync(stoppingToken);
+            var tcpTask = ServeTcpDnsAsync(stoppingToken);
+            await Task.WhenAll(udpTask, tcpTask);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
@@ -34,8 +37,10 @@ public sealed class DnsServer : BackgroundService
     private async Task ServeUdpDnsAsync(CancellationToken cancellationToken)
     {
         using var udpClient = new UdpClient();
+        udpClient.ExclusiveAddressUse = false;
+        udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
         udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
-        udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 53));
+        udpClient.Client.Bind(new IPEndPoint(IPAddress.Loopback, 53));
         var buffer = new byte[16384];
         while (!cancellationToken.IsCancellationRequested)
         {

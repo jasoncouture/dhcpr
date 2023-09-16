@@ -8,43 +8,63 @@ using Dhcpr.Core.Linq;
 using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
-using DNS.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcessor<DnsPacketReceivedMessage>, IDisposable
 {
+    private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
 
-    public DomainMessageContextMessageProcessor(IEnumerable<IDomainMessageMiddleware> middlewareChain)
+    public DomainMessageContextMessageProcessor(IEnumerable<IDomainMessageMiddleware> middlewareChain, ILogger<DomainMessageContextMessageProcessor> logger)
     {
+        _logger = logger;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
     }
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
-        DomainMessage? response = null;
-        foreach (var middleware in _middlewareChain)
+        try
         {
-            response = await middleware.ProcessAsync(message.Context, cancellationToken);
-            if (message.Context.Cancel) // This is intended for things that want to ignore the request.
-                break;
-            if (response is not null) // This is intended for things to say "I don't handle this, try next"
-                break;
+            DomainMessage? response = null;
+            foreach (var middleware in _middlewareChain)
+            {
+                response = await middleware.ProcessAsync(message.Context, cancellationToken);
+                if (message.Context.Cancel) // This is intended for things that want to ignore the request.
+                    break;
+                if (response is not null) // This is intended for things to say "I don't handle this, try next"
+                    break;
+            }
+
+
+
+            // This is a directive to ignore the message.
+            // The middleware may have responded to it, or may be blocking this client.
+            // Internal clients will always see this as a request failure (null) during dispose.
+            if (response is null)
+            {
+                return;
+            }
+
+            if (response.Id != message.Context.DomainMessage.Id)
+            {
+                response = response with { Id = message.Context.DomainMessage.Id };
+            }
+
+            if (message is InternalDnsRequestReceivedMessage internalMessage)
+            {
+                internalMessage.TaskCompletionSource.TrySetResult(response);
+                return;
+            }
+
+
+            await SendResponseAsync(message, response, cancellationToken);
         }
-
-        // This is a directive to ignore the message.
-        // The middleware may have responded to it, or may be blocking this client.
-        if (response is null)
-            return;
-
-        if (response.Id != message.Context.DomainMessage.Id)
+        catch (Exception ex)
         {
-            response = response with { Id = message.Context.DomainMessage.Id };
+            _logger.LogError(ex, "Failed to process message due to an exception");
         }
-
-
-        await SendResponseAsync(message, response, cancellationToken);
     }
 
     private static async Task SendResponseAsync(

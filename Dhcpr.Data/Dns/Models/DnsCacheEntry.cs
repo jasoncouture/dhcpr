@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Dhcpr.Data.Dns.Models;
 
 public sealed class DnsCacheEntry : IDataRecord<DnsCacheEntry>
-{ 
+{
     static void ISelfBuildingModel<DnsCacheEntry>.OnModelCreating(EntityTypeBuilder<DnsCacheEntry> builder)
     {
         builder.AddDataRecordValueGenerators();
@@ -17,12 +17,12 @@ public sealed class DnsCacheEntry : IDataRecord<DnsCacheEntry>
 
     public string Id { get; set; } = Guid.NewGuid().ToString("n").Substring(0, 8);
     public string Name { get; set; } = string.Empty;
-    
+
     public ResourceRecordType Type { get; set; }
     public ResourceRecordClass Class { get; set; }
     public byte[] Payload { get; set; } = Array.Empty<byte>();
     public TimeSpan TimeToLive { get; set; }
-    public DateTimeOffset Created { get; set; }= DateTimeOffset.Now;
+    public DateTimeOffset Created { get; set; } = DateTimeOffset.Now;
     public DateTimeOffset Modified { get; set; } = DateTimeOffset.Now;
     public DateTimeOffset Expires { get; set; }
 }

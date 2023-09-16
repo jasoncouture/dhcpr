@@ -21,7 +21,7 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
-        
+
         services.AddSingleton<ISocketFactory, SocketFactory>();
 
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));

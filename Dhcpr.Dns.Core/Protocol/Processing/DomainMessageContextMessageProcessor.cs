@@ -97,22 +97,22 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
     )
     {
         await (message switch
-            {
-                TcpDnsPacketReceivedMessage tcpMessage =>
-                    SendResponseAsync(
-                        segment,
-                        tcpMessage.Client,
-                        cancellationToken
-                    ),
-                UdpDnsPacketReceivedMessage udpMessage =>
-                    SendResponseAsync(
-                        segment,
-                        udpMessage.Client,
-                        udpMessage.Context.ClientEndPoint,
-                        cancellationToken
-                    ),
-                _ => Task.CompletedTask
-            })
+        {
+            TcpDnsPacketReceivedMessage tcpMessage =>
+                SendResponseAsync(
+                    segment,
+                    tcpMessage.Client,
+                    cancellationToken
+                ),
+            UdpDnsPacketReceivedMessage udpMessage =>
+                SendResponseAsync(
+                    segment,
+                    udpMessage.Client,
+                    udpMessage.Context.ClientEndPoint,
+                    cancellationToken
+                ),
+            _ => Task.CompletedTask
+        })
             .IgnoreExceptionsAsync(cancellationToken)
             .ConfigureAwait(false);
     }

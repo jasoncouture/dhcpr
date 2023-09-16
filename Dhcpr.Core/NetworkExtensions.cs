@@ -14,7 +14,7 @@ public static partial class NetworkExtensions
         if (IPAddress.IsLoopback(address)) return false;
         using var unicastAddresses = NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()).SelectMany(i => i.UnicastAddresses).ToPooledList().ToPooledList();
         using var possibleNetworks = unicastAddresses.Where(i => i.Address.AddressFamily == address.AddressFamily).ToPooledList();
-        
+
         foreach (var network in possibleNetworks)
         {
 

@@ -40,7 +40,7 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
         DomainResponseCode responseCode = DomainResponseCode.NameError
     )
     {
-        
+
         answers ??= Enumerable.Empty<DomainResourceRecord>();
         authorities ??= Enumerable.Empty<DomainResourceRecord>();
         additional ??= Enumerable.Empty<DomainResourceRecord>();
@@ -60,7 +60,7 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
         DomainMessage request,
         DomainResourceRecords resourceRecords,
         DomainResponseCode responseCode = DomainResponseCode.NameError
-        
+
     )
     {
         return new DomainMessage(

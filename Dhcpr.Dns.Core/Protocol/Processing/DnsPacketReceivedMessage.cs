@@ -4,7 +4,7 @@ public abstract record DnsPacketReceivedMessage(DomainMessageContext Context) : 
 {
     protected virtual void Dispose(bool disposing)
     {
-        
+
     }
 
     public void Dispose()

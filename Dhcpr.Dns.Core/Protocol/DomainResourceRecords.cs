@@ -17,7 +17,7 @@ public record DomainResourceRecords
     private DomainResourceRecords() : this(ImmutableArray<DomainResourceRecord>.Empty,
         ImmutableArray<DomainResourceRecord>.Empty, ImmutableArray<DomainResourceRecord>.Empty)
     {
-        
+
     }
     public IEnumerator<DomainResourceRecord> GetEnumerator() =>
         Answers.Concat(Authorities)

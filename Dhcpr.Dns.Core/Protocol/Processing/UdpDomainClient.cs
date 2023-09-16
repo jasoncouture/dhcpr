@@ -61,7 +61,7 @@ public sealed class DomainClientFactory : IDomainClientFactory
         }
 
         using var clients = ListPool<IDomainClient>.Default.Get();
-        
+
         if (options.Type.HasFlag(DomainClientType.Internal))
         {
             clients.Add(_internalDomainClient);
@@ -102,7 +102,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var tasks = _innerClients.Select(i => i.SendAsync(message, source.Token).AsTask()).ToPooledList();
         using var exceptions = ListPool<Exception>.Default.Get();
-        
+
         while (tasks.Count > 0)
         {
             var completed = await Task.WhenAny(tasks);
@@ -121,10 +121,10 @@ public sealed class DomainClientParallelWrapper : IDomainClient
             }
             catch (AggregateException ex)
             {
-                foreach(var exception in ex.InnerExceptions)
+                foreach (var exception in ex.InnerExceptions)
                     exceptions.Add(exception);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 exceptions.Add(ex);
             }
@@ -135,9 +135,9 @@ public sealed class DomainClientParallelWrapper : IDomainClient
 
     public void Dispose()
     {
-        foreach(var client in _innerClients)
+        foreach (var client in _innerClients)
             client.Dispose();
-        
+
         _innerClients.Dispose();
     }
 }
@@ -184,7 +184,7 @@ public sealed class DomainClientWrapper : IDomainClient
             }
             catch (AggregateException ex)
             {
-                foreach(var exception in ex.InnerExceptions)
+                foreach (var exception in ex.InnerExceptions)
                     exceptions.Add(exception);
             }
             catch (Exception ex)
@@ -200,7 +200,7 @@ public sealed class DomainClientWrapper : IDomainClient
         }
         catch (AggregateException ex)
         {
-            foreach(var exception in ex.InnerExceptions)
+            foreach (var exception in ex.InnerExceptions)
                 exceptions.Add(exception);
         }
         catch (Exception ex)
@@ -260,7 +260,7 @@ public sealed class UdpDomainClient : IDomainClient
 
             if (result.Id != messageId) // ID did not match, try again.
                 continue;
-            
+
             return result;
         }
     }

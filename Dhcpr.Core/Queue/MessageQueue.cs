@@ -31,7 +31,7 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
             {
                 UpdateSignalState();
                 await _queueWaitTask.Task.WaitAsync(cancellationToken);
-                
+
                 return;
             }
             catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)

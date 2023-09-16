@@ -3,7 +3,7 @@
 public interface IDomainMessageMiddleware
 {
     public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken);
-    string GroupName { get; }
+    string Name { get; }
     int Priority { get; }
 }
 
@@ -14,6 +14,6 @@ public class NameErrorDomainMiddleware : IDomainMessageMiddleware
         return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(context.DomainMessage));
     }
 
-    public string GroupName { get; } = "NameError";
-    public int Priority { get; } = 0;
+    public string Name { get; } = "Name Error Middleware";
+    public int Priority { get; } = int.MaxValue;
 }

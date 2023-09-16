@@ -30,10 +30,8 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
             try
             {
                 UpdateSignalState();
-                var waitTask = _queueWaitTask.Task;
-                await waitTask.WaitAsync(Constants.GetPollWaitTimeoutWithJitter(), cancellationToken)
-                    ;
-
+                await _queueWaitTask.Task.WaitAsync(cancellationToken);
+                
                 return;
             }
             catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)

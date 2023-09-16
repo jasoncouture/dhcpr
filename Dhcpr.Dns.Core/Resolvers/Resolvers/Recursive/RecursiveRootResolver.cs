@@ -3,259 +3,138 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 
+using Dhcpr.Core;
 using Dhcpr.Core.Linq;
-using Dhcpr.Dns.Core.Resolvers.Caching;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Abstractions;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Wrappers;
+using Dhcpr.Data.Dns.Models;
+using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 
-using DNS.Client.RequestResolver;
-using DNS.Protocol;
-using DNS.Protocol.ResourceRecords;
-
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-public sealed class RecursiveRootResolver : MultiResolver, IRecursiveResolver
+public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
-    private readonly IResolverCache _resolverCache;
+    private readonly IDomainClientFactory _clientFactory;
     private readonly ObjectPool<StringBuilder> _stringBuilderPool;
+    private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
         IEnumerable<IPEndPoint> servers,
-        IResolverCache resolverCache,
-        ObjectPool<StringBuilder> stringBuilderPool
+        IDomainClientFactory clientFactory,
+        ObjectPool<StringBuilder> stringBuilderPool,
+        ILogger<RecursiveRootResolver> logger
     )
     {
         _servers = servers.ToImmutableArray();
-        _resolverCache = resolverCache;
+        _clientFactory = clientFactory;
         _stringBuilderPool = stringBuilderPool;
-        AddResolvers(_servers.Select(i => _resolverCache.GetResolver(i, CreateUdpResolver)).Cast<IRequestResolver>()
-            .ToArray());
+        _logger = logger;
     }
 
-    private IRequestResolver GetResolver(IEnumerable<IPEndPoint> endPoints, bool withCache = true)
+    private static readonly DomainRecordType[] NameServerRecordTypes = { DomainRecordType.A, DomainRecordType.AAAA };
+
+
+    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
+        CancellationToken cancellationToken)
     {
-        var resolver = _resolverCache.GetResolver(endPoints, CreateParallelResolver,
-            CreateUdpResolver);
-        if (withCache)
-            return _resolverCache.WrapWithCache(resolver);
-        return resolver;
-    }
-
-    private static readonly RecordType[] NameServerRecordTypes = { RecordType.A, RecordType.AAAA };
-
-    private bool Recurse
-    {
-        get => _recurseState.Value;
-        set => _recurseState.Value = value;
-    }
-
-    private static readonly AsyncLocal<bool> _recurseState = new();
-
-    [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
-    public override async Task<IResponse?> Resolve(
-        IRequest request,
-        CancellationToken cancellationToken = default
-    )
-    {
-        if (_servers.Length == 0) return null;
-        using var pooledAnswers = ListPool<IResourceRecord>.Default.Get();
-        using var pooledAuthorityRecords = ListPool<IResourceRecord>.Default.Get();
-        using var pooledAdditionalAnswerRecords = ListPool<IResourceRecord>.Default.Get();
+        var question = context.DomainMessage.Questions[0];
+        using var labels = question.Name.Labels.ToPooledList();
         using var endPoints = _servers.ToPooledList();
-        using var labels = request.Questions[0].Name.ToString(Encoding.ASCII).Split('.').ToPooledList();
-        var queryNameBuilder = _stringBuilderPool.Get();
-        int maxIteration = labels.Count + 10;
-        IResponse? response = null;
-
+        var builder = _stringBuilderPool.Get();
+        using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            while (true)
+            while (labels.Count > 1)
             {
-                maxIteration -= 1;
-                if (maxIteration <= 0)
+                addressRecords.Clear();
+                var next = labels[^1];
+                labels.RemoveAt(labels.Count - 1);
+                if (builder.Length > 0)
+                    builder.Insert(0, '.');
+                builder.Insert(0, next);
+
+                var resolver = await _clientFactory.GetParallelDomainClient(
+                    endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
+                    cancellationToken);
+                var message = DomainMessage.CreateRequest(builder.ToString(), DomainRecordType.NS);
+
+                var responseMessage = await resolver.SendAsync(message, cancellationToken);
+                addressRecords.AddRange(responseMessage.Records
+                    .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                    .Select(i => (IPAddressData)i.RecordData)
+                    .Select(i => i.Address));
+                if (addressRecords.Count != 0)
                 {
-                    return null;
-                }
-
-                var resolver = GetResolver(endPoints);
-                var lastLabelCount = labels.Count;
-                if (labels.Count > 0)
-                {
-                    if (queryNameBuilder.Length != 0)
-                        queryNameBuilder.Insert(0, '.');
-                    queryNameBuilder.Insert(0, labels[^1]);
-                    // This prevents the list from copying the array.
-                    // If we removed at 0, it will copy count-1 to index 0
-                    // But it does have a check for when the index is the last element
-                    // and skips the array copy.
-                    labels.RemoveAt(labels.Count - 1);
-                }
-
-                if (lastLabelCount == 0)
-                {
-                    var question = request.Questions[0];
-                    // No cache here, we may get nameservers with the A/AAAA request.
-                    // So if we do, we won't want that cached.
-                    resolver = GetResolver(endPoints, withCache: false);
-                    response = await resolver.Resolve(request, cancellationToken);
-                    using var allResponseRecords = response.ToResourceRecordPooledList();
-                    if (
-                        question.Type is RecordType.A or
-                            RecordType.AAAA &&
-                        response.AnswerRecords.Any(i => i.Type == question.Type)
-                    )
-                        return response;
-                    if (
-                        question.Type is not RecordType.A
-                            and not RecordType.AAAA &&
-                        allResponseRecords.Any(i => i.Type == question.Type)
-                    )
-                        return response;
-                    resolver = GetResolver(endPoints);
-                    if (response.AuthorityRecords.Count > 0 || response.AdditionalRecords.Count > 0)
-                    {
-                        using var nameserverAddresses =
-                            await GetNameServerAddresses(resolver, response, cancellationToken);
-                        if (nameserverAddresses.Count > 0)
-                        {
-                            endPoints.Clear();
-                            endPoints.AddRange(AddressRecordsToEndPoints(nameserverAddresses));
-                        }
-
-                        continue;
-                    }
-
-                    resolver = GetResolver(endPoints, withCache: false);
-                    request = new Request(request)
-                    {
-                        RecursionDesired = true, Id = Random.Shared.Next(0, int.MaxValue)
-                    };
-                    question = request.Questions[0];
-                    question = new Question(question.Name, RecordType.CNAME, RecordClass.ANY);
-                    request.Questions.Clear();
-                    request.Questions.Add(question);
-                    response = await resolver.Resolve(request, cancellationToken);
-                    response = response.Clone();
-                    response.Questions.Clear();
-                    response.Questions.Add(question);
-                    return response;
-                }
-
-                var currentRequest =
-                    new Request(request) { Id = Random.Shared.Next(1, int.MaxValue), RecursionDesired = true };
-                currentRequest.Questions.Clear();
-                currentRequest.Questions.Add(new Question(new Domain(queryNameBuilder.ToString()), RecordType.NS));
-
-                var currentResponse = await resolver.Resolve(currentRequest, cancellationToken);
-
-
-                using var additionalRecords =
-                    await GetNameServerAddresses(resolver, currentResponse, cancellationToken);
-                if (additionalRecords.Count == 0)
-                {
+                    endPoints.Clear();
+                    endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
                     continue;
                 }
 
+                var internalClient =
+                    await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
+                        cancellationToken);
+                using var nameserverQueries = GetNameserverNames(responseMessage.Records.Where(i =>
+                        i.Type == DomainRecordType.NS || i.Type == DomainRecordType.SOA)).Select(i =>
+                        internalClient.SendAsync(DomainMessage.CreateRequest(i), cancellationToken).AsTask()
+                            .OperationCancelledToNull()
+                            .ConvertExceptionsToNull()
+                    )
+                    .ToPooledList();
+                addressRecords.Clear();
+
+                var results = await Task.WhenAll(nameserverQueries);
+
+                addressRecords.AddRange(
+                    results.Where(i => i is not null)
+                        .SelectMany(i => i!.Records)
+                        .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                        .Select(i => (IPAddressData)i.RecordData)
+                        .Select(i => i.Address)
+                );
+
+                if (addressRecords.Count == 0) return null;
+
                 endPoints.Clear();
-                endPoints.AddRange(AddressRecordsToEndPoints(additionalRecords));
+                endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
             }
+
+            var finalResolver = await _clientFactory.GetParallelDomainClient(
+                endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
+                cancellationToken);
+            var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
+            return await finalResolver.SendAsync(clonedRequest, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
+            return null;
         }
         finally
         {
-            _stringBuilderPool.Return(queryNameBuilder);
+            _stringBuilderPool.Return(builder);
         }
     }
 
-    private async ValueTask<PooledList<IPAddressResourceRecord>> GetNameServerAddresses(IRequestResolver resolver,
-        IResponse response,
-        CancellationToken cancellationToken)
+    private IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)
     {
-        using var allResponseRecords = response.ToResourceRecordPooledList();
-        if (allResponseRecords.Count == 0)
-            return ListPool<IPAddressResourceRecord>.Default.Get();
-
-        var additionalRecords = allResponseRecords.OfType<IPAddressResourceRecord>().ToPooledList();
-        if (additionalRecords.Count > 0)
+        foreach (var record in records)
         {
-            return additionalRecords;
-        }
-
-        additionalRecords.AddRange(await ResolveNameServers(resolver, response, cancellationToken));
-        if (additionalRecords.Count != 0 || !Recurse)
-            return additionalRecords;
-
-        Recurse = true;
-
-        additionalRecords.AddRange(await ResolveNameServers(this, response, cancellationToken));
-
-        Recurse = false;
-
-        return additionalRecords;
-    }
-
-    private IEnumerable<IPEndPoint> AddressRecordsToEndPoints(IEnumerable<IPAddressResourceRecord> records)
-    {
-        return records.Select(i => new IPEndPoint(i.IPAddress, 53));
-    }
-
-    private static async Task<PooledList<IPAddressResourceRecord>> ResolveNameServers(IRequestResolver dnsResolver,
-        IResponse currentResponse,
-        CancellationToken cancellationToken)
-    {
-        var additionalRecords = currentResponse.AuthorityRecords
-            .Concat(currentResponse.AdditionalRecords)
-            .Concat(currentResponse.AnswerRecords)
-            .OfType<IPAddressResourceRecord>()
-            .ToPooledList();
-
-        if (additionalRecords.Count > 0)
-            return additionalRecords;
-
-        foreach (var record in
-                 currentResponse.AuthorityRecords.OfType<NameServerResourceRecord>())
-        {
-            foreach (var recordType in NameServerRecordTypes)
+            switch (record.Type)
             {
-                var newRequest = new Request() { RecursionDesired = true };
-                newRequest.Questions.Add(new Question(record.NSDomainName, recordType));
-                var nameServerResponse = await dnsResolver.Resolve(newRequest, cancellationToken);
-
-                additionalRecords.AddRange(nameServerResponse.AnswerRecords
-                    .OfType<IPAddressResourceRecord>());
-                if (additionalRecords.Count > 0)
-                    return additionalRecords;
+                case DomainRecordType.NS:
+                    yield return ((NameData)record.RecordData).Name.ToString();
+                    break;
+                case DomainRecordType.SOA:
+                    yield return record.Name.ToString();
+                    break;
             }
         }
-
-        foreach (var authority in
-                 currentResponse.AuthorityRecords.OfType<StartOfAuthorityResourceRecord>())
-        {
-            foreach (var recordType in NameServerRecordTypes)
-            {
-                var newRequest = new Request() { RecursionDesired = true };
-                newRequest.Questions.Add(new Question(authority.MasterDomainName, recordType));
-                var nameServerResponse = await dnsResolver.Resolve(newRequest, cancellationToken)
-                    ;
-                additionalRecords.AddRange(nameServerResponse.AnswerRecords
-                    .OfType<IPAddressResourceRecord>());
-                if (additionalRecords.Count > 0)
-                    return additionalRecords;
-            }
-        }
-
-        return additionalRecords;
     }
 
-    private ParallelResolver CreateParallelResolver(IEnumerable<IRequestResolver> resolvers)
-    {
-        return new ParallelResolver(resolvers);
-    }
-
-    private static UdpRequestResolver CreateUdpResolver(IPEndPoint endPoint)
-    {
-        return new UdpRequestResolver(endPoint, new TcpRequestResolver(endPoint), timeout: 500);
-    }
+    public string Name { get; } = "Recursive Resolver";
+    public int Priority { get; } = 5000;
 }

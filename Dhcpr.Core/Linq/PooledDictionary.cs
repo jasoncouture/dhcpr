@@ -8,7 +8,7 @@ public sealed class PooledDictionary<TKey, TValue> : IDictionary<TKey, TValue>, 
 {
     private long _token = 0;
     private int _estimatedCapacity;
-    
+
     private static readonly List<int> Primes = new()
     {
         3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,

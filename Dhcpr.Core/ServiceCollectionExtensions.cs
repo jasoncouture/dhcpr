@@ -18,7 +18,7 @@ public static class ServiceCollectionExtensions
             maximumConcurrency = Environment.ProcessorCount;
         else if (maximumConcurrency <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximumConcurrency));
-        var configurationName = typeof(TMessage).FullName ?? 
+        var configurationName = typeof(TMessage).FullName ??
                                 throw new InvalidOperationException("Unable to get type name for requested message type");
         // In configure, we set the concurrency to the maximum value we've seen thus far
         services.Configure<QueueProcessorConfiguration>(configurationName, i =>
@@ -26,7 +26,7 @@ public static class ServiceCollectionExtensions
             if (maximumConcurrency > i.MaximumConcurrency)
                 i.MaximumConcurrency = maximumConcurrency;
         });
-        
+
         // And in post configure, we pull it back down to the minimum
         services.PostConfigure<QueueProcessorConfiguration>(configurationName, i =>
         {

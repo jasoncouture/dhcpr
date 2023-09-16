@@ -40,7 +40,7 @@ public class InternalDomainClient : IInternalDomainClient
         _messageQueue.Enqueue(message, cancellationToken);
 
         var result = await message.TaskCompletionSource.Task.ConfigureAwait(false);
-        
+
         if (result is null)
             throw new OperationCanceledException("Did not receive a response from the internal DNS chain");
 

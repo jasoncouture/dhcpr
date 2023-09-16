@@ -155,7 +155,7 @@ public static class DomainMessageEncoder
     public static PooledList<DomainResourceRecord> ReadRecordsAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int count)
     {
         var resourceRecords = ListPool<DomainResourceRecord>.Default.Get();
-        
+
         for (var x = 0; x < count; x++)
         {
             resourceRecords.Add(ReadRecordAndAdvance(ref bytes));

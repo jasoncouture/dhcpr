@@ -44,7 +44,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
     {
         var endPoints = _currentConfiguration.Forwarders.GetForwarderEndpoints();
         if (endPoints.Length == 0) return null;
-        
+
         var clients = await Task.WhenAll(endPoints
             .Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp })
             .Select(i => _domainClientFactory.GetDomainClient(i, cancellationToken).AsTask()));
@@ -56,7 +56,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
         var completed = await Task.WhenAny(udpTasks);
 
         Task.WhenAll(udpTasks).IgnoreExceptionsAsync().Orphan();
-        
+
         return await completed;
     }
 

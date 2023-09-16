@@ -37,7 +37,7 @@ internal class DatabaseExpirationScannerService : IQueueMessageProcessor<HeartBe
                 ;
 
             await transaction.CommitAsync(cancellationToken);
-            
+
             if (deleted == 0)
             {
                 break;

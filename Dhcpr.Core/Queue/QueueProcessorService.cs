@@ -24,7 +24,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         _options = optionsFactory.Create(configurationName);
     }
 
-    
+
 
     private (CancellationTokenSource cancellationTokenSource, CancellationTokenRegistration subscription)
         GetCancellationTokenSource(
@@ -78,7 +78,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
                 async () => await Task.WhenAll(
                         messageProcessors.Select(async i =>
                             await i.ProcessMessageAsync(message, token)
-                                
+
                         )
                     ).OperationCancelledToBoolean()
                     ,

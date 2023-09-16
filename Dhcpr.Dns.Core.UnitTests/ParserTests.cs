@@ -82,7 +82,7 @@ public class ParserTests
             }.ToImmutableArray(),
             DomainResourceRecords.Empty
         );
-        
+
         Span<byte> data = stackalloc byte[message.EstimatedSize];
         var bytesWritten = DomainMessageEncoder.Encode(data, message);
 

@@ -105,14 +105,14 @@ public static class DomainMessageEncoder
     }
 
     private const ushort DnsCompressionFlag = 0xC000;
-    private const ushort DnsCompressionFlagMask = (~DnsCompressionFlag) & 0xFFFF;
+    private const ushort DnsCompressionFlagMask = (DnsCompressionFlag ^ 0xFFFF) & 0xFFFF;
 
     private static string ReadLabelAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int recurseDepth = 0)
     {
         // While it's valid for a pointer to point to another pointer, need to make sure we limit it.
         if (recurseDepth > 3)
             throw new InvalidDataException("DNS Packet is malformed, possible infinite loop with label references");
-        var nextCount = (int)ReadByteAndAdvance(ref bytes);
+        var nextCount = ReadByteAndAdvance(ref bytes);
         switch (nextCount)
         {
             case 0:
@@ -127,7 +127,8 @@ public static class DomainMessageEncoder
                 }
         }
         
-        var pointerOffset = (int)ReadByteAndAdvance(ref bytes);
+        var lowerBits = ReadByteAndAdvance(ref bytes);
+        var pointerOffset = (int)BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() & DnsCompressionFlagMask;
         var targetBytes = bytes.Start[pointerOffset..];
 
         var domainLabels = ReadLabelsAndAdvance(ref targetBytes, recurseDepth + 1);

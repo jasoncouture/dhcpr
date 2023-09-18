@@ -112,31 +112,23 @@ public static class DomainMessageEncoder
         // While it's valid for a pointer to point to another pointer, need to make sure we limit it.
         if (recurseDepth > 3)
             throw new InvalidDataException("DNS Packet is malformed, possible infinite loop with label references");
-        var nextCount = (byte)ReadByteAndAdvance(ref bytes);
+        var nextCount = (int)ReadByteAndAdvance(ref bytes);
         switch (nextCount)
         {
             case 0:
                 return string.Empty;
             case < 192 and > 63:
                 throw new InvalidDataException("Maximum label length is 63 bytes");
-            case < 192:
+            case <= 63:
                 {
                     var ret = Encoding.ASCII.GetString(bytes[..nextCount]);
                     bytes = bytes[nextCount..];
                     return ret;
                 }
         }
-
-
-        var lengthStartOffset = bytes.Offset - 1;
-        bytes = bytes.FromStart()[lengthStartOffset..];
-        var pointerOffset = ReadUnsignedShortAndAdvance(ref bytes);
-        if ((pointerOffset & DnsCompressionFlag) != DnsCompressionFlag)
-            throw new InvalidDataException("Expected compressed label pointer, but the upper bits are incorrect");
-        // Strip off the upper 2 bits
-        pointerOffset &= DnsCompressionFlagMask;
-        var targetBytes = bytes.FromStart();
-        targetBytes = targetBytes[pointerOffset..];
+        
+        var pointerOffset = (int)ReadByteAndAdvance(ref bytes);
+        var targetBytes = bytes.Start[pointerOffset..];
 
         var domainLabels = ReadLabelsAndAdvance(ref targetBytes, recurseDepth + 1);
 
@@ -175,7 +167,7 @@ public static class DomainMessageEncoder
 
         bytes = bytes[dataLength..];
 
-        return new DomainResourceRecord(labels, type, @class, ttl, dataBuffer.Span.ToImmutableArray());
+        return new DomainResourceRecord(labels, type, @class, ttl, dataBuffer.CurrentSpan.ToImmutableArray());
     }
 
     public static PooledList<DomainQuestion> GetQuestionsFromDataAndAdvance(ref ReadOnlyDnsParsingSpan bytes,
@@ -298,8 +290,13 @@ public static class DomainMessageEncoder
         EncodeAndAdvance(ref buffer, (ushort)record.Class);
         EncodeAndAdvance(ref buffer, (int)record.TimeToLive.TotalSeconds);
         EncodeAndAdvance(ref buffer, (ushort)record.Data.Length);
-        record.Data.CopyTo(buffer);
-        buffer = buffer[record.Data.Length..];
+        EncodeAndAdvance(ref buffer, record.Data.AsSpan());
+    }
+
+    public static void EncodeAndAdvance(ref DnsParsingSpan buffer, ReadOnlySpan<byte> data)
+    {
+        data.CopyTo(buffer);
+        buffer = buffer[data.Length..];
     }
 
     public static void EncodeAndAdvance(ref DnsParsingSpan buffer, int value)

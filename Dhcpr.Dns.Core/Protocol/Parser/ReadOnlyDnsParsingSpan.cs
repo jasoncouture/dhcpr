@@ -4,7 +4,8 @@ public readonly ref struct ReadOnlyDnsParsingSpan
 {
     private readonly ReadOnlySpan<byte> _buffer;
     private readonly ReadOnlySpan<byte> _start;
-    public ReadOnlySpan<byte> Span => _buffer;
+    public ReadOnlySpan<byte> CurrentSpan => _buffer;
+    public ReadOnlyDnsParsingSpan Start => new(_start);
     public int Count => _buffer.Length;
     public byte this[Index index] => _buffer[index.GetOffset(Count)];
 
@@ -44,6 +45,5 @@ public readonly ref struct ReadOnlyDnsParsingSpan
 
     public static implicit operator ReadOnlySpan<byte>(ReadOnlyDnsParsingSpan span) => span._buffer;
 
-    public ReadOnlyDnsParsingSpan FromStart() => new(_start);
     public int Offset { get; }
 }

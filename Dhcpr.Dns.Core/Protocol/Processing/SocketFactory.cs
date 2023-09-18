@@ -9,8 +9,8 @@ public sealed class SocketFactory : ISocketFactory
     {
         var client = new UdpClient();
         localEndPoint ??= new IPEndPoint(IPAddress.Any, 0);
-        client.ExclusiveAddressUse = !exclusive;
-        client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+        //client.ExclusiveAddressUse = !exclusive;
+        // client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         client.Client.Bind(localEndPoint);
         return client;
     }

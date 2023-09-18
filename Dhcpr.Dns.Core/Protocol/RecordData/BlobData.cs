@@ -16,6 +16,6 @@ public sealed record BlobData(ImmutableArray<byte> Blob) : IDomainResourceRecord
 
     public static IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes)
     {
-        return new BlobData(bytes.Span.ToImmutableArray());
+        return new BlobData(bytes.CurrentSpan.ToImmutableArray());
     }
 }

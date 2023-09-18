@@ -12,6 +12,7 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
@@ -23,13 +24,17 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
-        IEnumerable<IPEndPoint> servers,
+        IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
         IDomainClientFactory clientFactory,
         ObjectPool<StringBuilder> stringBuilderPool,
         ILogger<RecursiveRootResolver> logger
     )
     {
-        _servers = servers.ToImmutableArray();
+        _servers = rootServerConfiguration.CurrentValue.Addresses
+            .Select(i => i.GetEndPoint(53))
+            .Cast<IPEndPoint>()
+            .Shuffle()
+            .ToImmutableArray();
         _clientFactory = clientFactory;
         _stringBuilderPool = stringBuilderPool;
         _logger = logger;
@@ -78,11 +83,12 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
                         cancellationToken);
                 using var nameserverQueries = GetNameserverNames(responseMessage.Records.Where(i =>
-                        i.Type == DomainRecordType.NS || i.Type == DomainRecordType.SOA)).Select(i =>
-                        internalClient.SendAsync(DomainMessage.CreateRequest(i), cancellationToken).AsTask()
-                            .OperationCancelledToNull()
-                            .ConvertExceptionsToNull()
-                    )
+                        i.Type is DomainRecordType.NS or DomainRecordType.SOA)).SelectMany(i =>new[] { 
+                            internalClient.SendAsync(DomainMessage.CreateRequest(i), cancellationToken).AsTask(),
+                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA), cancellationToken).AsTask()
+                        }
+                    ).Select(i => i.OperationCancelledToNull()
+                        .ConvertExceptionsToNull())
                     .ToPooledList();
                 addressRecords.Clear();
 
@@ -96,7 +102,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                         .Select(i => i.Address)
                 );
 
-                if (addressRecords.Count == 0) return null;
+                if (addressRecords.Count == 0) 
+                    continue;
 
                 endPoints.Clear();
                 endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
@@ -119,10 +126,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
     }
 
-    private IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)
+    private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)
     {
         foreach (var record in records)
         {
+            // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
             switch (record.Type)
             {
                 case DomainRecordType.NS:

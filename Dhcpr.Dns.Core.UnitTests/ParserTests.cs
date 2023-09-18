@@ -1,9 +1,11 @@
 ﻿using System.Collections.Immutable;
+using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
 using DNS.Protocol;
+using DNS.Protocol.ResourceRecords;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -24,6 +26,8 @@ public class ParserTests
     {
         var libraryRequest = new Request { Id = 1234, RecursionDesired = true };
         libraryRequest.Questions.Add(new Question(new Domain("www.google.com")));
+        libraryRequest.AdditionalRecords.Add(new NameServerResourceRecord(new Domain("fake.net"), new Domain("fake2.org")));
+        libraryRequest.AdditionalRecords.Add(new IPAddressResourceRecord(new Domain("fake3.edu"), IPAddress.Broadcast));
         var libraryRequestBytes = libraryRequest.ToArray()!;
         var decodedMessage = DomainMessageEncoder.Decode(libraryRequestBytes);
         //Assert.Equal(libraryRequestBytes.Length, decodedMessage.Size);

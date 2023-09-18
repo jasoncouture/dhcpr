@@ -7,29 +7,7 @@ using Dhcpr.Dns.Core.Protocol.Parser;
 
 using DNS.Protocol;
 
-
-[MemoryDiagnoser]
-[SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
-public class DnsMessageDecodingBenchmarks
-{
-    static DnsMessageDecodingBenchmarks()
-    {
-        Payload = DnsMessageEncodingBenchmarks.Request.ToArray();
-    }
-    private static byte[] Payload { get; }
-
-    [Benchmark]
-    public void Library()
-    {
-        Request.FromArray(Payload);
-    }
-
-    [Benchmark]
-    public void DomainMessage()
-    {
-        DomainMessageEncoder.Decode(Payload);
-    }
-}
+namespace Dhcpr.Benchmarks;
 
 [MemoryDiagnoser]
 [SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]

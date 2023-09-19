@@ -16,7 +16,7 @@ public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfCom
         }
     }
 
-    public DomainLabels(string str) : this(str.Split('.')) { }
+    public DomainLabels(string str) : this(str.TrimEnd('.').Split('.')) { }
 
     public DomainLabels(IEnumerable<string> strings) : this(ValidateAndCreateLabelsFromStrings(strings)
         .ToImmutableArray())

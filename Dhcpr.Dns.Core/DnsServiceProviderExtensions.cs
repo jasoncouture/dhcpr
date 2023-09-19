@@ -18,6 +18,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();

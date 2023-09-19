@@ -87,22 +87,20 @@ public static class DomainMessageEncoder
             (DomainResponseCode)ReadBits(flags, ResponseCodeBitIndex, ResponseCodeBitCount)
         );
     }
-
-    public static DomainLabels ReadLabelsAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int recurseDepth = 0)
+    public static DomainLabels ReadLabelsAndAdvance(ref ReadOnlyDnsParsingSpan bytes)
     {
         // TODO: Make this not recursive.
         using var labels = ListPool<string>.Default.Get();
+        using var visitedPositions = Pool.GetHashSet<int>();
+
         while (true)
         {
-            var next = ReadLabelAndAdvance(ref bytes, recurseDepth);
+            var next = ReadLabelAndAdvance(ref bytes, visitedPositions);
             if (string.IsNullOrWhiteSpace(next)) break;
-            if (next.Contains('.'))
+            if (next.EndsWith('.'))
             {
                 var returnedLabels = next.TrimEnd('.').Split('.');
-
-                labels.AddRange(returnedLabels);
-
-                return new DomainLabels(labels);
+                return new DomainLabels(labels.Concat(returnedLabels));
             }
 
             labels.Add(next);
@@ -114,16 +112,19 @@ public static class DomainMessageEncoder
     private const ushort DnsCompressionFlag = 0xC000;
     private const ushort DnsCompressionFlagMask = (DnsCompressionFlag ^ 0xFFFF) & 0xFFFF;
 
-    private static string ReadLabelAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int recurseDepth = 0)
+    private static readonly ThreadLocal<HashSet<int>> HashSetPool = new();
+
+    private static string ReadLabelAndAdvance(ref ReadOnlyDnsParsingSpan bytes, HashSet<int> visitedPositions)
     {
         // While it's valid for a pointer to point to another pointer, need to make sure we limit it.
-        if (recurseDepth > 3)
-            throw new InvalidDataException("DNS Packet is malformed, possible infinite loop with label references");
-        var nextCount = ReadByteAndAdvance(ref bytes);
+        if (!visitedPositions.Add(bytes.Offset))
+            throw new InvalidDataException("DNS compression loop detected.");
+        var nextCount = (ushort)ReadByteAndAdvance(ref bytes);
+        if (nextCount == 0)
+            return string.Empty;
+
         switch (nextCount)
         {
-            case 0:
-                return string.Empty;
             case < 192 and > 63:
                 throw new InvalidDataException("Maximum label length is 63 bytes");
             case <= 63:
@@ -134,26 +135,32 @@ public static class DomainMessageEncoder
                 }
         }
 
-        var lowerBits = ReadByteAndAdvance(ref bytes);
-        var pointerOffset = BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() &
-                            DnsCompressionFlagMask;
+        // backup one byte, and read it as a ushort, it's a pointer.
+        bytes = bytes.Start[(bytes.Offset - 1)..];
+        var pointerOffset = ReadUnsignedShortAndAdvance(ref bytes);
+        pointerOffset &= DnsCompressionFlagMask;
+
         var targetBytes = bytes.Start[pointerOffset..];
 
-        var domainLabels = ReadLabelsAndAdvance(ref targetBytes, recurseDepth + 1);
+        using var labelPool = ListPool<string>.Default.Get();
 
-        if (domainLabels.Labels.Length == 0)
-            return string.Empty;
+        while (true)
+        {
+            var next = ReadLabelAndAdvance(ref targetBytes, visitedPositions);
+            if (string.IsNullOrWhiteSpace(next)) break;
+            labelPool.Add(next.TrimEnd('.'));
+            if (next.EndsWith('.')) break;
+        }
 
-        var next = string.Join(
+        if (labelPool.Count > 0)
+            labelPool.Add(string.Empty);
+
+        return string.Join(
             '.',
-            domainLabels.Labels
-                .Select(i => i.Label)
-                .Append(string.Empty)
+            labelPool
         );
-
-        return next;
     }
-    
+
 
     public static PooledList<DomainResourceRecord> ReadRecordsAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int count)
     {

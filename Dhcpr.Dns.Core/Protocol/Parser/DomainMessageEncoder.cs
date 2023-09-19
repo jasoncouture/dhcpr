@@ -49,8 +49,8 @@ public static class DomainMessageEncoder
         var parsingSpan = new ReadOnlyDnsParsingSpan(bytes);
         var id = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var flags = ReadMessageFlagsAndAdvance(ref parsingSpan);
+        
         var questionCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
-
         var answerCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var authorityCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var additionalCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
@@ -90,7 +90,7 @@ public static class DomainMessageEncoder
         using var labels = ListPool<string>.Default.Get();
         while (true)
         {
-            var next = ReadLabelAndAdvance(ref bytes);
+            var next = ReadLabelAndAdvance(ref bytes, recurseDepth);
             if (string.IsNullOrWhiteSpace(next)) break;
             if (next.Contains('.'))
             {
@@ -128,7 +128,7 @@ public static class DomainMessageEncoder
         }
         
         var lowerBits = ReadByteAndAdvance(ref bytes);
-        var pointerOffset = (int)BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() & DnsCompressionFlagMask;
+        var pointerOffset = BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() & DnsCompressionFlagMask;
         var targetBytes = bytes.Start[pointerOffset..];
 
         var domainLabels = ReadLabelsAndAdvance(ref targetBytes, recurseDepth + 1);
@@ -329,15 +329,14 @@ public static class DomainMessageEncoder
             var currentFullLabel = string.Join('.', slice);
             if (buffer.TryGetOffset(currentFullLabel, out var offset))
             {
-                EncodeAndAdvance(ref buffer, (ushort)((offset & ushort.MaxValue) | 0xC000));
+                EncodeAndAdvance(ref buffer, (ushort)((offset & ushort.MaxValue) | DnsCompressionFlag));
                 return;
             }
 
             buffer.AddLabel(currentFullLabel, buffer.Offset);
             EncodeAndAdvance(ref buffer, labels.Labels[index]);
         }
-
-        EncodeAndAdvance(ref buffer, DomainLabel.Empty);
+        EncodeAndAdvance(ref buffer, (byte)0);
     }
 
     public static void EncodeAndAdvance(ref DnsParsingSpan bytes, byte value)

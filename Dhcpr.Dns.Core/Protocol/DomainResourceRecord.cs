@@ -14,18 +14,7 @@ public sealed record DomainResourceRecord(
 {
     private IDomainResourceRecordData? _recordData;
     private int? _size;
-    public int EstimatedSize => _size ??= Name.EstimatedSize + sizeof(ushort) + sizeof(ushort) + sizeof(int) + 1 + Data.Length;
-    public ushort DataLogicalSize => GetDataSizeForType(Type);
-    
-    private ushort GetDataSizeForType(DomainRecordType type)
-    {
-        return type switch
-        {
-            DomainRecordType.A => 1,
-            DomainRecordType.AAAA => 1,
-            _ => (ushort)Data.Length
-        };
-    }
+    public int EstimatedSize => _size ??= Name.EstimatedSize + sizeof(ushort) + sizeof(ushort) + sizeof(int) + sizeof(ushort) + Data.Length;
 
     public IDomainResourceRecordData RecordData => _recordData ??= Data.AsSpan().ToData(Type);
 }

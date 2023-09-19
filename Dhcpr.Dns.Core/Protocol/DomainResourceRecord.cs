@@ -9,7 +9,7 @@ public sealed record DomainResourceRecord(
     DomainRecordType Type,
     DomainRecordClass Class,
     TimeSpan TimeToLive,
-    IDomainResourceRecordData Data 
+    IDomainResourceRecordData Data
 ) : ISelfComputeEstimatedSize
 {
     private int? _size;

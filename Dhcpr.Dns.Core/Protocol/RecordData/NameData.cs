@@ -14,6 +14,6 @@ public record NameData(DomainLabels Name) : IDomainResourceRecordData
         DomainMessageEncoder.EncodeAndAdvance(ref origin, (ushort)(span.Offset - (origin.Offset + 2)));
     }
 
-    public static IDomainResourceRecordData ReadFrom(ref ReadOnlyDnsParsingSpan bytes, int dataLength) 
+    public static IDomainResourceRecordData ReadFrom(ref ReadOnlyDnsParsingSpan bytes, int dataLength)
         => new NameData(DomainMessageEncoder.ReadLabelsAndAdvance(ref bytes));
 }

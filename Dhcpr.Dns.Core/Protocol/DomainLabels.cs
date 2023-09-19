@@ -25,7 +25,7 @@ public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfCom
 
     private string? _domainName;
     private int? _size;
-    public int EstimatedSize => _size ??= Labels.Append(DomainLabel.Empty).Select(i => i.EstimatedSize).Sum();
+    public int EstimatedSize => _size ??= Labels.Select(i => i.EstimatedSize).Sum() + 1;
     private string DomainName => _domainName ??= FormatDomainName(Labels);
 
     public static DomainLabels Empty { get; } = new DomainLabels(ImmutableArray<DomainLabel>.Empty);

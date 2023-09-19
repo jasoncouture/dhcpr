@@ -16,6 +16,100 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+public sealed class CacheResolverDecorator : IDomainMessageMiddleware
+{
+    private readonly IDomainMessageMiddleware _innerMiddleware;
+
+    public CacheResolverDecorator(IDomainMessageMiddleware innerMiddleware)
+    {
+        _innerMiddleware = innerMiddleware;
+    }
+
+    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
+    {
+        return await _innerMiddleware.ProcessAsync(context, cancellationToken);
+    }
+
+    public string Name => _innerMiddleware.Name;
+
+    public int Priority => _innerMiddleware.Priority;
+}
+
+public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
+{
+    private readonly IDomainMessageMiddleware _innerMiddleware;
+    private readonly IDomainClientFactory _clientFactory;
+
+    public CanonicalNameResolverDecorator(IDomainMessageMiddleware innerMiddleware, IDomainClientFactory clientFactory)
+    {
+        this._innerMiddleware = innerMiddleware;
+        _clientFactory = clientFactory;
+    }
+
+    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
+        CancellationToken cancellationToken)
+    {
+        var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
+        if (result is null)
+            return result;
+        result = result with { Flags = result.Flags with { RecursionAvailable = true } };
+        if (!context.DomainMessage.Flags.RecursionDesired)
+            return result;
+
+        if (context.DomainMessage.Questions.All(i =>
+                i.Type is not DomainRecordType.A and not DomainRecordType.AAAA and not DomainRecordType.CNAME))
+            return result;
+
+        if (result.Records.All(i => i.Type != DomainRecordType.CNAME))
+            return result;
+
+        if (result.Records.Answers.Any(i =>
+                i.Type != DomainRecordType.CNAME && i.Type == context.DomainMessage.Questions[0].Type))
+            return result;
+
+        var cnameRecords = result.Records
+            .Where(i => i.Type == DomainRecordType.CNAME)
+            .ToPooledList();
+
+        var internalClient =
+            await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
+                cancellationToken);
+
+        foreach (var (record, type) in cnameRecords.SelectMany(i => new[]
+                 {
+                     (record: i, DomainRecordType.A), (record: i, DomainRecordType.AAAA)
+                 }))
+        {
+            var nextRequest = DomainMessage.CreateRequest(((NameData)record.Data).Name.ToString(), type);
+
+            var nextResponse = await internalClient.SendAsync(nextRequest, cancellationToken)
+                .AsTask()
+                .ConvertExceptionsToNull();
+
+            if (nextResponse is null) continue;
+            if (nextResponse.Records.Answers.Length == 0) continue;
+
+            result = result with
+            {
+                Records = result.Records with
+                {
+                    Additional = result.Records.Additional
+                        .Concat(
+                            nextResponse.Records.Where(i => i.Type == type)
+                        )
+                        .ToImmutableArray()
+                }
+            };
+        }
+
+        return result;
+    }
+
+    public string Name => _innerMiddleware.Name;
+
+    public int Priority => _innerMiddleware.Priority;
+}
+
 public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
     private readonly IDomainClientFactory _clientFactory;
@@ -53,7 +147,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            while (labels.Count > 1)
+            while (labels.Count > 0)
             {
                 addressRecords.Clear();
                 var next = labels[^1];
@@ -83,9 +177,14 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
                         cancellationToken);
                 using var nameserverQueries = GetNameserverNames(responseMessage.Records.Where(i =>
-                        i.Type is DomainRecordType.NS or DomainRecordType.SOA)).SelectMany(i =>new[] { 
+                        i.Type is DomainRecordType.NS or DomainRecordType.SOA))
+                    .Where(i => !string.IsNullOrWhiteSpace(i))
+                    .SelectMany(i =>
+                        new[]
+                        {
                             internalClient.SendAsync(DomainMessage.CreateRequest(i), cancellationToken).AsTask(),
-                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA), cancellationToken).AsTask()
+                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA),
+                                cancellationToken).AsTask()
                         }
                     ).Select(i => i.OperationCancelledToNull()
                         .ConvertExceptionsToNull())
@@ -102,7 +201,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                         .Select(i => i.Address)
                 );
 
-                if (addressRecords.Count == 0) 
+                if (addressRecords.Count == 0)
                     continue;
 
                 endPoints.Clear();
@@ -113,7 +212,27 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
                 cancellationToken);
             var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
-            return await finalResolver.SendAsync(clonedRequest, cancellationToken);
+            var result = await finalResolver.SendAsync(clonedRequest, cancellationToken);
+
+            if (result.Records.Answers.Length != 0 ||
+                clonedRequest.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+            {
+                return result;
+            }
+
+            clonedRequest = clonedRequest with
+            {
+                Questions = clonedRequest.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
+                    .ToImmutableArray()
+            };
+            var cnameResponse = await finalResolver.SendAsync(clonedRequest, cancellationToken);
+            if (cnameResponse.Records.Answers.Length > 0 &&
+                cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
+            {
+                return cnameResponse;
+            }
+
+            return result;
         }
         catch (Exception ex)
         {

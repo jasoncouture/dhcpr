@@ -14,6 +14,7 @@ public sealed record StartOfAuthorityData(
 
     public void WriteTo(ref DnsParsingSpan span)
     {
+        DomainMessageEncoder.EncodeAndAdvance(ref span, (ushort)EstimatedSize);
         DomainMessageEncoder.EncodeAndAdvance(ref span, SerialNumber);
         DomainMessageEncoder.EncodeAndAdvance(ref span, RefreshInterval);
         DomainMessageEncoder.EncodeAndAdvance(ref span, RetryInterval);
@@ -21,7 +22,7 @@ public sealed record StartOfAuthorityData(
         DomainMessageEncoder.EncodeAndAdvance(ref span, MinimumTimeToLive);
     }
 
-    public static IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes)
+    public static IDomainResourceRecordData ReadFrom(ref ReadOnlyDnsParsingSpan bytes, int dataLength)
     {
         var serialNumber = DomainMessageEncoder.ReadIntegerAndAdvance(ref bytes);
         var refreshInterval = DomainMessageEncoder.ReadIntegerAndAdvance(ref bytes);

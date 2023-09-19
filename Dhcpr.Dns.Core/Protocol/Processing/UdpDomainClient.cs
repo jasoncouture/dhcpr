@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
@@ -49,6 +50,7 @@ public sealed class UdpDomainClient : IDomainClient
             cancellationToken.ThrowIfCancellationRequested();
             var socketResult = await socket.ReceiveFromAsync(buffer, target, cancellationToken);
             buffer = buffer[..socketResult.ReceivedBytes];
+            
             var result = DomainMessageEncoder.Decode(buffer.Span);
 
             if (result.Id != messageId) // ID did not match, try again.

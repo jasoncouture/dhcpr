@@ -10,13 +10,17 @@ public sealed record TextData(string Text) : IDomainResourceRecordData
 
     public void WriteTo(ref DnsParsingSpan span)
     {
+        DomainMessageEncoder.EncodeAndAdvance(ref span, (ushort)EstimatedSize);
         DomainMessageEncoder.EncodeAndAdvance(ref span, (byte)Text.Length);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Text);
     }
 
-    public static IDomainResourceRecordData ReadFrom(ReadOnlyDnsParsingSpan bytes)
+    public static IDomainResourceRecordData ReadFrom(ref ReadOnlyDnsParsingSpan bytes, int dataLength)
     {
         var textLength = bytes[0];
-        return new TextData(Encoding.ASCII.GetString(bytes[1..textLength]));
+        bytes = bytes[1..];
+        var text = Encoding.ASCII.GetString(bytes[..textLength].CurrentSpan);
+        bytes = bytes[textLength..];
+        return new TextData(text);
     }
 }

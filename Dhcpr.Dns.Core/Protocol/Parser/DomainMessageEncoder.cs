@@ -1,8 +1,11 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Parser;
 
@@ -49,7 +52,7 @@ public static class DomainMessageEncoder
         var parsingSpan = new ReadOnlyDnsParsingSpan(bytes);
         var id = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var flags = ReadMessageFlagsAndAdvance(ref parsingSpan);
-        
+
         var questionCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var answerCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var authorityCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
@@ -87,6 +90,7 @@ public static class DomainMessageEncoder
 
     public static DomainLabels ReadLabelsAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int recurseDepth = 0)
     {
+        // TODO: Make this not recursive.
         using var labels = ListPool<string>.Default.Get();
         while (true)
         {
@@ -94,8 +98,11 @@ public static class DomainMessageEncoder
             if (string.IsNullOrWhiteSpace(next)) break;
             if (next.Contains('.'))
             {
-                labels.AddRange(next.Split('.'));
-                break;
+                var returnedLabels = next.TrimEnd('.').Split('.');
+
+                labels.AddRange(returnedLabels);
+
+                return new DomainLabels(labels);
             }
 
             labels.Add(next);
@@ -126,9 +133,10 @@ public static class DomainMessageEncoder
                     return ret;
                 }
         }
-        
+
         var lowerBits = ReadByteAndAdvance(ref bytes);
-        var pointerOffset = BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() & DnsCompressionFlagMask;
+        var pointerOffset = BitConverter.ToUInt16(new[] { (byte)nextCount, (byte)lowerBits }).ToHostByteOrder() &
+                            DnsCompressionFlagMask;
         var targetBytes = bytes.Start[pointerOffset..];
 
         var domainLabels = ReadLabelsAndAdvance(ref targetBytes, recurseDepth + 1);
@@ -140,10 +148,12 @@ public static class DomainMessageEncoder
             '.',
             domainLabels.Labels
                 .Select(i => i.Label)
+                .Append(string.Empty)
         );
 
         return next;
     }
+    
 
     public static PooledList<DomainResourceRecord> ReadRecordsAndAdvance(ref ReadOnlyDnsParsingSpan bytes, int count)
     {
@@ -165,10 +175,10 @@ public static class DomainMessageEncoder
         var ttl = ReadTimeSpanAndAdvance(ref bytes);
         var dataLength = ReadUnsignedShortAndAdvance(ref bytes);
         var dataBuffer = bytes[..dataLength];
-
+        var ret = new DomainResourceRecord(labels, type, @class, ttl, dataBuffer.ToData(type, dataLength));
         bytes = bytes[dataLength..];
 
-        return new DomainResourceRecord(labels, type, @class, ttl, dataBuffer.CurrentSpan.ToImmutableArray());
+        return ret;
     }
 
     public static PooledList<DomainQuestion> GetQuestionsFromDataAndAdvance(ref ReadOnlyDnsParsingSpan bytes,
@@ -290,14 +300,12 @@ public static class DomainMessageEncoder
         EncodeAndAdvance(ref buffer, (ushort)record.Type);
         EncodeAndAdvance(ref buffer, (ushort)record.Class);
         EncodeAndAdvance(ref buffer, (int)record.TimeToLive.TotalSeconds);
-        EncodeAndAdvance(ref buffer, (ushort)record.Data.Length);
-        EncodeAndAdvance(ref buffer, record.Data.AsSpan());
+        EncodeAndAdvance(ref buffer, record.Data);
     }
 
-    public static void EncodeAndAdvance(ref DnsParsingSpan buffer, ReadOnlySpan<byte> data)
+    public static void EncodeAndAdvance(ref DnsParsingSpan buffer, IDomainResourceRecordData data)
     {
-        data.CopyTo(buffer);
-        buffer = buffer[data.Length..];
+        data.WriteTo(ref buffer);
     }
 
     public static void EncodeAndAdvance(ref DnsParsingSpan buffer, int value)
@@ -336,6 +344,7 @@ public static class DomainMessageEncoder
             buffer.AddLabel(currentFullLabel, buffer.Offset);
             EncodeAndAdvance(ref buffer, labels.Labels[index]);
         }
+
         EncodeAndAdvance(ref buffer, (byte)0);
     }
 

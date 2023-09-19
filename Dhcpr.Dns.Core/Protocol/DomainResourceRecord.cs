@@ -9,12 +9,9 @@ public sealed record DomainResourceRecord(
     DomainRecordType Type,
     DomainRecordClass Class,
     TimeSpan TimeToLive,
-    ImmutableArray<byte> Data
+    IDomainResourceRecordData Data 
 ) : ISelfComputeEstimatedSize
 {
-    private IDomainResourceRecordData? _recordData;
     private int? _size;
-    public int EstimatedSize => _size ??= Name.EstimatedSize + sizeof(ushort) + sizeof(ushort) + sizeof(int) + sizeof(ushort) + Data.Length;
-
-    public IDomainResourceRecordData RecordData => _recordData ??= Data.AsSpan().ToData(Type);
+    public int EstimatedSize => _size ??= Name.EstimatedSize + sizeof(ushort) + sizeof(ushort) + sizeof(int) + sizeof(ushort) + Data.EstimatedSize;
 }

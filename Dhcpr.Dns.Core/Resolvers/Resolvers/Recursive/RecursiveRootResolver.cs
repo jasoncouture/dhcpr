@@ -70,7 +70,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 var responseMessage = await resolver.SendAsync(message, cancellationToken);
                 addressRecords.AddRange(responseMessage.Records
                     .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                    .Select(i => (IPAddressData)i.RecordData)
+                    .Select(i => (IPAddressData)i.Data)
                     .Select(i => i.Address));
                 if (addressRecords.Count != 0)
                 {
@@ -98,7 +98,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     results.Where(i => i is not null)
                         .SelectMany(i => i!.Records)
                         .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                        .Select(i => (IPAddressData)i.RecordData)
+                        .Select(i => (IPAddressData)i.Data)
                         .Select(i => i.Address)
                 );
 
@@ -134,7 +134,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             switch (record.Type)
             {
                 case DomainRecordType.NS:
-                    yield return ((NameData)record.RecordData).Name.ToString();
+                    yield return ((NameData)record.Data).Name.ToString();
                     break;
                 case DomainRecordType.SOA:
                     yield return record.Name.ToString();

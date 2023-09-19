@@ -7,32 +7,31 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 public static class ResourceRecordExtensions
 {
     [SuppressMessage("ReSharper", "SwitchStatementHandlesSomeKnownEnumValuesWithDefault")]
-    public static IDomainResourceRecordData ToData(this ReadOnlySpan<byte> bytes, DomainRecordType type)
+    public static IDomainResourceRecordData ToData(this ref ReadOnlyDnsParsingSpan parsingSpan, DomainRecordType type, int dataLength)
     {
-        var parsingSpan = new ReadOnlyDnsParsingSpan(bytes);
         switch (type)
         {
             case DomainRecordType.A:
             case DomainRecordType.AAAA:
-                return CreateData<IPAddressData>(parsingSpan);
+                return CreateData<IPAddressData>(ref parsingSpan, dataLength);
             case DomainRecordType.NS:
             case DomainRecordType.CNAME:
             case DomainRecordType.PTR:
-                return CreateData<NameData>(parsingSpan);
+                return CreateData<NameData>(ref parsingSpan, dataLength);
             case DomainRecordType.SOA:
-                return CreateData<StartOfAuthorityData>(parsingSpan);
+                return CreateData<StartOfAuthorityData>(ref parsingSpan, dataLength);
             case DomainRecordType.MX:
-                return CreateData<MailExchangerData>(parsingSpan);
+                return CreateData<MailExchangerData>(ref parsingSpan, dataLength);
             case DomainRecordType.TXT:
-                return CreateData<TextData>(parsingSpan);
+                return CreateData<TextData>(ref parsingSpan, dataLength);
             case DomainRecordType.SRV:
-                return CreateData<ServiceData>(parsingSpan);
+                return CreateData<ServiceData>(ref parsingSpan, dataLength);
             default:
-                return CreateData<BlobData>(parsingSpan);
+                return CreateData<BlobData>(ref parsingSpan, dataLength);
         }
     }
 
-    private static IDomainResourceRecordData CreateData<T>(ReadOnlyDnsParsingSpan bytes)
+    private static IDomainResourceRecordData CreateData<T>(ref ReadOnlyDnsParsingSpan bytes, int dataLength)
         where T : IDomainResourceRecordData
-        => T.ReadFrom(bytes);
+        => T.ReadFrom(ref bytes, dataLength);
 }

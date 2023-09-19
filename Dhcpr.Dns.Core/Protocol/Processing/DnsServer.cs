@@ -36,24 +36,31 @@ public sealed class DnsServer : BackgroundService
 
     private async Task ServeUdpDnsAsync(CancellationToken cancellationToken)
     {
-        using var udpClient = new UdpClient();
+        var udpClient = new UdpClient();
         udpClient.ExclusiveAddressUse = false;
         udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
         udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
         udpClient.Client.Bind(new IPEndPoint(IPAddress.Loopback, 53));
         var buffer = new byte[16384];
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            var result =
-                await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), AnyEndPoint, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var result =
+                    await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), AnyEndPoint, cancellationToken);
 
-            CreateContextAndQueueForProcessing(
-                result.RemoteEndPoint,
-                networkInterface: result.PacketInformation.Interface,
-                udpClient,
-                buffer[..result.ReceivedBytes],
-                cancellationToken
-            );
+                CreateContextAndQueueForProcessing(
+                    result.RemoteEndPoint,
+                    networkInterface: result.PacketInformation.Interface,
+                    udpClient,
+                    buffer[..result.ReceivedBytes],
+                    cancellationToken
+                );
+            }
+        }
+        finally
+        {
+            udpClient.Dispose();
         }
     }
 

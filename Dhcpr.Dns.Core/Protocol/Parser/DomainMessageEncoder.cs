@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 using Dhcpr.Core;
@@ -87,78 +88,63 @@ public static class DomainMessageEncoder
             (DomainResponseCode)ReadBits(flags, ResponseCodeBitIndex, ResponseCodeBitCount)
         );
     }
+
     public static DomainLabels ReadLabelsAndAdvance(ref ReadOnlyDnsParsingSpan bytes)
     {
-        // TODO: Make this not recursive.
-        using var labels = ListPool<string>.Default.Get();
         using var visitedPositions = Pool.GetHashSet<int>();
-
-        while (true)
-        {
-            var next = ReadLabelAndAdvance(ref bytes, visitedPositions);
-            if (string.IsNullOrWhiteSpace(next)) break;
-            if (next.EndsWith('.'))
-            {
-                var returnedLabels = next.TrimEnd('.').Split('.');
-                return new DomainLabels(labels.Concat(returnedLabels));
-            }
-
-            labels.Add(next);
-        }
-
-        return new DomainLabels(labels);
+        using var labels = ReadLabelArrayAndAdvance(ref bytes, visitedPositions);
+        return new DomainLabels(labels.ToImmutableArray());
     }
 
     private const ushort DnsCompressionFlag = 0xC000;
     private const ushort DnsCompressionFlagMask = (DnsCompressionFlag ^ 0xFFFF) & 0xFFFF;
 
-    private static readonly ThreadLocal<HashSet<int>> HashSetPool = new();
-
-    private static string ReadLabelAndAdvance(ref ReadOnlyDnsParsingSpan bytes, HashSet<int> visitedPositions)
+    private static void VisitPosition(int offset, HashSet<int> visitedPositions)
     {
-        // While it's valid for a pointer to point to another pointer, need to make sure we limit it.
-        if (!visitedPositions.Add(bytes.Offset))
+        if (!visitedPositions.Add(offset))
             throw new InvalidDataException("DNS compression loop detected.");
-        var nextCount = (ushort)ReadByteAndAdvance(ref bytes);
-        if (nextCount == 0)
-            return string.Empty;
-
-        switch (nextCount)
-        {
-            case < 192 and > 63:
-                throw new InvalidDataException("Maximum label length is 63 bytes");
-            case <= 63:
-                {
-                    var ret = Encoding.ASCII.GetString(bytes[..nextCount]);
-                    bytes = bytes[nextCount..];
-                    return ret;
-                }
-        }
-
-        // backup one byte, and read it as a ushort, it's a pointer.
-        bytes = bytes.Start[(bytes.Offset - 1)..];
-        var pointerOffset = ReadUnsignedShortAndAdvance(ref bytes);
-        pointerOffset &= DnsCompressionFlagMask;
-
-        var targetBytes = bytes.Start[pointerOffset..];
-
-        using var labelPool = ListPool<string>.Default.Get();
-
+    }
+    // No, it can't be. :|
+    [SuppressMessage("ReSharper", "ReturnTypeCanBeEnumerable.Local")]
+    private static PooledList<DomainLabel> ReadLabelArrayAndAdvance(ref ReadOnlyDnsParsingSpan bytes,
+        HashSet<int> visitedPositions)
+    {
+        var labelPool = ListPool<DomainLabel>.Default.Get();
+        var targetBytes = bytes;
+        bool encounteredPointer = false;
         while (true)
         {
-            var next = ReadLabelAndAdvance(ref targetBytes, visitedPositions);
-            if (string.IsNullOrWhiteSpace(next)) break;
-            labelPool.Add(next.TrimEnd('.'));
-            if (next.EndsWith('.')) break;
+            VisitPosition(targetBytes.Offset, visitedPositions);
+            var nextCount = ReadByteAndAdvance(ref targetBytes);
+            switch (nextCount)
+            {
+                case 0:
+                    if (!encounteredPointer) 
+                        bytes = targetBytes;
+                    return labelPool;
+                case < 192 and > 63:
+                    throw new InvalidDataException("Maximum label length is 63 bytes");
+                case <= 63:
+                    labelPool.Add(new DomainLabel(Encoding.ASCII.GetString(targetBytes[..nextCount])));
+                    targetBytes = targetBytes[nextCount..];
+                    break;
+                case >= 192:
+                    
+                    targetBytes = targetBytes.Start[(targetBytes.Offset - 1)..];
+                    var pointerOffset = ReadUnsignedShortAndAdvance(ref targetBytes);
+                    pointerOffset &= DnsCompressionFlagMask;
+                    if (!encounteredPointer)
+                    {
+                        bytes = targetBytes;
+                        encounteredPointer = true;
+                    }
+                    targetBytes = targetBytes.Start[pointerOffset..];
+                    break;
+            }
+
+            if (!encounteredPointer) 
+                bytes = targetBytes;
         }
-
-        if (labelPool.Count > 0)
-            labelPool.Add(string.Empty);
-
-        return string.Join(
-            '.',
-            labelPool
-        );
     }
 
 

@@ -88,7 +88,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     .SelectMany(i =>
                         new[]
                         {
-                            internalClient.SendAsync(DomainMessage.CreateRequest(i), cancellationToken).AsTask(),
+                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.A), cancellationToken).AsTask(),
                             internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA),
                                 cancellationToken).AsTask()
                         }
@@ -97,7 +97,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     .ToPooledList();
                 addressRecords.Clear();
 
-                var results = await Task.WhenAll(nameserverQueries);
+                using var results = (await Task.WhenAll(nameserverQueries))
+                    .Where(i => i is not null && i.Flags.ResponseCode == DomainResponseCode.NoError)
+                    .Cast<DomainMessage>().ToPooledList();
 
                 addressRecords.AddRange(
                     results.Where(i => i is not null)

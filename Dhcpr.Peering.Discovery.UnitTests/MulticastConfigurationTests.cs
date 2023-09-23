@@ -18,7 +18,14 @@ public class MulticastConfigurationTests
     }
 
     [Theory]
-    [MemberData(nameof(GenerateMulticastAddresses))]
+    [InlineData("224.1.1.1")]
+    [InlineData("224.255.255.255")]
+    [InlineData("239.1.1.1")]
+    [InlineData("239.255.255.255")]
+    [InlineData("224.1.1.1:1234")]
+    [InlineData("224.255.255.255:1234")]
+    [InlineData("239.1.1.1:1234")]
+    [InlineData("239.255.255.255:1234")]
     public void ValidationPassesWhenValidMulticastAddressIsProvided(string addressOrEndPoint)
     {
         var config = new MulticastConfiguration() { Address = addressOrEndPoint };

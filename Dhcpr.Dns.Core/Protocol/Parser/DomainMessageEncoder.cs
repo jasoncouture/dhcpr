@@ -119,7 +119,7 @@ public static class DomainMessageEncoder
             switch (nextCount)
             {
                 case 0:
-                    if (!encounteredPointer) 
+                    if (!encounteredPointer)
                         bytes = targetBytes;
                     return labelPool;
                 case < 192 and > 63:
@@ -129,7 +129,7 @@ public static class DomainMessageEncoder
                     targetBytes = targetBytes[nextCount..];
                     break;
                 case >= 192:
-                    
+
                     targetBytes = targetBytes.Start[(targetBytes.Offset - 1)..];
                     var pointerOffset = ReadUnsignedShortAndAdvance(ref targetBytes);
                     pointerOffset &= DnsCompressionFlagMask;
@@ -142,7 +142,7 @@ public static class DomainMessageEncoder
                     break;
             }
 
-            if (!encounteredPointer) 
+            if (!encounteredPointer)
                 bytes = targetBytes;
         }
     }

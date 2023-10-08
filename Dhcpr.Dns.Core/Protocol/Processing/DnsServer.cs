@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Queue;
@@ -36,10 +37,14 @@ public sealed class DnsServer : BackgroundService
 
     private async Task ServeUdpDnsAsync(CancellationToken cancellationToken)
     {
+        const int SIO_UDP_CONNRESET = -1744830452;
         var udpClient = new UdpClient();
         udpClient.ExclusiveAddressUse = false;
         udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
         udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
+        // This prevents the socket from throwing an exception about a connection forcibly closed
+        if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            udpClient.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
         udpClient.Client.Bind(new IPEndPoint(IPAddress.Loopback, 53));
         var buffer = new byte[16384];
         try

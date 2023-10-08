@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
@@ -61,7 +62,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 if (builder.Length > 0)
                     builder.Insert(0, '.');
                 builder.Insert(0, next);
-
+                
                 var resolver = await _clientFactory.GetParallelDomainClient(
                     endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
                     cancellationToken);
@@ -82,32 +83,36 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 var internalClient =
                     await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
                         cancellationToken);
+                using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 using var nameserverQueries = GetNameserverNames(responseMessage.Records.Where(i =>
                         i.Type is DomainRecordType.NS or DomainRecordType.SOA))
                     .Where(i => !string.IsNullOrWhiteSpace(i))
-                    .SelectMany(i =>
+                    .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (i) =>
                         new[]
                         {
-                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.A), cancellationToken).AsTask(),
+                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.A), cancellationTokenSource.Token).AsTask(),
                             internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA),
-                                cancellationToken).AsTask()
+                                cancellationTokenSource.Token).AsTask()
                         }
                     ).Select(i => i.OperationCancelledToNull()
                         .ConvertExceptionsToNull())
                     .ToPooledList();
+                
                 addressRecords.Clear();
-
-                using var results = (await Task.WhenAll(nameserverQueries))
-                    .Where(i => i is not null && i.Flags.ResponseCode == DomainResponseCode.NoError)
-                    .Cast<DomainMessage>().ToPooledList();
-
-                addressRecords.AddRange(
-                    results.Where(i => i is not null)
-                        .SelectMany(i => i!.Records)
-                        .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                        .Select(i => (IPAddressData)i.Data)
-                        .Select(i => i.Address)
-                );
+                
+                while (nameserverQueries.Count > 0)
+                {
+                    var nextTask = await Task.WhenAny(nameserverQueries);
+                    nameserverQueries.Remove(nextTask);
+                    var nextMessage = await nextTask;
+                    if (nextMessage is null) continue;
+                    var records = nextMessage.Records.Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                        .Select(i => ((IPAddressData)i.Data).Address);
+                    addressRecords.AddRange(records);
+                    cancellationTokenSource.Cancel();
+                    await Task.WhenAll(nameserverQueries);
+                    break;
+                }
 
                 if (addressRecords.Count == 0)
                     continue;
@@ -145,7 +150,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
-            return null;
+            return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
         }
         finally
         {

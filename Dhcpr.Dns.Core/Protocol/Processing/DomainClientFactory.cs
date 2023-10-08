@@ -1,4 +1,7 @@
-﻿using Dhcpr.Core.Linq;
+﻿using System.Net;
+using System.Net.Sockets;
+
+using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -38,7 +41,21 @@ public sealed class DomainClientFactory : IDomainClientFactory
 
         if (options.Type.HasFlag(DomainClientType.Udp))
         {
-            clients.Add(new UdpDomainClient(_socketFactory.GetUdpClient(), options.EndPoint));
+            var endPoint = options.EndPoint switch
+            {
+                { AddressFamily: AddressFamily.InterNetwork } => new IPEndPoint(IPAddress.Any, 0),
+                { AddressFamily: AddressFamily.InterNetworkV6 } => new IPEndPoint(IPAddress.IPv6Any, 0),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported endpoint address family {options.EndPoint.AddressFamily}")
+            };
+            try
+            {
+                clients.Add(new UdpDomainClient(_socketFactory.GetUdpClient(endPoint), options.EndPoint));
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
         }
 
         while (clients.Count > 2)

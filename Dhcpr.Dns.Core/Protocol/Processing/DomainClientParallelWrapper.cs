@@ -10,11 +10,11 @@ public sealed class DomainClientParallelWrapper : IDomainClient
     public DomainClientParallelWrapper(IEnumerable<IDomainClient> innerClients)
     {
         _innerClients = innerClients.ToPooledList();
-        if (_innerClients.Count == 0)
-        {
-            _innerClients.Dispose();
-            throw new ArgumentException("No DNS clients provided", nameof(innerClients));
-        }
+        if (_innerClients.Count != 0)
+            return;
+
+        _innerClients.Dispose();
+        throw new ArgumentException("No DNS clients provided", nameof(innerClients));
     }
 
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)

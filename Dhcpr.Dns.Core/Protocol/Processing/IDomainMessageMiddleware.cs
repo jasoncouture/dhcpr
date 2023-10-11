@@ -3,6 +3,6 @@
 public interface IDomainMessageMiddleware
 {
     public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken);
-    string Name { get; }
-    int Priority { get; }
+    string Name => GetType().Name;
+    int Priority => 0;
 }

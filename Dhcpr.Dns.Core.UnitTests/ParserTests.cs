@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 using Dhcpr.Core;
@@ -12,6 +13,7 @@ using DNS.Protocol.ResourceRecords;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
+[SuppressMessage("ReSharper", "ClassCanBeSealed.Global")]
 public class ParserTests
 {
     [Fact]

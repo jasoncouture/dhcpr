@@ -11,13 +11,8 @@ on:
 
 jobs:
   build:
-
-    runs-on: dhcpr-runner
-
+    runs-on: dhcpr-runners
     steps:
-    - run: sudo apt-get update
-    - run: sudo apt-get upgrade -y
-    - run: sudo apt-get install curl wget git -y
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v2

@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: jasoncouture/setup-dotnet@b18b053aab9abcf64f1fb4ff4f8b05d773861b59
+      uses: jasoncouture/setup-dotnet@main
       with:
         dotnet-version: 7.0.x
     - uses: actions/cache@v3

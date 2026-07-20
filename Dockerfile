@@ -13,12 +13,14 @@ FROM alpine:3.24 AS final
 WORKDIR /app
 EXPOSE 8080
 ENV DOTNET_URLS=http://+:8080 \
-    DataProtection__KeysPath=/data/dataprotection-keys \
+    DataProtection__Keys__Path=/data/dataprotection-keys \
     DHCP__ENABLED="false" \
     DNS__ROOTSERVERS__DOWNLOAD="true" \
     DNS__ROOTSERVERS__CACHEFILEPATH="/data/root-servers.txt"
 
 VOLUME ["/data"]
+
+RUN mkdir -p /data/dataprotection-keys
 
 RUN apk add --no-cache \
     curl \

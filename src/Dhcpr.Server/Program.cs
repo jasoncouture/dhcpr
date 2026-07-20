@@ -1,9 +1,13 @@
 using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
+using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.Extensions.Options;
 
 ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
 ThreadPool.GetMinThreads(out var workerMinThreads, out _);
@@ -21,15 +25,18 @@ builder.Services.AddMemoryCache(o =>
     o.ExpirationScanFrequency = TimeSpan.FromMinutes(5);
 });
 
-// Antiforgery/Blazor circuit protection uses Data Protection. Default key ring is
-// per-container and ephemeral — after a restart tokens fail to decrypt. Pin a
-// stable application name and, when configured, persist keys under /data.
-var dataProtection = builder.Services.AddDataProtection().SetApplicationName("dhcpr");
-var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
-if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
-{
-    dataProtection.PersistKeysToFileSystem(Directory.CreateDirectory(dataProtectionKeysPath));
-}
+builder.Services.AddOptionsWithValidateOnStart<DataProtectionKeyOptions>()
+    .BindConfiguration("DataProtection:Keys");
+
+builder.Services.AddDataProtection().SetApplicationName("dhcpr");
+
+builder.Services.AddOptions<KeyManagementOptions>()
+    .Configure<ILoggerFactory, IOptions<DataProtectionKeyOptions>>((options, loggerFactory, keyOptions) =>
+    {
+        if (string.IsNullOrWhiteSpace(keyOptions.Value.Path)) return;
+        Directory.CreateDirectory(keyOptions.Value.Path);
+        options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(keyOptions.Value.Path), loggerFactory);
+    });
 
 builder.Services.AddCoreServices();
 builder.Services.AddDns(builder.Configuration.GetSection("DNS"));

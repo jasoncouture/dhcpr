@@ -12,8 +12,9 @@ service:
   httpPort: 8080
   dnsPort: 53
 
-# In-namespace Gateway (same pattern as ansible clusters/kube-lab/markdown-blog).
-# Traefik merges it onto the shared dataplane; cert-manager gateway-shim issues TLS.
+# In-namespace Gateway. Controllers matching gateway.className merge it onto
+# their dataplane. For cert-manager gateway-shim, set annotations e.g.
+#   cert-manager.io/cluster-issuer: <your-issuer>
 gateway:
   enabled: false
   className: traefik
@@ -22,8 +23,7 @@ gateway:
   hostname: ""
   # Defaults to "<fullname>-tls" when empty.
   certificateSecretName: ""
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01-vultr
+  annotations: {}
 
 # When gateway.enabled is true, parentRefs point at this chart's Gateway
 # (sectionName: websecure). Otherwise parentRefs below are used as-is.

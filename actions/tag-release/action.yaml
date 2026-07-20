@@ -18,7 +18,7 @@ inputs:
     description: Fully qualified version of this build
     required: true
   tag-latest:
-    description: Also force-update the floating latest git tag (use on default branch only)
+    description: Also force-update floating latest to the workflow commit (GITHUB_SHA), not the chart bump
     required: false
     default: "false"
 runs:
@@ -32,7 +32,7 @@ runs:
         git tag -f "v${{ inputs.major }}.${{ inputs.minor }}${{ inputs.prerelease }}"
         git tag -f "builds/v${{ inputs.fullVersion }}"
         if [ "${{ inputs.tag-latest }}" = "true" ]; then
-          git tag -f latest
+          git tag -f latest "$GITHUB_SHA"
         fi
 
     - name: Push release tags

@@ -14,7 +14,6 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
     private readonly IServiceProvider _serviceProvider;
     private readonly QueueProcessorConfiguration _options;
     private readonly ConcurrentQueue<CancellationTokenSource> _cancellationTokenSourceQueue = new();
-    private IQueueMessageProcessor<T>[]? _singletonProcessors;
 
     public QueueProcessorService(string configurationName, IOptionsFactory<QueueProcessorConfiguration> optionsFactory,
         IMessageQueue<T> messageQueue, IServiceProvider serviceProvider)
@@ -54,16 +53,9 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         try
         {
             var token = rentedCancellationTokenSource.cancellationTokenSource.Token;
-            if (_options.ScopePerMessage)
-            {
-                await using var scope = _serviceProvider.CreateAsyncScope();
-                var messageProcessors = scope.ServiceProvider.GetServices<IQueueMessageProcessor<T>>();
-                await RunMessageProcessorsAsync(message, messageProcessors, token);
-                return;
-            }
-
-            _singletonProcessors ??= _serviceProvider.GetServices<IQueueMessageProcessor<T>>().ToArray();
-            await RunMessageProcessorsAsync(message, _singletonProcessors, token);
+            await using var scope = _serviceProvider.CreateAsyncScope();
+            var messageProcessors = scope.ServiceProvider.GetServices<IQueueMessageProcessor<T>>();
+            await RunMessageProcessorsAsync(message, messageProcessors, token);
         }
         finally
         {

@@ -25,9 +25,6 @@ public static class ServiceCollectionExtensions
         {
             if (maximumConcurrency > i.MaximumConcurrency)
                 i.MaximumConcurrency = maximumConcurrency;
-            // Scoped/transient processors need a per-message scope; singletons do not.
-            if (lifetime is not ServiceLifetime.Singleton)
-                i.ScopePerMessage = true;
         });
 
         // And in post configure, we pull it back down to the minimum
@@ -35,10 +32,6 @@ public static class ServiceCollectionExtensions
         {
             if (i.MaximumConcurrency > maximumConcurrency)
                 i.MaximumConcurrency = maximumConcurrency;
-            if (lifetime is ServiceLifetime.Singleton)
-                i.ScopePerMessage = false;
-            else
-                i.ScopePerMessage = true;
         });
 
         services.Add(ServiceDescriptor.Describe(typeof(IQueueMessageProcessor<TMessage>), typeof(TService), lifetime));

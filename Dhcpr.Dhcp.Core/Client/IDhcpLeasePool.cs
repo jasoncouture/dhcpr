@@ -9,6 +9,6 @@ public interface IDhcpLeasePool
     IEnumerable<DhcpClientLease> ClientLeases { get; }
     bool TryGetDhcpLease(HardwareAddress address, [NotNullWhen(true)] out DhcpClientLease? lease);
     bool TrySetLease(DhcpClientLease lease);
-    DhcpClientLease? TryCreateLease(HardwareAddress address, IPNetwork network);
+    DhcpClientLease? TryCreateLease(HardwareAddress address, DhcpNetwork network);
     bool TryRemoveLease(DhcpClientLease lease);
 }

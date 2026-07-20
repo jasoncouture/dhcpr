@@ -67,7 +67,7 @@ public sealed class DhcpServerHostedService : BackgroundService
                 continue;
             }
 
-            var networkInfo = new DhcpNetworkInformation(new IPNetwork(localAddress, subnetMask, broadcastAddress),
+            var networkInfo = new DhcpNetworkInformation(new DhcpNetwork(localAddress, subnetMask, broadcastAddress),
                 receiveResult.PacketInformation.Interface, interfaceName);
             var context = new DhcpRequestContext()
             {

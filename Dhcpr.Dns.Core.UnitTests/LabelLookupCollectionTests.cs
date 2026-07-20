@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core.Linq;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Files;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 

@@ -6,11 +6,11 @@ using Dhcpr.Core.Linq;
 namespace Dhcpr.Dhcp.Core.Client;
 
 public sealed record DhcpSubnet(
-    IPNetwork Network,
+    DhcpNetwork Network,
     ImmutableArray<IPAddressRange> AddressRanges
 ) : IDhcpSubnet
 {
-    public IPAddress? SelectAddress(IEnumerable<IPAddress> usedAddresses, IPNetwork network)
+    public IPAddress? SelectAddress(IEnumerable<IPAddress> usedAddresses, DhcpNetwork network)
     {
         if (!Network.Contains(network.Address)) return null;
         using var availableAddressRanges =

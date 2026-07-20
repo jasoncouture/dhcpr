@@ -35,7 +35,7 @@ public sealed class DhcpLeasePool : IDhcpLeasePool
         return output == lease;
     }
 
-    public DhcpClientLease? TryCreateLease(HardwareAddress address, IPNetwork network)
+    public DhcpClientLease? TryCreateLease(HardwareAddress address, DhcpNetwork network)
     {
         if (TryGetDhcpLease(address, out _)) return null;
         using var shuffledSubnets = _subnets.OrderBy(i => Guid.NewGuid()).ToPooledList();

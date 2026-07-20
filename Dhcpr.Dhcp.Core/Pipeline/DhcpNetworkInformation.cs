@@ -3,7 +3,7 @@
 namespace Dhcpr.Dhcp.Core.Pipeline;
 
 public sealed record DhcpNetworkInformation(
-    IPNetwork Network,
+    DhcpNetwork Network,
     int InterfaceIndex,
     string InterfaceName
 );

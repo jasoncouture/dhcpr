@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
         // TODO: Add DHCP components and configuration.
 
         services.Configure<DhcpConfiguration>(configuration);
-        var testNetwork = new IPNetwork(IPAddress.Parse("10.0.0.1"), IPAddress.Parse("255.255.255.0"),
+        var testNetwork = new DhcpNetwork(IPAddress.Parse("10.0.0.1"), IPAddress.Parse("255.255.255.0"),
             IPAddress.Parse("10.0.0.255"));
         // Temporary for testing
         services.AddSingleton<IDhcpSubnet>(_ => new DhcpSubnet(testNetwork,

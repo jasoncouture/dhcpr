@@ -4,7 +4,7 @@ namespace Dhcpr.Dhcp.Core.Client;
 
 public interface IDhcpSubnet
 {
-    public IPNetwork Network { get; }
-    public IPAddress? SelectAddress(IEnumerable<IPAddress> usedAddresses, IPNetwork network);
+    public DhcpNetwork Network { get; }
+    public IPAddress? SelectAddress(IEnumerable<IPAddress> usedAddresses, DhcpNetwork network);
 
 }

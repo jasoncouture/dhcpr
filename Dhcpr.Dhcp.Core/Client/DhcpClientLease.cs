@@ -12,7 +12,7 @@ namespace Dhcpr.Dhcp.Core.Client;
 public sealed record DhcpClientLease(
     HardwareAddress HardwareAddress,
     int TransactionId,
-    IPNetwork Network,
+    DhcpNetwork Network,
     DateTimeOffset Created,
     DateTimeOffset ExpiresAt,
     DhcpClientState State,

@@ -10,7 +10,7 @@ namespace Dhcpr.Dhcp.Core.Pipeline;
 public sealed class DhcpNetworkValidationRequestHandler : IDhcpRequestHandler
 {
     private readonly ILogger<DhcpNetworkValidationRequestHandler> _logger;
-    private readonly IPNetwork[] _networks;
+    private readonly DhcpNetwork[] _networks;
     public int Priority => 500;
 
     public DhcpNetworkValidationRequestHandler(ILogger<DhcpNetworkValidationRequestHandler> logger,
@@ -20,7 +20,7 @@ public sealed class DhcpNetworkValidationRequestHandler : IDhcpRequestHandler
         // TODO: Get this from config, and keep it up to date.
         _networks = new[]
         {
-            new IPNetwork(IPAddress.Parse("10.0.0.0"), IPAddress.Parse("10.0.0.255"), IPAddress.Parse("10.0.0.255"))
+            new DhcpNetwork(IPAddress.Parse("10.0.0.0"), IPAddress.Parse("10.0.0.255"), IPAddress.Parse("10.0.0.255"))
         };
     }
 

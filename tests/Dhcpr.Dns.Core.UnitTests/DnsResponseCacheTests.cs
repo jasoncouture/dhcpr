@@ -13,7 +13,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class DnsResponseCacheTests
 {
     [Fact]
-    public void CacheHitReturnsAgedTtlAndSameRecords()
+    public void CacheHitReturnsStoredRecords()
     {
         var cache = CreateCache();
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
@@ -40,8 +40,7 @@ public class DnsResponseCacheTests
         Assert.True(cached.Flags.RecursionAvailable);
         Assert.Single(cached.Records.Answers);
         Assert.Equal(address, ((IPAddressData)cached.Records.Answers[0].Data).Address);
-        Assert.True(cached.Records.Answers[0].TimeToLive <= TimeSpan.FromSeconds(300));
-        Assert.True(cached.Records.Answers[0].TimeToLive > TimeSpan.FromSeconds(290));
+        Assert.Equal(TimeSpan.FromSeconds(300), cached.Records.Answers[0].TimeToLive);
     }
 
     [Fact]

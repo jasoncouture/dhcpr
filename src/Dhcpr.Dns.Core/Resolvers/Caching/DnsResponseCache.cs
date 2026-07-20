@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 using Dhcpr.Dns.Core.Protocol;
 
 using Microsoft.Extensions.Caching.Memory;
@@ -10,6 +8,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
 {
     private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MaxCacheTtl = TimeSpan.FromHours(1);
+    private static readonly TimeSpan SlidingExpiration = TimeSpan.FromMinutes(1);
 
     private readonly IMemoryCache _memoryCache;
 
@@ -28,18 +27,6 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (!_memoryCache.TryGetValue(key, out CacheEntry? entry) || entry is null)
             return false;
 
-        var age = DateTimeOffset.UtcNow - entry.Created;
-        if (age >= entry.Lifetime)
-        {
-            _memoryCache.Remove(key);
-            return false;
-        }
-
-        // Fresh hits keep the stored records (no per-request ImmutableArray rebuild).
-        var records = age.TotalSeconds < 1
-            ? entry.Records
-            : AgeRecords(entry.Records, age);
-
         response = new DomainMessage(
             request.Id,
             entry.Flags with
@@ -50,7 +37,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
                 Truncated = false
             },
             request.Questions,
-            records);
+            entry.Records);
         return true;
     }
 
@@ -76,15 +63,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
             lifetime = MaxCacheTtl;
 
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
-        var entry = new CacheEntry(
-            response.Flags,
-            response.Records,
-            DateTimeOffset.UtcNow,
-            lifetime);
+        var entry = new CacheEntry(response.Flags, response.Records);
 
         _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = lifetime,
+            SlidingExpiration = SlidingExpiration,
             Size = 1
         });
     }
@@ -112,34 +96,5 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return TimeSpan.Zero;
     }
 
-    private static DomainResourceRecords AgeRecords(DomainResourceRecords records, TimeSpan age)
-        => new(
-            AgeSection(records.Answers, age),
-            AgeSection(records.Authorities, age),
-            AgeSection(records.Additional, age));
-
-    private static ImmutableArray<DomainResourceRecord> AgeSection(
-        ImmutableArray<DomainResourceRecord> records,
-        TimeSpan age)
-    {
-        if (records.IsDefaultOrEmpty)
-            return records;
-
-        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(records.Length);
-        foreach (var record in records)
-        {
-            var ttl = record.TimeToLive - age;
-            if (ttl < TimeSpan.Zero)
-                ttl = TimeSpan.Zero;
-            builder.Add(record with { TimeToLive = ttl });
-        }
-
-        return builder.MoveToImmutable();
-    }
-
-    private sealed record CacheEntry(
-        DomainMessageFlags Flags,
-        DomainResourceRecords Records,
-        DateTimeOffset Created,
-        TimeSpan Lifetime);
+    private sealed record CacheEntry(DomainMessageFlags Flags, DomainResourceRecords Records);
 }

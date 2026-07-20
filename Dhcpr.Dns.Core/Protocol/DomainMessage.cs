@@ -16,6 +16,11 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
     public static DomainMessage CreateRequest(string domain, DomainRecordType type = DomainRecordType.A,
         DomainRecordClass @class = DomainRecordClass.IN, bool recursionRequested = true,
         DomainOperationCode requestType = DomainOperationCode.Query)
+        => CreateRequest(new DomainLabels(domain), type, @class, recursionRequested, requestType);
+
+    public static DomainMessage CreateRequest(DomainLabels domain, DomainRecordType type = DomainRecordType.A,
+        DomainRecordClass @class = DomainRecordClass.IN, bool recursionRequested = true,
+        DomainOperationCode requestType = DomainOperationCode.Query)
     {
         return new DomainMessage((ushort)Random.Shared.Next(0, (int)ushort.MaxValue + 1),
             new DomainMessageFlags(
@@ -29,7 +34,7 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
                 false,
                 DomainResponseCode.NoError
             ),
-            new[] { new DomainQuestion(new DomainLabels(domain), type, @class) }.ToImmutableArray(),
+            new[] { new DomainQuestion(domain, type, @class) }.ToImmutableArray(),
             DomainResourceRecords.Empty);
     }
     public static DomainMessage CreateResponse(

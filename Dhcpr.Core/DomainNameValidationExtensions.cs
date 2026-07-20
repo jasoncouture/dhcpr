@@ -4,10 +4,11 @@ namespace Dhcpr.Core;
 
 public static partial class DomainNameValidationExtensions
 {
-    [GeneratedRegex(@"(?isn)^(?<name>(([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,62}\.)*([a-z]{1}[a-z0-9\-]*[a-z0-9]){0,62})\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
+    // RFC 1123: labels may start with a digit; LDH only; 1–63 chars; no leading/trailing hyphen.
+    [GeneratedRegex(@"(?isn)^(?<name>(([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)\.)*([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?))\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
     public static partial Regex GetDnsRegularExpression();
 
-    [GeneratedRegex(@"(?isn)^[a-z]{1}([a-z0-9\-]*[a-z0-9]{1}){0,1}$")]
+    [GeneratedRegex(@"(?isn)^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")]
     public static partial Regex GetLabelRegularExpression();
     public static bool IsValidDomainName(this string domainName) => GetDnsRegularExpression().IsMatch(domainName);
     public static bool IsValidDomainNameLabel(this string label) => GetLabelRegularExpression().IsMatch(label);

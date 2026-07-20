@@ -49,8 +49,7 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
 
         foreach (var record in cnameRecords)
         {
-            var targetName = ((NameData)record.Data).Name.ToString();
-            var nextRequest = DomainMessage.CreateRequest(targetName, questionType);
+            var nextRequest = DomainMessage.CreateRequest(((NameData)record.Data).Name, questionType);
 
             var nextResponse = await internalClient.SendAsync(nextRequest, cancellationToken)
                 .AsTask()

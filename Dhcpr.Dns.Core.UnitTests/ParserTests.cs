@@ -126,9 +126,20 @@ public class ParserTests
     [InlineData("m")]
     [InlineData("a0")]
     [InlineData("gtld-servers")]
+    [InlineData("70046ujm1swdqc9mj1tj7l71in215vaa")]
+    [InlineData("3com")]
     public void LabelValidationWorksCorrectly(string label)
     {
         Assert.Matches(DomainNameValidationExtensions.GetLabelRegularExpression(), label);
+    }
+
+    [Theory]
+    [InlineData("-bad")]
+    [InlineData("bad-")]
+    [InlineData("")]
+    public void LabelValidationRejectsInvalidLabels(string label)
+    {
+        Assert.DoesNotMatch(DomainNameValidationExtensions.GetLabelRegularExpression(), label);
     }
 
     [Theory]

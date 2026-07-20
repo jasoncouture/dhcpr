@@ -140,7 +140,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
+            if(!cancellationToken.IsCancellationRequested) {
+                _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
+            }
+            
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
         }

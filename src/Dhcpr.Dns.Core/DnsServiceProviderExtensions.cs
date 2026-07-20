@@ -23,11 +23,13 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
         services.AddHostedService<DnsServer>();
-        services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
+        services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(
+            maximumConcurrency: 4096,
+            lifetime: ServiceLifetime.Singleton);
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
-        // Outermost decorator last: Cache → CanonicalName → resolver
+        // Outermost last: Cache → CanonicalName → resolver (shared cache hits on first middleware)
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
 

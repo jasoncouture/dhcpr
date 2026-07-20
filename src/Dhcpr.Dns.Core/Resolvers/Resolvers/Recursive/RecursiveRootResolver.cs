@@ -17,6 +17,8 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
+    private const int MaxParallelNameservers = 3;
+
     private readonly IDomainClientFactory _clientFactory;
     private readonly ObjectPool<StringBuilder> _stringBuilderPool;
     private readonly ILogger<RecursiveRootResolver> _logger;
@@ -32,7 +34,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         _servers = rootServerConfiguration.CurrentValue.Addresses
             .Select(i => i.GetEndPoint(53))
             .Cast<IPEndPoint>()
-            .Shuffle()
+            .OrderBy(_ => Random.Shared.Next())
             .ToImmutableArray();
         _clientFactory = clientFactory;
         _stringBuilderPool = stringBuilderPool;
@@ -49,7 +51,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            while (labels.Count > 0)
+            // Walk parent zones only — never NS-query the FQDN (one fewer RTT).
+            while (labels.Count > 1)
             {
                 addressRecords.Clear();
                 var next = labels[^1];
@@ -59,7 +62,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 builder.Insert(0, next);
 
                 var resolver = await _clientFactory.GetParallelDomainClient(
-                    endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
+                    SelectQueryEndpoints(endPoints),
                     cancellationToken);
                 var message = DomainMessage.CreateRequest(builder.ToString(), DomainRecordType.NS);
 
@@ -113,7 +116,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             }
 
             var finalResolver = await _clientFactory.GetParallelDomainClient(
-                endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
+                SelectQueryEndpoints(endPoints),
                 cancellationToken);
             var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
             var result = await finalResolver.SendAsync(clonedRequest, cancellationToken);
@@ -140,10 +143,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
         catch (Exception ex)
         {
-            if(!cancellationToken.IsCancellationRequested) {
+            if (!cancellationToken.IsCancellationRequested)
+            {
                 _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
             }
-            
+
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
         }
@@ -151,6 +155,15 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         {
             _stringBuilderPool.Return(builder);
         }
+    }
+
+    private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
+    {
+        IEnumerable<IPEndPoint> selected = endPoints.Count <= MaxParallelNameservers
+            ? endPoints
+            : endPoints.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
+
+        return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp });
     }
 
     private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

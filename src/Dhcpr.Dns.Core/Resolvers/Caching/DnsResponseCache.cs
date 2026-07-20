@@ -36,7 +36,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         }
 
         var records = AgeRecords(entry.Records, age);
-        if (records.Any(r => r.TimeToLive <= TimeSpan.Zero))
+        if (HasExpiredTtl(records))
         {
             _memoryCache.Remove(key);
             return false;
@@ -88,19 +88,36 @@ public sealed class DnsResponseCache : IDnsResponseCache
 
     private static TimeSpan ComputeLifetime(DomainMessage response)
     {
-        var ttls = response.Records
-            .Select(r => r.TimeToLive)
-            .Where(t => t > TimeSpan.Zero)
-            .ToArray();
+        var min = TimeSpan.MaxValue;
+        var found = false;
+        foreach (var record in response.Records)
+        {
+            if (record.TimeToLive <= TimeSpan.Zero)
+                continue;
+            if (record.TimeToLive >= min)
+                continue;
+            min = record.TimeToLive;
+            found = true;
+        }
 
-        if (ttls.Length > 0)
-            return ttls.Min();
+        if (found)
+            return min;
 
-        // NXDOMAIN / NODATA with no usable TTL — short negative cache.
         if (response.Flags.ResponseCode is DomainResponseCode.NameError or DomainResponseCode.NoError)
             return NegativeCacheTtl;
 
         return TimeSpan.Zero;
+    }
+
+    private static bool HasExpiredTtl(DomainResourceRecords records)
+    {
+        foreach (var record in records)
+        {
+            if (record.TimeToLive <= TimeSpan.Zero)
+                return true;
+        }
+
+        return false;
     }
 
     private static DomainResourceRecords AgeRecords(DomainResourceRecords records, TimeSpan age)
@@ -116,13 +133,16 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (records.IsDefaultOrEmpty)
             return records;
 
-        return records.Select(r =>
+        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(records.Length);
+        foreach (var record in records)
         {
-            var ttl = r.TimeToLive - age;
+            var ttl = record.TimeToLive - age;
             if (ttl < TimeSpan.Zero)
                 ttl = TimeSpan.Zero;
-            return r with { TimeToLive = ttl };
-        }).ToImmutableArray();
+            builder.Add(record with { TimeToLive = ttl });
+        }
+
+        return builder.MoveToImmutable();
     }
 
     private sealed record CacheEntry(

@@ -1,0 +1,47 @@
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: harbor.instigaterevolution.com/instigaterevolution/dhcpr/dns
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  httpPort: 8080
+  dnsPort: 53
+
+# HTTPRoute parentRefs are values-driven so the route can attach to an in-namespace
+# Gateway (or anything else the cluster supports). Traefik does not implement ListenerSet.
+httpRoute:
+  enabled: false
+  host: dns.instigaterevolution.com
+  annotations: {}
+  parentRefs:
+    - name: dhcpr
+      kind: Gateway
+
+# /data holds Data Protection keys and root-server cache. Use ReadWriteMany if
+# running more than one replica.
+persistence:
+  size: 1Gi
+  storageClassName: ""
+  accessMode: ReadWriteMany
+
+# Raw container env entries — standard Kubernetes EnvVar shape.
+# Production appsettings bind DNS to loopback; override for in-cluster listen.
+env:
+  - name: DNS__ListenAddresses__0
+    value: "udp://0.0.0.0:53"
+  - name: DNS__ListenAddresses__1
+    value: "tcp://0.0.0.0:53"
+  - name: DNS__ListenAddresses__2
+    value: "udp://[::]:53"
+  - name: DNS__ListenAddresses__3
+    value: "tcp://[::]:53"
+
+# Optional bulk env from ConfigMaps/Secrets (Kubernetes EnvFromSource shape).
+envFrom: []
+
+resources: {}

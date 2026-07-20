@@ -11,6 +11,7 @@ using Dhcpr.Dhcp.Core.Protocol;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dhcp.Core;
 
@@ -18,19 +19,28 @@ public sealed class DhcpServerHostedService : BackgroundService
 {
     private readonly ILogger<DhcpServerHostedService> _logger;
     private readonly IMessageQueue<QueuedDhcpMessage> _processingQueue;
+    private readonly IOptionsMonitor<DhcpConfiguration> _options;
     private readonly UdpClient _client = new();
 
     public DhcpServerHostedService(
         ILogger<DhcpServerHostedService> logger,
-        IMessageQueue<QueuedDhcpMessage> processingQueue)
+        IMessageQueue<QueuedDhcpMessage> processingQueue,
+        IOptionsMonitor<DhcpConfiguration> options)
     {
         _logger = logger;
         _processingQueue = processingQueue;
+        _options = options;
     }
 
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_options.CurrentValue.Enabled)
+        {
+            _logger.LogInformation("DHCP server is disabled.");
+            return;
+        }
+
         using var dhcpServerSocket = _client;
 
         dhcpServerSocket.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);

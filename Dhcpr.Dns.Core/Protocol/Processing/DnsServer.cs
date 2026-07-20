@@ -9,46 +9,123 @@ using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DnsServer : BackgroundService
 {
-    private static readonly IPEndPoint AnyEndPoint = new IPEndPoint(IPAddress.Any, 0);
-    private static readonly IPEndPoint ListenEndPoint = new IPEndPoint(IPAddress.Any, 53);
+    private static readonly IPEndPoint AnyEndPoint = new(IPAddress.Any, 0);
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
+    private readonly IOptionsMonitor<DnsConfiguration> _options;
+    private readonly ILogger<DnsServer> _logger;
 
-    public DnsServer(IMessageQueue<DnsPacketReceivedMessage> messageQueue)
+    public DnsServer(
+        IMessageQueue<DnsPacketReceivedMessage> messageQueue,
+        IOptionsMonitor<DnsConfiguration> options,
+        ILogger<DnsServer> logger)
     {
         _messageQueue = messageQueue;
+        _options = options;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var listenEndPoints = _options.CurrentValue.GetListenEndpoints();
+        if (listenEndPoints.Length == 0)
+            throw new InvalidOperationException("DNS ListenAddresses must contain at least one listen URI.");
+
         try
         {
-            await ServeUdpDnsAsync(stoppingToken);
-            var udpTask = ServeUdpDnsAsync(stoppingToken);
-            var tcpTask = ServeTcpDnsAsync(stoppingToken);
-            await Task.WhenAll(udpTask, tcpTask);
+            var tasks = new List<Task>();
+            foreach (var listen in listenEndPoints)
+            {
+                var addresses = await ResolveListenAddressesAsync(listen, stoppingToken);
+                if (addresses.Length == 0)
+                {
+                    var target = listen.IsNetworkInterface
+                        ? $"interface \"{listen.Host}\""
+                        : $"host \"{listen.Host}\"";
+                    var available = listen.IsNetworkInterface
+                        ? $" Available interfaces: {string.Join(", ", DnsExtensions.GetNetworkInterfaceNames())}."
+                        : string.Empty;
+                    throw new InvalidOperationException(
+                        $"DNS listen {target} did not resolve to any addresses.{available}");
+                }
+
+                foreach (var address in addresses)
+                {
+                    var endPoint = new IPEndPoint(address, listen.Port);
+                    foreach (var protocol in ExpandProtocols(listen.Protocol))
+                    {
+                        tasks.Add(protocol switch
+                        {
+                            DnsListenProtocol.Udp => ServeUdpDnsAsync(endPoint, stoppingToken),
+                            DnsListenProtocol.Tcp => ServeTcpDnsAsync(endPoint, stoppingToken),
+                            _ => throw new InvalidOperationException($"Unsupported listen protocol: {protocol}")
+                        });
+                        _logger.LogInformation(
+                            "DNS server listening on {Scheme}://{EndPoint}{Interface}",
+                            protocol.ToString().ToLowerInvariant(),
+                            endPoint,
+                            listen.IsNetworkInterface ? $" (interface {listen.Host})" : string.Empty);
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
     }
 
-    private async Task ServeUdpDnsAsync(CancellationToken cancellationToken)
+    private static IEnumerable<DnsListenProtocol> ExpandProtocols(DnsListenProtocol protocol)
+        => protocol switch
+        {
+            DnsListenProtocol.Both => new[] { DnsListenProtocol.Udp, DnsListenProtocol.Tcp },
+            DnsListenProtocol.Udp or DnsListenProtocol.Tcp => new[] { protocol },
+            _ => throw new InvalidOperationException($"Unsupported listen protocol: {protocol}")
+        };
+
+    private static async Task<IPAddress[]> ResolveListenAddressesAsync(
+        DnsListenEndpoint listen,
+        CancellationToken cancellationToken)
     {
-        const int SIO_UDP_CONNRESET = -1744830452;
-        var udpClient = new UdpClient();
-        udpClient.ExclusiveAddressUse = false;
-        udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.ReuseAddress, true);
-        udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
-        // This prevents the socket from throwing an exception about a connection forcibly closed
-        if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            udpClient.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
-        udpClient.Client.Bind(new IPEndPoint(IPAddress.Loopback, 53));
-        var buffer = new byte[16384];
+        if (listen.IsNetworkInterface)
+            return DnsExtensions.GetNetworkInterfaceAddresses(listen.Host);
+
+        if (IPAddress.TryParse(listen.Host, out var ipAddress))
+            return new[] { ipAddress };
+
+        return await System.Net.Dns.GetHostAddressesAsync(listen.Host, cancellationToken);
+    }
+
+    private async Task ServeUdpDnsAsync(IPEndPoint listenEndPoint, CancellationToken cancellationToken)
+    {
+        const int SioUdpConnreset = -1744830452;
+        var udpClient = new UdpClient(listenEndPoint.AddressFamily);
         try
         {
+            udpClient.ExclusiveAddressUse = false;
+            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            if (listenEndPoint.AddressFamily == AddressFamily.InterNetwork)
+            {
+                udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.PacketInformation, true);
+            }
+            else if (listenEndPoint.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                udpClient.Client.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.PacketInformation, true);
+            }
+
+            // Prevents "connection forcibly closed" exceptions on ICMP port-unreachable.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                udpClient.Client.IOControl((IOControlCode)SioUdpConnreset, new byte[] { 0, 0, 0, 0 }, null);
+
+            udpClient.Client.Bind(listenEndPoint);
+            var buffer = new byte[16384];
             while (!cancellationToken.IsCancellationRequested)
             {
                 var result =
@@ -58,6 +135,7 @@ public sealed class DnsServer : BackgroundService
                     result.RemoteEndPoint,
                     networkInterface: result.PacketInformation.Interface,
                     udpClient,
+                    listenEndPoint,
                     buffer[..result.ReceivedBytes],
                     cancellationToken
                 );
@@ -113,7 +191,7 @@ public sealed class DnsServer : BackgroundService
                     continue;
                 }
 
-                CreateContextAndQueueForProcessing(client, buffer, cancellationToken);
+                CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
                 // We sized our buffer so that we only asked for the exact amount we needed.
                 // So we can just reset the buffer here without any risk of losing data.
                 bufferSegment = new ArraySegment<byte>(buffer, 0, 2);
@@ -157,6 +235,7 @@ public sealed class DnsServer : BackgroundService
         EndPoint remoteEndPoint,
         int networkInterface,
         UdpClient udpClient,
+        IPEndPoint listenEndPoint,
         byte[] bytes,
         CancellationToken cancellationToken
     )
@@ -166,9 +245,11 @@ public sealed class DnsServer : BackgroundService
         try
         {
             var message = DomainMessageEncoder.Decode(bytes);
-            IPAddress localAddress = GetLocalIPAddress(networkInterface, remoteIPEndPoint.AddressFamily);
+            var localAddress = GetLocalIPAddress(networkInterface, remoteIPEndPoint.AddressFamily);
+            if (localAddress.Equals(IPAddress.Any) || localAddress.Equals(IPAddress.IPv6Any))
+                localAddress = listenEndPoint.Address;
 
-            var endPoint = new IPEndPoint(localAddress, ListenEndPoint.Port);
+            var endPoint = new IPEndPoint(localAddress, listenEndPoint.Port);
             var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message);
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);
@@ -180,7 +261,7 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
-    private IPAddress GetLocalIPAddress(int networkInterface, AddressFamily addressFamily)
+    private static IPAddress GetLocalIPAddress(int networkInterface, AddressFamily addressFamily)
     {
         if (addressFamily is not AddressFamily.InterNetwork and not AddressFamily.InterNetworkV6)
             throw new ArgumentException("Only IPv4 and IPv6 are supported.", nameof(addressFamily));
@@ -201,7 +282,7 @@ public sealed class DnsServer : BackgroundService
             return ipProperties.UnicastAddresses.First(i => i.Address.AddressFamily == addressFamily).Address;
         }
 
-        return IPAddress.Any;
+        return addressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
     }
 
     private static async Task<TcpClient?> AcceptNextConnectionAsync(TcpListener listener,
@@ -211,11 +292,11 @@ public sealed class DnsServer : BackgroundService
         return await listener.AcceptTcpClientAsync(cancellationToken).AsTask().OperationCancelledToNull();
     }
 
-    private async Task ServeTcpDnsAsync(CancellationToken stoppingToken)
+    private async Task ServeTcpDnsAsync(IPEndPoint listenEndPoint, CancellationToken stoppingToken)
     {
-        var tcpServer = new TcpListener(IPAddress.Any, 53);
+        var tcpServer = new TcpListener(listenEndPoint);
         var activeTasks = new List<Task>();
-        Task<TcpClient?> acceptTask = Task.FromResult<TcpClient?>(null);
+        var acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
         try
         {
             tcpServer.Start(ushort.MaxValue);

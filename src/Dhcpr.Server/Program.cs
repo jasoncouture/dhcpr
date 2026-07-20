@@ -34,8 +34,8 @@ builder.Services.AddOptions<KeyManagementOptions>()
     .Configure<ILoggerFactory, IOptions<DataProtectionKeyOptions>>((options, loggerFactory, keyOptions) =>
     {
         if (string.IsNullOrWhiteSpace(keyOptions.Value.Path)) return;
-        Directory.CreateDirectory(keyOptions.Value.Path);
-        options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(keyOptions.Value.Path), loggerFactory);
+        var target = Directory.CreateDirectory(keyOptions.Value.Path);
+        options.XmlRepository = new FileSystemXmlRepository(target, loggerFactory);
     });
 
 builder.Services.AddCoreServices();

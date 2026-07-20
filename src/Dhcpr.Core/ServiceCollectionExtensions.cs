@@ -9,11 +9,14 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddQueueProcessor<TMessage, TService>(
         this IServiceCollection services,
         int maximumConcurrency = -1,
-        ServiceLifetime lifetime = ServiceLifetime.Scoped
+        ServiceLifetime lifetime = ServiceLifetime.Singleton
     )
         where TService : IQueueMessageProcessor<TMessage>
         where TMessage : class
     {
+        if (lifetime is not (ServiceLifetime.Singleton or ServiceLifetime.Transient))
+            throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime,
+                "Queue processors are resolved from the root provider and must be Singleton (or Transient).");
         if (maximumConcurrency == -1)
             maximumConcurrency = Environment.ProcessorCount;
         else if (maximumConcurrency <= 0)

@@ -29,18 +29,17 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         if (!context.DomainMessage.Flags.RecursionDesired)
             return result;
 
-        if (context.DomainMessage.Questions.All(i =>
-                i.Type is not DomainRecordType.A and not DomainRecordType.AAAA and not DomainRecordType.CNAME))
+        var questionType = context.DomainMessage.Questions[0].Type;
+        if (questionType is not (DomainRecordType.A or DomainRecordType.AAAA))
             return result;
 
         if (result.Records.All(i => i.Type != DomainRecordType.CNAME))
             return result;
 
-        if (result.Records.Answers.Any(i =>
-                i.Type != DomainRecordType.CNAME && i.Type == context.DomainMessage.Questions[0].Type))
+        if (result.Records.Answers.Any(i => i.Type == questionType))
             return result;
 
-        var cnameRecords = result.Records
+        using var cnameRecords = result.Records
             .Where(i => i.Type == DomainRecordType.CNAME)
             .ToPooledList();
 
@@ -48,12 +47,10 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
             await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
                 cancellationToken);
 
-        foreach (var (record, type) in cnameRecords.SelectMany(i => new[]
-                 {
-                     (record: i, DomainRecordType.A), (record: i, DomainRecordType.AAAA)
-                 }))
+        foreach (var record in cnameRecords)
         {
-            var nextRequest = DomainMessage.CreateRequest(((NameData)record.Data).Name.ToString(), type);
+            var targetName = ((NameData)record.Data).Name.ToString();
+            var nextRequest = DomainMessage.CreateRequest(targetName, questionType);
 
             var nextResponse = await internalClient.SendAsync(nextRequest, cancellationToken)
                 .AsTask()
@@ -66,13 +63,15 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
             {
                 Records = result.Records with
                 {
-                    Additional = result.Records.Additional
-                        .Concat(
-                            nextResponse.Records.Where(i => i.Type == type)
-                        )
+                    Answers = result.Records.Answers
+                        .Concat(nextResponse.Records.Answers.Where(i =>
+                            i.Type is DomainRecordType.CNAME || i.Type == questionType))
                         .ToImmutableArray()
                 }
             };
+
+            if (result.Records.Answers.Any(i => i.Type == questionType))
+                break;
         }
 
         return result;

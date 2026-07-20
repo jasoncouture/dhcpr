@@ -1,12 +1,10 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
-using Dhcpr.Data.Dns.Models;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -41,9 +39,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         _logger = logger;
     }
 
-    private static readonly DomainRecordType[] NameServerRecordTypes = { DomainRecordType.A, DomainRecordType.AAAA };
-
-
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
@@ -62,58 +57,54 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 if (builder.Length > 0)
                     builder.Insert(0, '.');
                 builder.Insert(0, next);
-                
+
                 var resolver = await _clientFactory.GetParallelDomainClient(
                     endPoints.Select(i => new DomainClientOptions() { EndPoint = i, Type = DomainClientType.Udp }),
                     cancellationToken);
                 var message = DomainMessage.CreateRequest(builder.ToString(), DomainRecordType.NS);
 
                 var responseMessage = await resolver.SendAsync(message, cancellationToken);
-                addressRecords.AddRange(responseMessage.Records
-                    .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                    .Select(i => (IPAddressData)i.Data)
-                    .Select(i => i.Address));
-                if (addressRecords.Count != 0)
-                {
-                    endPoints.Clear();
-                    endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
+                using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
+
+                // Authoritative NODATA / no referral — keep current nameservers and continue.
+                if (nsNames.Count == 0)
                     continue;
-                }
 
-                var internalClient =
-                    await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
-                        cancellationToken);
-                using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                using var nameserverQueries = GetNameserverNames(responseMessage.Records.Where(i =>
-                        i.Type is DomainRecordType.NS or DomainRecordType.SOA))
-                    .Where(i => !string.IsNullOrWhiteSpace(i))
-                    .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (i) =>
-                        new[]
-                        {
-                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.A), cancellationTokenSource.Token).AsTask(),
-                            internalClient.SendAsync(DomainMessage.CreateRequest(i, DomainRecordType.AAAA),
-                                cancellationTokenSource.Token).AsTask()
-                        }
-                    ).Select(i => i.OperationCancelledToNull()
-                        .ConvertExceptionsToNull())
-                    .ToPooledList();
-                
-                addressRecords.Clear();
-                
-                while (nameserverQueries.Count > 0)
+                var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                addressRecords.AddRange(GetGlueAddresses(responseMessage.Records, nsNameSet));
+
+                if (addressRecords.Count == 0)
                 {
-                    var nextTask = await Task.WhenAny(nameserverQueries);
-                    nameserverQueries.Remove(nextTask);
-                    var nextMessage = await nextTask;
-                    if (nextMessage is null) continue;
-                    var records = nextMessage.Records.Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                        .Select(i => ((IPAddressData)i.Data).Address);
-                    addressRecords.AddRange(records);
-                    cancellationTokenSource.Cancel();
-                    await Task.WhenAll(nameserverQueries);
-                    break;
+                    var internalClient =
+                        await _clientFactory.GetDomainClient(
+                            new DomainClientOptions() { Type = DomainClientType.Internal },
+                            cancellationToken);
+
+                    using var nameserverQueries = nsNames
+                        .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
+                            new[]
+                            {
+                                internalClient
+                                    .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.A),
+                                        cancellationToken).AsTask(),
+                                internalClient
+                                    .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
+                                        cancellationToken).AsTask()
+                            })
+                        .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
+                        .ToPooledList();
+
+                    var responses = await Task.WhenAll(nameserverQueries);
+                    foreach (var nextMessage in responses)
+                    {
+                        if (nextMessage is null) continue;
+                        addressRecords.AddRange(nextMessage.Records
+                            .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                            .Select(i => ((IPAddressData)i.Data).Address));
+                    }
                 }
 
+                // Could not resolve NS addresses — keep current endpoints.
                 if (addressRecords.Count == 0)
                     continue;
 
@@ -150,7 +141,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
-            return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+            return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure);
         }
         finally
         {
@@ -162,16 +154,27 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     {
         foreach (var record in records)
         {
-            // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
-            switch (record.Type)
-            {
-                case DomainRecordType.NS:
-                    yield return ((NameData)record.Data).Name.ToString();
-                    break;
-                case DomainRecordType.SOA:
-                    yield return record.Name.ToString();
-                    break;
-            }
+            if (record.Type is not DomainRecordType.NS)
+                continue;
+            if (record.Data is not NameData nameData)
+                continue;
+            yield return nameData.Name.ToString();
+        }
+    }
+
+    private static IEnumerable<IPAddress> GetGlueAddresses(
+        IEnumerable<DomainResourceRecord> records,
+        HashSet<string> nsNames)
+    {
+        foreach (var record in records)
+        {
+            if (record.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+                continue;
+            if (!nsNames.Contains(record.Name.ToString()))
+                continue;
+            if (record.Data is not IPAddressData addressData)
+                continue;
+            yield return addressData.Address;
         }
     }
 

@@ -41,21 +41,20 @@ public sealed class DomainClientFactory : IDomainClientFactory
 
         if (options.Type.HasFlag(DomainClientType.Udp))
         {
-            var endPoint = options.EndPoint switch
+            var localEndPoint = options.EndPoint switch
             {
                 { AddressFamily: AddressFamily.InterNetwork } => new IPEndPoint(IPAddress.Any, 0),
                 { AddressFamily: AddressFamily.InterNetworkV6 } => new IPEndPoint(IPAddress.IPv6Any, 0),
                 _ => throw new InvalidOperationException(
                     $"Unsupported endpoint address family {options.EndPoint.AddressFamily}")
             };
-            try
-            {
-                clients.Add(new UdpDomainClient(_socketFactory.GetUdpClient(endPoint), options.EndPoint));
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            var udpClient = new UdpDomainClient(_socketFactory.GetUdpClient(localEndPoint), options.EndPoint);
+            var tcpClient = new TcpDomainClient(_socketFactory, options.EndPoint);
+            clients.Add(new DomainClientTruncationFallbackWrapper(udpClient, tcpClient));
+        }
+        else if (options.Type.HasFlag(DomainClientType.Tcp))
+        {
+            clients.Add(new TcpDomainClient(_socketFactory, options.EndPoint));
         }
 
         while (clients.Count > 2)
@@ -64,6 +63,9 @@ public sealed class DomainClientFactory : IDomainClientFactory
             clients.RemoveAt(clients.Count - 1);
             clients[^1] = wrappedClients;
         }
+
+        if (clients.Count == 0)
+            throw new ArgumentException("No DNS client types requested", nameof(options));
 
         if (options.TimeOut > TimeSpan.Zero)
         {

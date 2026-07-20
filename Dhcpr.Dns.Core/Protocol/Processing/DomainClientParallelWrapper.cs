@@ -22,6 +22,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var tasks = _innerClients.Select(i => i.SendAsync(message, source.Token).AsTask()).ToPooledList();
         using var exceptions = ListPool<Exception>.Default.Get();
+        DomainMessage? truncatedFallback = null;
 
         while (tasks.Count > 0)
         {
@@ -30,13 +31,14 @@ public sealed class DomainClientParallelWrapper : IDomainClient
             try
             {
                 var result = await completed;
-                // Orphan the remaining tasks.
-                foreach (var task in tasks)
+                if (!IsAcceptableResponse(result))
                 {
-                    task.IgnoreExceptionsAsync().Orphan();
+                    if (result.Flags.Truncated)
+                        truncatedFallback ??= result;
+                    continue;
                 }
 
-                source.Cancel();
+                CancelRemaining(tasks, source);
                 return result;
             }
             catch (AggregateException ex)
@@ -50,9 +52,32 @@ public sealed class DomainClientParallelWrapper : IDomainClient
             }
         }
 
+        if (truncatedFallback is not null)
+            return truncatedFallback;
+
         if (exceptions.Count == 1)
             throw new InvalidOperationException("DNS Query failed", exceptions[0]);
-        throw new AggregateException(exceptions);
+        if (exceptions.Count > 1)
+            throw new AggregateException(exceptions);
+        throw new InvalidOperationException("DNS Query failed: no usable response");
+    }
+
+    private static bool IsAcceptableResponse(DomainMessage result)
+    {
+        if (result.Flags.Truncated)
+            return false;
+
+        return result.Flags.ResponseCode is DomainResponseCode.NoError or DomainResponseCode.NameError;
+    }
+
+    private static void CancelRemaining(PooledList<Task<DomainMessage>> tasks, CancellationTokenSource source)
+    {
+        foreach (var task in tasks)
+        {
+            task.IgnoreExceptionsAsync().Orphan();
+        }
+
+        source.Cancel();
     }
 
     public void Dispose()

@@ -4,10 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # cache_from:
-      #   - type=registry,ref=harbor.instigaterevolution.com/instigaterevolution/markdown-blog/app:buildcache
-      # cache_to:
-      #   - type=registry,ref=harbor.instigaterevolution.com/instigaterevolution/markdown-blog/app:buildcache,mode=max
       x-bake:
         platforms:
           - linux/amd64

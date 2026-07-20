@@ -1,0 +1,142 @@
+name: docker-build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list-targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list-targets
+        uses: docker/bake-action/subaction/matrix@v7
+        with:
+          files: compose.yaml
+          target: default
+
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.nbgv.outputs.SemVer2 }}
+      major: ${{ steps.nbgv.outputs.VersionMajor }}
+      minor: ${{ steps.nbgv.outputs.VersionMinor }}
+      prerelease: ${{ steps.nbgv.outputs.PrereleaseVersion }}
+      fullVersion: ${{ steps.nbgv.outputs.Version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: dotnet/nbgv@v0.4.2
+        id: nbgv
+
+  build:
+    needs:
+      - prepare
+      - get-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    name: "${{ matrix.target }}:${{ needs.get-version.outputs.version }}"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: harbor.instigaterevolution.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: harbor.instigaterevolution.com/instigaterevolution/${{ github.event.repository.name }}/dns
+          bake-target: ${{ matrix.target }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v${{ needs.get-version.outputs.major }}${{ needs.get-version.outputs.prerelease }}
+            type=raw,value=v${{ needs.get-version.outputs.major }}.${{ needs.get-version.outputs.minor }}${{ needs.get-version.outputs.prerelease }}
+            type=raw,value=v${{ needs.get-version.outputs.version }}
+
+      - uses: docker/bake-action@v7
+        with:
+          files: |
+            compose.yaml
+            cwd://${{ steps.meta.outputs.bake-file }}
+          targets: ${{ matrix.target }}
+          sbom: true
+          provenance: true
+          push: true
+
+  tag-release:
+    if: github.ref_type != 'tag'
+    needs:
+      - build
+      - get-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "forgejo-actions[bot]"
+          git config user.email "actions@noreply.localhost"
+      - name: Bump chart version
+        uses: ./actions/bump-chart-version
+        with:
+          version: ${{ needs.get-version.outputs.version }}
+      - name: Tag release
+        uses: ./actions/tag-release
+        with:
+          version: ${{ needs.get-version.outputs.version }}
+          major: ${{ needs.get-version.outputs.major }}
+          minor: ${{ needs.get-version.outputs.minor }}
+          prerelease: ${{ needs.get-version.outputs.prerelease }}
+          fullVersion: ${{ needs.get-version.outputs.fullVersion }}
+
+  push-chart:
+    if: github.ref_type != 'tag'
+    needs:
+      - tag-release
+      - get-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.get-version.outputs.version }}
+
+      - uses: azure/setup-helm@v4
+
+      - name: Log in to registry
+        uses: docker/login-action@v4
+        with:
+          registry: harbor.instigaterevolution.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Package chart
+        run: helm package charts/dhcpr -d dist
+
+      - name: Push chart
+        run: helm push dist/dhcpr-*.tgz oci://harbor.instigaterevolution.com/instigaterevolution/charts

@@ -1,0 +1,34 @@
+name: Tag release
+description: Generates and force-pushes vMAJOR / vMAJOR.MINOR / vVERSION tags against the current commit
+inputs:
+  version:
+    description: Full version (e.g. 1.1.0-alpha.5 or 1.1.0)
+    required: true
+  major:
+    description: Version major
+    required: true
+  minor:
+    description: Version minor
+    required: true
+  prerelease:
+    description: Prerelease suffix (e.g. -alpha), empty for a real release
+    required: false
+    default: ""
+  fullVersion:
+    description: Fully qualified version of this build
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Generate release tags
+      shell: bash
+      run: |
+        git tag -f "v${{ inputs.version }}"
+        git tag -f "v${{ inputs.major }}${{ inputs.prerelease }}"
+        git tag -f "v${{ inputs.major }}.${{ inputs.minor }}${{ inputs.prerelease }}"
+        git tag -f "builds/v${{ inputs.fullVersion }}"
+
+    - name: Push release tags
+      shell: bash
+      run: |
+        git push --force origin --tags

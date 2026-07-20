@@ -1,0 +1,50 @@
+name: prepare-release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install fj
+        run: |
+          curl -fsSL https://codeberg.org/forgejo-contrib/forgejo-cli/releases/download/v0.5.0/forgejo-cli-x86_64-linux.tar.gz -o /tmp/fj.tar.gz
+          sudo tar -xzf /tmp/fj.tar.gz -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/fj
+
+      - name: Log in to fj
+        run: fj auth add-key "$FJ_USER" "$FJ_PAT"
+        env:
+          FJ_USER: ${{ secrets.FJ_USER }}
+          FJ_PAT: ${{ secrets.FJ_PAT }}
+
+      - name: Configure git
+        run: |
+          git config user.name "forgejo-actions[bot]"
+          git config user.email "actions@noreply.localhost"
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Prepare release
+        id: prepare
+        run: |
+          dotnet nbgv prepare-release -f json | tee /tmp/prepare-release.json
+          echo "branch=$(jq -r '.NewBranch.Name' /tmp/prepare-release.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Push branches
+        run: git push origin --all
+
+      - name: Dispatch docker-build for release branch
+        run: fj actions dispatch docker-build.yaml "${{ steps.prepare.outputs.branch }}"

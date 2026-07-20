@@ -1,0 +1,20 @@
+name: Bump chart version
+description: Bumps charts/dhcpr/Chart.yaml appVersion and version, and commits the change
+inputs:
+  version:
+    description: Semantic version to bump to
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Update chart app version
+      shell: bash
+      run: |
+        sed -i 's/^appVersion: .*/appVersion: "v${{ inputs.version }}"/' charts/dhcpr/Chart.yaml
+        sed -i 's/^version: .*/version: ${{ inputs.version }}/' charts/dhcpr/Chart.yaml
+
+    - name: Commit chart app changes
+      shell: bash
+      run: |
+        git add charts/dhcpr/Chart.yaml
+        git commit -m "chore: bump chart image tag to v${{ inputs.version }}"

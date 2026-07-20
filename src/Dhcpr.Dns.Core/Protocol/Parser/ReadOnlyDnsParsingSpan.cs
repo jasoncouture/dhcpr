@@ -19,11 +19,8 @@ public readonly ref struct ReadOnlyDnsParsingSpan
     }
 
     public ReadOnlyDnsParsingSpan(ReadOnlySpan<byte> buffer)
-        : this(buffer, Span<byte>.Empty, 0)
+        : this(buffer, buffer, 0)
     {
-        var start = new byte[buffer.Length].AsSpan();
-        buffer.CopyTo(start);
-        _start = start;
     }
 
     public ReadOnlyDnsParsingSpan(ReadOnlySpan<byte> buffer,

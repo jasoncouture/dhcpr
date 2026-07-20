@@ -39,11 +39,9 @@ public ref struct DnsParsingSpan
     }
 
     public bool TryGetOffset(string label, out int offset)
-    {
-        return _labels.TryGetValue(label.ToLowerInvariant(), out offset);
-    }
+        => _labels.TryGetValue(label, out offset);
 
-    public void AddLabel(string label, int offset) => _labels.TryAdd(label.ToLowerInvariant(), offset);
+    public void AddLabel(string label, int offset) => _labels.TryAdd(label, offset);
 
     public DnsParsingSpan Slice(int start) => this[start..];
 

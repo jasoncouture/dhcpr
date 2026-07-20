@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Net;
-using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -8,7 +7,6 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.UnitTests;
@@ -227,7 +225,6 @@ public class RecursiveRootResolverTests
         return new RecursiveRootResolver(
             options,
             factory,
-            ObjectPool.Create(new StringBuilderPooledObjectPolicy()),
             NullLogger<RecursiveRootResolver>.Instance);
     }
 

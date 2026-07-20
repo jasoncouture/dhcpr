@@ -127,6 +127,7 @@ public static class DomainMessageEncoder
         if (!visitedPositions.Add(offset))
             throw new InvalidDataException("DNS compression loop detected.");
     }
+
     // No, it can't be. :|
     [SuppressMessage("ReSharper", "ReturnTypeCanBeEnumerable.Local")]
     private static PooledList<DomainLabel> ReadLabelArrayAndAdvance(ref ReadOnlyDnsParsingSpan bytes,
@@ -347,18 +348,21 @@ public static class DomainMessageEncoder
 
     public static void EncodeAndAdvance(ref DnsParsingSpan buffer, DomainLabels labels)
     {
+        // Build the FQDN once; suffixes are slices of that string (avoids string.Join per label).
+        var fullName = labels.ToString();
+        var suffixStart = 0;
         for (var index = 0; index < labels.Labels.Length; index++)
         {
-            var slice = labels.Labels[index..];
-            var currentFullLabel = string.Join('.', slice);
-            if (buffer.TryGetOffset(currentFullLabel, out var offset))
+            var suffix = suffixStart == 0 ? fullName : fullName[suffixStart..];
+            if (buffer.TryGetOffset(suffix, out var offset))
             {
                 EncodeAndAdvance(ref buffer, (ushort)((offset & ushort.MaxValue) | DnsCompressionFlag));
                 return;
             }
 
-            buffer.AddLabel(currentFullLabel, buffer.Offset);
+            buffer.AddLabel(suffix, buffer.Offset);
             EncodeAndAdvance(ref buffer, labels.Labels[index]);
+            suffixStart += labels.Labels[index].Label.Length + 1; // label + '.'
         }
 
         EncodeAndAdvance(ref buffer, (byte)0);

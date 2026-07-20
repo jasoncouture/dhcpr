@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Text;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
@@ -10,7 +9,6 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
@@ -20,14 +18,12 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private const int MaxParallelNameservers = 3;
 
     private readonly IDomainClientFactory _clientFactory;
-    private readonly ObjectPool<StringBuilder> _stringBuilderPool;
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
         IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
         IDomainClientFactory clientFactory,
-        ObjectPool<StringBuilder> stringBuilderPool,
         ILogger<RecursiveRootResolver> logger
     )
     {
@@ -37,7 +33,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             .OrderBy(_ => Random.Shared.Next())
             .ToImmutableArray();
         _clientFactory = clientFactory;
-        _stringBuilderPool = stringBuilderPool;
         _logger = logger;
     }
 
@@ -45,26 +40,27 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         var question = context.DomainMessage.Questions[0];
-        using var labels = question.Name.Labels.ToPooledList();
-        using var endPoints = _servers.ToPooledList();
-        var builder = _stringBuilderPool.Get();
+        var remainingLabels = question.Name.Labels;
+        using var endPoints = ListPool<IPEndPoint>.Default.Get();
+        endPoints.AddRange(_servers);
+        using var zoneLabels = ListPool<DomainLabel>.Default.Get();
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
             // Walk parent zones only — never NS-query the FQDN (one fewer RTT).
-            while (labels.Count > 1)
+            while (remainingLabels.Length > 1)
             {
                 addressRecords.Clear();
-                var next = labels[^1];
-                labels.RemoveAt(labels.Count - 1);
-                if (builder.Length > 0)
-                    builder.Insert(0, '.');
-                builder.Insert(0, next);
+                var next = remainingLabels[^1];
+                remainingLabels = remainingLabels[..^1];
+                zoneLabels.Insert(0, next);
 
                 var resolver = await _clientFactory.GetParallelDomainClient(
                     SelectQueryEndpoints(endPoints),
                     cancellationToken);
-                var message = DomainMessage.CreateRequest(builder.ToString(), DomainRecordType.NS);
+                var message = DomainMessage.CreateRequest(
+                    new DomainLabels(zoneLabels.ToImmutableArray()),
+                    DomainRecordType.NS);
 
                 var responseMessage = await resolver.SendAsync(message, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
@@ -150,10 +146,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
-        }
-        finally
-        {
-            _stringBuilderPool.Return(builder);
         }
     }
 

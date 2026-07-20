@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  IS_DEFAULT_BRANCH: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -68,7 +71,7 @@ jobs:
           images: harbor.instigaterevolution.com/instigaterevolution/${{ github.event.repository.name }}/dns
           bake-target: ${{ matrix.target }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ env.IS_DEFAULT_BRANCH }}
             type=raw,value=v${{ needs.get-version.outputs.major }}${{ needs.get-version.outputs.prerelease }}
             type=raw,value=v${{ needs.get-version.outputs.major }}.${{ needs.get-version.outputs.minor }}${{ needs.get-version.outputs.prerelease }}
             type=raw,value=v${{ needs.get-version.outputs.version }}
@@ -111,6 +114,7 @@ jobs:
           minor: ${{ needs.get-version.outputs.minor }}
           prerelease: ${{ needs.get-version.outputs.prerelease }}
           fullVersion: ${{ needs.get-version.outputs.fullVersion }}
+          tag-latest: ${{ env.IS_DEFAULT_BRANCH }}
 
   push-chart:
     if: github.ref_type != 'tag'

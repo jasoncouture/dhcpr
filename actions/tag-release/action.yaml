@@ -17,6 +17,10 @@ inputs:
   fullVersion:
     description: Fully qualified version of this build
     required: true
+  tag-latest:
+    description: Also force-update the floating latest git tag (use on default branch only)
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
@@ -27,6 +31,9 @@ runs:
         git tag -f "v${{ inputs.major }}${{ inputs.prerelease }}"
         git tag -f "v${{ inputs.major }}.${{ inputs.minor }}${{ inputs.prerelease }}"
         git tag -f "builds/v${{ inputs.fullVersion }}"
+        if [ "${{ inputs.tag-latest }}" = "true" ]; then
+          git tag -f latest
+        fi
 
     - name: Push release tags
       shell: bash

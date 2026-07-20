@@ -21,9 +21,25 @@ public class InternalDomainClient : IInternalDomainClient
             new InternalDnsRequestReceivedMessage(
                 new DomainMessageContext(InternalEndPoint, InternalEndPoint,
                     domainMessage));
+        await using var registration = cancellationToken.Register(
+            static state =>
+            {
+                var tcs = (TaskCompletionSource<DomainMessage?>)state!;
+                tcs.TrySetCanceled();
+            },
+            message.TaskCompletionSource);
+
         _messageQueue.Enqueue(message, cancellationToken);
 
-        var result = await message.TaskCompletionSource.Task.ConfigureAwait(false);
+        DomainMessage? result;
+        try
+        {
+            result = await message.TaskCompletionSource.Task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
 
         if (result is null)
             throw new OperationCanceledException("Did not receive a response from the internal DNS chain");

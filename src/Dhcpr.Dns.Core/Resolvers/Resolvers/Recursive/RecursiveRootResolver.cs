@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.Sockets;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
@@ -47,8 +48,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            // Walk parent zones only — never NS-query the FQDN (one fewer RTT).
-            while (remainingLabels.Length > 1)
+            // Walk every label including the QNAME. Non-zone cuts typically return NODATA/SOA
+            // (no NS) and we keep the parent nameservers.
+            while (remainingLabels.Length > 0)
             {
                 addressRecords.Clear();
                 var next = remainingLabels[^1];
@@ -111,11 +113,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
             }
 
-            var finalResolver = await _clientFactory.GetParallelDomainClient(
-                SelectQueryEndpoints(endPoints),
-                cancellationToken);
             var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
-            var result = await finalResolver.SendAsync(clonedRequest, cancellationToken);
+            var result = await QueryFollowingReferralsAsync(clonedRequest, endPoints, cancellationToken);
 
             if (result.Records.Answers.Length != 0 ||
                 clonedRequest.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
@@ -128,7 +127,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 Questions = clonedRequest.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
                     .ToImmutableArray()
             };
-            var cnameResponse = await finalResolver.SendAsync(clonedRequest, cancellationToken);
+            var cnameResponse = await QueryFollowingReferralsAsync(clonedRequest, endPoints, cancellationToken);
             if (cnameResponse.Records.Answers.Length > 0 &&
                 cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
             {
@@ -149,13 +148,59 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
     }
 
+    private async ValueTask<DomainMessage> QueryFollowingReferralsAsync(
+        DomainMessage request,
+        PooledList<IPEndPoint> endPoints,
+        CancellationToken cancellationToken)
+    {
+        const int maxReferralDepth = 8;
+        DomainMessage? last = null;
+
+        for (var depth = 0; depth < maxReferralDepth; depth++)
+        {
+            var resolver = await _clientFactory.GetParallelDomainClient(
+                SelectQueryEndpoints(endPoints),
+                cancellationToken);
+            last = await resolver.SendAsync(request, cancellationToken);
+
+            if (last.Records.Answers.Length > 0)
+                return last;
+
+            using var nsNames = GetNameserverNames(last.Records).ToPooledList();
+            if (nsNames.Count == 0)
+                return last;
+
+            var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            using var referralAddresses = GetGlueAddresses(last.Records, nsNameSet).ToPooledList();
+            if (referralAddresses.Count == 0)
+                return last;
+
+            endPoints.Clear();
+            endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
+        }
+
+        return last!;
+    }
+
     private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
     {
-        IEnumerable<IPEndPoint> selected = endPoints.Count <= MaxParallelNameservers
-            ? endPoints
-            : endPoints.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
+        // Prefer IPv4 — IPv6 blackholes often ignore CancelAfter and stall the whole query.
+        var preferred = endPoints.Where(i => i.AddressFamily == AddressFamily.InterNetwork).ToPooledList();
+        var pool = preferred.Count > 0 ? preferred : endPoints;
+        try
+        {
+            IEnumerable<IPEndPoint> selected = pool.Count <= MaxParallelNameservers
+                ? pool
+                : pool.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
 
-        return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp });
+            return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp })
+                .ToArray();
+        }
+        finally
+        {
+            if (!ReferenceEquals(preferred, endPoints))
+                preferred.Dispose();
+        }
     }
 
     private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

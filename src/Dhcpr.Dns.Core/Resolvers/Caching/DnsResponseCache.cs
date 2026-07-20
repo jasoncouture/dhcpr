@@ -64,6 +64,11 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return;
         if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure or DomainResponseCode.Refused)
             return;
+        // Never cache bare delegations — they are not answers and poison the cache for hours.
+        if (response.Records.Answers.Length == 0 &&
+            response.Records.Any(r => r.Type == DomainRecordType.NS) &&
+            response.Flags.ResponseCode is DomainResponseCode.NoError)
+            return;
 
         var lifetime = ComputeLifetime(response);
         if (lifetime <= TimeSpan.Zero)

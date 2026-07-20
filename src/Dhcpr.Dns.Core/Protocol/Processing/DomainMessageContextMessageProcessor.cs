@@ -25,6 +25,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
+        var internalMessage = message as InternalDnsRequestReceivedMessage;
         try
         {
             DomainMessage? response = null;
@@ -37,13 +38,12 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                     break;
             }
 
-
-
             // This is a directive to ignore the message.
             // The middleware may have responded to it, or may be blocking this client.
-            // Internal clients will always see this as a request failure (null) during dispose.
+            // Internal clients treat null as failure via TrySetResult(null).
             if (response is null)
             {
+                internalMessage?.TaskCompletionSource.TrySetResult(null);
                 return;
             }
 
@@ -52,17 +52,22 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                 response = response with { Id = message.Context.DomainMessage.Id };
             }
 
-            if (message is InternalDnsRequestReceivedMessage internalMessage)
+            if (internalMessage is not null)
             {
                 internalMessage.TaskCompletionSource.TrySetResult(response);
                 return;
             }
 
-
             await SendResponseAsync(message, response, cancellationToken);
         }
         catch (Exception ex)
         {
+            if (internalMessage is not null)
+            {
+                internalMessage.TaskCompletionSource.TrySetException(ex);
+                return;
+            }
+
             _logger.LogError(ex, "Failed to process message due to an exception");
         }
     }

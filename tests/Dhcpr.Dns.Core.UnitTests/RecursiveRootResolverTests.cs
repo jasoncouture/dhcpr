@@ -216,6 +216,43 @@ public class RecursiveRootResolverTests
         Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
     }
 
+    [Fact]
+    public async Task TwoLabelNameQueriesZoneNsThenAnswers()
+    {
+        var queried = new List<IPEndPoint>();
+        var factory = new ScriptedDomainClientFactory(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+
+            if (type == DomainRecordType.A && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
+            {
+                // TLD would only refer; authoritative NS answers.
+                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
+                    return Answer(request, ARecord("google.com", GoogleWwwAddress));
+                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+            }
+
+            return EmptyNoError(request);
+        }, onUdpQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(factory);
+        var request = DomainMessage.CreateRequest("google.com");
+        var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Records.Answers, r =>
+            r.Type == DomainRecordType.A &&
+            ((IPAddressData)r.Data).Address.Equals(GoogleWwwAddress));
+        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
+    }
+
     private static RecursiveRootResolver CreateResolver(ScriptedDomainClientFactory factory)
     {
         var options = new TestOptionsMonitor(new RootServerConfiguration

@@ -4,8 +4,10 @@ using System.Net;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -253,7 +255,56 @@ public class RecursiveRootResolverTests
         Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
     }
 
-    private static RecursiveRootResolver CreateResolver(ScriptedDomainClientFactory factory)
+    [Fact]
+    public async Task SecondLookupReusesCachedComNs()
+    {
+        var cache = CreateCache();
+        var comNsQueries = 0;
+        var factory = new ScriptedDomainClientFactory(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+            {
+                comNsQueries++;
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+            }
+
+            if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return NodataWithSoa("example.com");
+
+            if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
+                return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+
+            if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+
+            if (type == DomainRecordType.NS &&
+                (name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase)))
+                return NodataWithSoa(name);
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(factory, cache);
+        await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.google.com")),
+            CancellationToken.None);
+        Assert.Equal(1, comNsQueries);
+
+        await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com")),
+            CancellationToken.None);
+        Assert.Equal(1, comNsQueries);
+    }
+
+    private static RecursiveRootResolver CreateResolver(
+        ScriptedDomainClientFactory factory,
+        IDnsResponseCache? cache = null)
     {
         var options = new TestOptionsMonitor(new RootServerConfiguration
         {
@@ -262,8 +313,12 @@ public class RecursiveRootResolverTests
         return new RecursiveRootResolver(
             options,
             factory,
+            cache ?? CreateCache(),
             NullLogger<RecursiveRootResolver>.Instance);
     }
+
+    private static DnsResponseCache CreateCache()
+        => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
 
     private static DomainMessage Referral(string zone, string nsName, IPAddress glue)
         => new(

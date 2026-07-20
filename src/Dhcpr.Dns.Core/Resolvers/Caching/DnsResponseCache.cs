@@ -1,4 +1,7 @@
+using System.Collections.Immutable;
+
 using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Caching.Memory;
 
@@ -49,15 +52,28 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return;
         if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure or DomainResponseCode.Refused)
             return;
-        // Never cache bare delegations — they are not answers and poison the cache for hours.
-        if (response.Records.Answers.Length == 0 &&
+
+        var questionType = request.Questions[0].Type;
+        // Bare NS referrals must not be cached as answers for A/AAAA/etc.
+        // NS questions may cache delegations — that is the layer answer.
+        if (questionType is not DomainRecordType.NS &&
+            response.Records.Answers.Length == 0 &&
             response.Records.Any(r => r.Type == DomainRecordType.NS) &&
             response.Flags.ResponseCode is DomainResponseCode.NoError)
             return;
 
+        if (!TryStore(request, response))
+            return;
+
+        if (questionType is DomainRecordType.NS)
+            CacheGlueRecords(response);
+    }
+
+    private bool TryStore(DomainMessage request, DomainMessage response)
+    {
         var lifetime = ComputeLifetime(response);
         if (lifetime <= TimeSpan.Zero)
-            return;
+            return false;
 
         if (lifetime > MaxCacheTtl)
             lifetime = MaxCacheTtl;
@@ -71,6 +87,41 @@ public sealed class DnsResponseCache : IDnsResponseCache
             SlidingExpiration = SlidingExpiration,
             Size = 1
         });
+        return true;
+    }
+
+    private void CacheGlueRecords(DomainMessage nsResponse)
+    {
+        var nsNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in nsResponse.Records)
+        {
+            if (record.Type is not DomainRecordType.NS)
+                continue;
+            if (record.Data is not NameData nameData)
+                continue;
+            nsNames.Add(nameData.Name.ToString());
+        }
+
+        if (nsNames.Count == 0)
+            return;
+
+        foreach (var group in nsResponse.Records
+                     .Where(r => r.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                     .Where(r => nsNames.Contains(r.Name.ToString()))
+                     .GroupBy(r => (Name: r.Name, r.Type)))
+        {
+            var glueRequest = DomainMessage.CreateRequest(group.Key.Name, group.Key.Type);
+            var glueRecords = group.ToImmutableArray();
+            var glueResponse = new DomainMessage(
+                glueRequest.Id,
+                nsResponse.Flags with { Response = true, ResponseCode = DomainResponseCode.NoError },
+                glueRequest.Questions,
+                new DomainResourceRecords(
+                    glueRecords,
+                    ImmutableArray<DomainResourceRecord>.Empty,
+                    ImmutableArray<DomainResourceRecord>.Empty));
+            TryStore(glueRequest, glueResponse);
+        }
     }
 
     private static TimeSpan ComputeLifetime(DomainMessage response)

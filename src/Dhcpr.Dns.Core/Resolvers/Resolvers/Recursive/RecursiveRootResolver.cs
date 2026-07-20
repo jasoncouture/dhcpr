@@ -8,6 +8,7 @@ using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,12 +20,14 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private const int MaxParallelNameservers = 3;
 
     private readonly IDomainClientFactory _clientFactory;
+    private readonly IDnsResponseCache _cache;
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
         IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
         IDomainClientFactory clientFactory,
+        IDnsResponseCache cache,
         ILogger<RecursiveRootResolver> logger
     )
     {
@@ -34,6 +37,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             .OrderBy(_ => Random.Shared.Next())
             .ToImmutableArray();
         _clientFactory = clientFactory;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -57,14 +61,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 remainingLabels = remainingLabels[..^1];
                 zoneLabels.Insert(0, next);
 
-                var resolver = await _clientFactory.GetParallelDomainClient(
-                    SelectQueryEndpoints(endPoints),
-                    cancellationToken);
                 var message = DomainMessage.CreateRequest(
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var responseMessage = await resolver.SendAsync(message, cancellationToken);
+                var responseMessage = await QueryNsAsync(message, endPoints, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
@@ -73,6 +74,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
                 var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 addressRecords.AddRange(GetGlueAddresses(responseMessage.Records, nsNameSet));
+
+                if (addressRecords.Count == 0)
+                    addressRecords.AddRange(GetCachedNameserverAddresses(nsNames));
 
                 if (addressRecords.Count == 0)
                 {
@@ -148,6 +152,22 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
     }
 
+    private async ValueTask<DomainMessage> QueryNsAsync(
+        DomainMessage message,
+        PooledList<IPEndPoint> endPoints,
+        CancellationToken cancellationToken)
+    {
+        if (_cache.TryGet(message, out var cached) && cached is not null)
+            return cached;
+
+        var resolver = await _clientFactory.GetParallelDomainClient(
+            SelectQueryEndpoints(endPoints),
+            cancellationToken);
+        var responseMessage = await resolver.SendAsync(message, cancellationToken);
+        _cache.Set(message, responseMessage);
+        return responseMessage;
+    }
+
     private async ValueTask<DomainMessage> QueryFollowingReferralsAsync(
         DomainMessage request,
         PooledList<IPEndPoint> endPoints,
@@ -170,16 +190,62 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             if (nsNames.Count == 0)
                 return last;
 
+            CacheReferralAsNs(last);
+
             var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
             using var referralAddresses = GetGlueAddresses(last.Records, nsNameSet).ToPooledList();
             if (referralAddresses.Count == 0)
-                return last;
+            {
+                referralAddresses.AddRange(GetCachedNameserverAddresses(nsNames));
+                if (referralAddresses.Count == 0)
+                    return last;
+            }
 
             endPoints.Clear();
             endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
         }
 
         return last!;
+    }
+
+    private void CacheReferralAsNs(DomainMessage referral)
+    {
+        DomainLabels? zone = null;
+        foreach (var record in referral.Records)
+        {
+            if (record.Type is not DomainRecordType.NS)
+                continue;
+            zone = record.Name;
+            break;
+        }
+
+        if (zone is null)
+            return;
+
+        var nsRequest = DomainMessage.CreateRequest(zone, DomainRecordType.NS);
+        _cache.Set(nsRequest, referral with { Questions = nsRequest.Questions });
+    }
+
+    private IEnumerable<IPAddress> GetCachedNameserverAddresses(IEnumerable<string> nsNames)
+    {
+        foreach (var name in nsNames)
+        {
+            foreach (var type in new[] { DomainRecordType.A, DomainRecordType.AAAA })
+            {
+                var lookup = DomainMessage.CreateRequest(name, type);
+                if (!_cache.TryGet(lookup, out var cached) || cached is null)
+                    continue;
+
+                foreach (var record in cached.Records.Answers)
+                {
+                    if (record.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+                        continue;
+                    if (record.Data is not IPAddressData addressData)
+                        continue;
+                    yield return addressData.Address;
+                }
+            }
+        }
     }
 
     private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)

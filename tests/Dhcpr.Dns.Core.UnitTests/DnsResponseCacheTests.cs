@@ -57,6 +57,78 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
+    public void DoesNotCacheBareReferralForAddressQuery()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("google.com", DomainRecordType.A);
+        var response = new DomainMessage(
+            request.Id,
+            new DomainMessageFlags(true, DomainOperationCode.Query, false, false, false, false, false, false,
+                DomainResponseCode.NoError),
+            request.Questions,
+            new DomainResourceRecords(
+                System.Collections.Immutable.ImmutableArray<DomainResourceRecord>.Empty,
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("google.com"),
+                        DomainRecordType.NS,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(172800),
+                        new NameData(new DomainLabels("ns1.google.com")))),
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("ns1.google.com"),
+                        DomainRecordType.A,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(172800),
+                        new IPAddressData(IPAddress.Parse("216.239.32.10"))))));
+
+        cache.Set(request, response);
+
+        Assert.False(cache.TryGet(request, out _));
+    }
+
+    [Fact]
+    public void CachesNsDelegationAndGlue()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("com", DomainRecordType.NS);
+        var glueAddress = IPAddress.Parse("192.5.6.30");
+        var response = new DomainMessage(
+            request.Id,
+            new DomainMessageFlags(true, DomainOperationCode.Query, false, false, false, false, false, false,
+                DomainResponseCode.NoError),
+            request.Questions,
+            new DomainResourceRecords(
+                System.Collections.Immutable.ImmutableArray<DomainResourceRecord>.Empty,
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("com"),
+                        DomainRecordType.NS,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(172800),
+                        new NameData(new DomainLabels("a.gtld-servers.net")))),
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("a.gtld-servers.net"),
+                        DomainRecordType.A,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(172800),
+                        new IPAddressData(glueAddress)))));
+
+        cache.Set(request, response);
+
+        Assert.True(cache.TryGet(request, out var cachedNs));
+        Assert.NotNull(cachedNs);
+        Assert.Contains(cachedNs!.Records, r => r.Type == DomainRecordType.NS);
+
+        var glueLookup = DomainMessage.CreateRequest("a.gtld-servers.net", DomainRecordType.A);
+        Assert.True(cache.TryGet(glueLookup, out var cachedGlue));
+        Assert.NotNull(cachedGlue);
+        Assert.Equal(glueAddress, ((IPAddressData)cachedGlue!.Records.Answers[0].Data).Address);
+    }
+
+    [Fact]
     public async Task DecoratorServesCachedResponseWithoutCallingInner()
     {
         var cache = CreateCache();

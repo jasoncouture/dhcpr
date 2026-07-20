@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -17,6 +18,9 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 public sealed class DnsServer : BackgroundService
 {
     private static readonly IPEndPoint AnyEndPoint = new(IPAddress.Any, 0);
+    private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> LocalAddressCache =
+        new();
+
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly ILogger<DnsServer> _logger;
@@ -136,7 +140,7 @@ public sealed class DnsServer : BackgroundService
                     networkInterface: result.PacketInformation.Interface,
                     udpClient,
                     listenEndPoint,
-                    buffer[..result.ReceivedBytes],
+                    buffer.AsSpan(0, result.ReceivedBytes),
                     cancellationToken
                 );
             }
@@ -236,7 +240,7 @@ public sealed class DnsServer : BackgroundService
         int networkInterface,
         UdpClient udpClient,
         IPEndPoint listenEndPoint,
-        byte[] bytes,
+        ReadOnlySpan<byte> bytes,
         CancellationToken cancellationToken
     )
     {
@@ -245,10 +249,7 @@ public sealed class DnsServer : BackgroundService
         try
         {
             var message = DomainMessageEncoder.Decode(bytes);
-            var localAddress = GetLocalIPAddress(networkInterface, remoteIPEndPoint.AddressFamily);
-            if (localAddress.Equals(IPAddress.Any) || localAddress.Equals(IPAddress.IPv6Any))
-                localAddress = listenEndPoint.Address;
-
+            var localAddress = ResolveLocalAddress(listenEndPoint, networkInterface, remoteIPEndPoint.AddressFamily);
             var endPoint = new IPEndPoint(localAddress, listenEndPoint.Port);
             var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message);
 
@@ -261,28 +262,48 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
+    private static IPAddress ResolveLocalAddress(
+        IPEndPoint listenEndPoint,
+        int networkInterface,
+        AddressFamily addressFamily)
+    {
+        // Specific listen address (e.g. 127.0.0.1) — never scan NICs on the hot path.
+        if (!listenEndPoint.Address.Equals(IPAddress.Any) &&
+            !listenEndPoint.Address.Equals(IPAddress.IPv6Any))
+            return listenEndPoint.Address;
+
+        var localAddress = GetLocalIPAddress(networkInterface, addressFamily);
+        if (localAddress.Equals(IPAddress.Any) || localAddress.Equals(IPAddress.IPv6Any))
+            return listenEndPoint.Address;
+        return localAddress;
+    }
+
     private static IPAddress GetLocalIPAddress(int networkInterface, AddressFamily addressFamily)
     {
         if (addressFamily is not AddressFamily.InterNetwork and not AddressFamily.InterNetworkV6)
             throw new ArgumentException("Only IPv4 and IPv6 are supported.", nameof(addressFamily));
-        foreach (var ipProperties in NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()))
-        {
-            if (ipProperties.UnicastAddresses.All(i => i.Address.AddressFamily != addressFamily))
-                continue;
-            if (addressFamily == AddressFamily.InterNetwork)
-            {
-                if (ipProperties.GetIPv4Properties().Index != networkInterface)
-                    continue;
 
-                return ipProperties.UnicastAddresses.First(i => i.Address.AddressFamily == addressFamily).Address;
+        return LocalAddressCache.GetOrAdd((networkInterface, addressFamily), static key =>
+        {
+            foreach (var ipProperties in NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()))
+            {
+                if (ipProperties.UnicastAddresses.All(i => i.Address.AddressFamily != key.Family))
+                    continue;
+                if (key.Family == AddressFamily.InterNetwork)
+                {
+                    if (ipProperties.GetIPv4Properties().Index != key.Interface)
+                        continue;
+
+                    return ipProperties.UnicastAddresses.First(i => i.Address.AddressFamily == key.Family).Address;
+                }
+
+                if (ipProperties.GetIPv6Properties().Index != key.Interface)
+                    continue;
+                return ipProperties.UnicastAddresses.First(i => i.Address.AddressFamily == key.Family).Address;
             }
 
-            if (ipProperties.GetIPv6Properties().Index != networkInterface)
-                continue;
-            return ipProperties.UnicastAddresses.First(i => i.Address.AddressFamily == addressFamily).Address;
-        }
-
-        return addressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
+            return key.Family == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
+        });
     }
 
     private static async Task<TcpClient?> AcceptNextConnectionAsync(TcpListener listener,

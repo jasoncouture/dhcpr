@@ -35,12 +35,10 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return false;
         }
 
-        var records = AgeRecords(entry.Records, age);
-        if (HasExpiredTtl(records))
-        {
-            _memoryCache.Remove(key);
-            return false;
-        }
+        // Fresh hits keep the stored records (no per-request ImmutableArray rebuild).
+        var records = age.TotalSeconds < 1
+            ? entry.Records
+            : AgeRecords(entry.Records, age);
 
         response = new DomainMessage(
             request.Id,
@@ -112,17 +110,6 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return NegativeCacheTtl;
 
         return TimeSpan.Zero;
-    }
-
-    private static bool HasExpiredTtl(DomainResourceRecords records)
-    {
-        foreach (var record in records)
-        {
-            if (record.TimeToLive <= TimeSpan.Zero)
-                return true;
-        }
-
-        return false;
     }
 
     private static DomainResourceRecords AgeRecords(DomainResourceRecords records, TimeSpan age)

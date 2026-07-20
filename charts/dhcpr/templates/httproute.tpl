@@ -1,8 +1,9 @@
 {{- if .Values.httpRoute.enabled }}
+{{- $fullName := include "dhcpr.fullname" . -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "dhcpr.fullname" . }}
+  name: {{ $fullName }}
   labels:
     {{- include "dhcpr.labels" . | nindent 4 }}
   {{- with .Values.httpRoute.annotations }}
@@ -11,11 +12,16 @@ metadata:
   {{- end }}
 spec:
   parentRefs:
+    {{- if .Values.gateway.enabled }}
+    - name: {{ $fullName }}
+      sectionName: websecure
+    {{- else }}
     {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+    {{- end }}
   hostnames:
-    - {{ .Values.httpRoute.host }}
+    - {{ .Values.httpRoute.host | quote }}
   rules:
     - backendRefs:
-        - name: {{ include "dhcpr.fullname" . }}
+        - name: {{ $fullName }}
           port: {{ .Values.service.httpPort }}
 {{- end }}

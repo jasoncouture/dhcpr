@@ -12,15 +12,28 @@ service:
   httpPort: 8080
   dnsPort: 53
 
-# HTTPRoute parentRefs are values-driven so the route can attach to an in-namespace
-# Gateway (or anything else the cluster supports). Traefik does not implement ListenerSet.
+# In-namespace Gateway (same pattern as ansible clusters/kube-lab/markdown-blog).
+# Traefik merges it onto the shared dataplane; cert-manager gateway-shim issues TLS.
+gateway:
+  enabled: false
+  className: traefik
+  port: 8443
+  # Defaults to httpRoute.host when empty.
+  hostname: ""
+  # Defaults to "<fullname>-tls" when empty.
+  certificateSecretName: ""
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01-vultr
+
+# When gateway.enabled is true, parentRefs point at this chart's Gateway
+# (sectionName: websecure). Otherwise parentRefs below are used as-is.
 httpRoute:
   enabled: false
   host: dns.instigaterevolution.com
   annotations: {}
   parentRefs:
     - name: dhcpr
-      kind: Gateway
+      sectionName: websecure
 
 # /data holds Data Protection keys and root-server cache. Use ReadWriteMany if
 # running more than one replica.

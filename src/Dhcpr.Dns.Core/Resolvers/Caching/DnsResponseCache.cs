@@ -30,6 +30,10 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (!_memoryCache.TryGetValue(key, out CacheEntry? entry) || entry is null)
             return false;
 
+        var age = DateTimeOffset.UtcNow - entry.CachedAt;
+        if (age < TimeSpan.Zero)
+            age = TimeSpan.Zero;
+
         response = new DomainMessage(
             request.Id,
             entry.Flags with
@@ -40,7 +44,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
                 Truncated = false
             },
             request.Questions,
-            entry.Records);
+            AgeRecords(entry.Records, age));
         return true;
     }
 
@@ -79,7 +83,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
             lifetime = MaxCacheTtl;
 
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
-        var entry = new CacheEntry(response.Flags, response.Records);
+        var entry = new CacheEntry(response.Flags, response.Records, DateTimeOffset.UtcNow);
 
         _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
         {
@@ -147,5 +151,36 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return TimeSpan.Zero;
     }
 
-    private sealed record CacheEntry(DomainMessageFlags Flags, DomainResourceRecords Records);
+    private static DomainResourceRecords AgeRecords(DomainResourceRecords records, TimeSpan age)
+        => new(
+            AgeSection(records.Answers, age),
+            AgeSection(records.Authorities, age),
+            AgeSection(records.Additional, age));
+
+    private static ImmutableArray<DomainResourceRecord> AgeSection(
+        ImmutableArray<DomainResourceRecord> records,
+        TimeSpan age)
+    {
+        if (records.IsDefaultOrEmpty)
+            return records;
+
+        if (age <= TimeSpan.Zero)
+            return records;
+
+        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(records.Length);
+        foreach (var record in records)
+        {
+            var ttl = record.TimeToLive - age;
+            if (ttl < TimeSpan.Zero)
+                ttl = TimeSpan.Zero;
+            builder.Add(record with { TimeToLive = ttl });
+        }
+
+        return builder.MoveToImmutable();
+    }
+
+    private sealed record CacheEntry(
+        DomainMessageFlags Flags,
+        DomainResourceRecords Records,
+        DateTimeOffset CachedAt);
 }

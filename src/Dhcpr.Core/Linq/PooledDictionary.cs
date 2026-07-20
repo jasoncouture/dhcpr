@@ -6,7 +6,7 @@ namespace Dhcpr.Core.Linq;
 
 public sealed class PooledDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IDisposable where TKey : notnull
 {
-    private long _token = 0;
+    private int _disposed;
     private int _estimatedCapacity;
 
     private static readonly List<int> Primes = new()
@@ -46,25 +46,16 @@ public sealed class PooledDictionary<TKey, TValue> : IDictionary<TKey, TValue>, 
 
     public int EstimatedCapacity => UpdateEstimatedCapacity();
 
-    internal void Discard()
-    {
-        Interlocked.Exchange(ref _token, 1);
-    }
-
     internal void Reset()
     {
         Clear();
-        Interlocked.Exchange(ref _token, 0);
+        Volatile.Write(ref _disposed, 0);
     }
 
     public void Dispose()
     {
-        if (
-            Interlocked.CompareExchange(
-                ref _token,
-                0,
-                1) != 0
-        ) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
         DictionaryPool<TKey, TValue>.Default.Return(this);
     }
 

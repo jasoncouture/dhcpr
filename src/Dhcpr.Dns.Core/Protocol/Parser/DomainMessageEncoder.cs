@@ -49,7 +49,6 @@ public static class DomainMessageEncoder
     {
         if (bytes.Length < MinimumSize)
             throw new ArgumentException("Domain messages require at least 12 bytes of data.");
-        using var labels = DictionaryPool<int, string>.Default.Get();
         var parsingSpan = new ReadOnlyDnsParsingSpan(bytes);
         var id = ReadUnsignedShortAndAdvance(ref parsingSpan);
         var flags = ReadMessageFlagsAndAdvance(ref parsingSpan);
@@ -60,16 +59,40 @@ public static class DomainMessageEncoder
         var additionalCount = ReadUnsignedShortAndAdvance(ref parsingSpan);
         using var questions = GetQuestionsFromDataAndAdvance(ref parsingSpan, questionCount);
 
-        using var resourceRecords =
-            ReadRecordsAndAdvance(ref parsingSpan, answerCount + authorityCount + additionalCount);
+        var totalRecords = answerCount + authorityCount + additionalCount;
+        using var resourceRecords = ReadRecordsAndAdvance(ref parsingSpan, totalRecords);
 
-        var domainResourceRecords = new DomainResourceRecords(
-            resourceRecords.Take(answerCount).ToImmutableArray(),
-            resourceRecords.Skip(answerCount).Take(authorityCount).ToImmutableArray(),
-            resourceRecords.Skip(answerCount).Skip(authorityCount).ToImmutableArray()
-        );
+        return new DomainMessage(
+            id,
+            flags,
+            questions.ToImmutableArray(),
+            SplitResourceRecords(resourceRecords, answerCount, authorityCount, additionalCount));
+    }
 
-        return new DomainMessage(id, flags, questions.ToImmutableArray(), domainResourceRecords);
+    private static DomainResourceRecords SplitResourceRecords(
+        PooledList<DomainResourceRecord> records,
+        int answerCount,
+        int authorityCount,
+        int additionalCount)
+    {
+        var answers = CopyRange(records, 0, answerCount);
+        var authorities = CopyRange(records, answerCount, authorityCount);
+        var additional = CopyRange(records, answerCount + authorityCount, additionalCount);
+        return new DomainResourceRecords(answers, authorities, additional);
+    }
+
+    private static ImmutableArray<DomainResourceRecord> CopyRange(
+        PooledList<DomainResourceRecord> records,
+        int start,
+        int count)
+    {
+        if (count <= 0)
+            return ImmutableArray<DomainResourceRecord>.Empty;
+
+        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(count);
+        for (var i = 0; i < count; i++)
+            builder.Add(records[start + i]);
+        return builder.MoveToImmutable();
     }
 
     public static DomainMessageFlags ReadMessageFlagsAndAdvance(ref ReadOnlyDnsParsingSpan bytes)

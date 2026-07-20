@@ -2,16 +2,17 @@
 
 public sealed class PooledHashSet<T> : HashSet<T>, IDisposable
 {
-    private long _state = 0;
+    private int _disposed;
 
     internal void Reset()
     {
         Clear();
-        Interlocked.Exchange(ref _state, 0);
+        Volatile.Write(ref _disposed, 0);
     }
+
     public void Dispose()
     {
-        if (Interlocked.CompareExchange(ref _state, 1, 0) != 0)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
         HashSetPool<T>.Default.Return(this);
     }

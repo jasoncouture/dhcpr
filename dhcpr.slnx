@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dhcpr.Abstractions/Dhcpr.Abstractions.csproj" />
+    <Project Path="src/Dhcpr.Core/Dhcpr.Core.csproj" />
+    <Project Path="src/Dhcpr.Dhcp.Core/Dhcpr.Dhcp.Core.csproj" />
+    <Project Path="src/Dhcpr.Dns.Core/Dhcpr.Dns.Core.csproj" />
+    <Project Path="src/Dhcpr.Peering.Discovery/Dhcpr.Peering.Discovery.csproj" />
+    <Project Path="src/Dhcpr.Server/Dhcpr.Server.csproj" />
+    <Project Path="src/Dhcpr.Storage/Dhcpr.Storage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dhcpr.Benchmarks/Dhcpr.Benchmarks.csproj" />
+    <Project Path="tests/Dhcpr.Dhcp.Core.UnitTests/Dhcpr.Dhcp.Core.UnitTests.csproj" />
+    <Project Path="tests/Dhcpr.Dns.Core.UnitTests/Dhcpr.Dns.Core.UnitTests.csproj" />
+    <Project Path="tests/Dhcpr.Peering.Discovery.UnitTests/Dhcpr.Peering.Discovery.UnitTests.csproj" />
+  </Folder>
+</Solution>

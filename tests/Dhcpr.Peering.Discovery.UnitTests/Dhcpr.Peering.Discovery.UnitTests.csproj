@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dhcpr.Dhcp.Core\Dhcpr.Dhcp.Core.csproj" />
+    <ProjectReference Include="../../src/Dhcpr.Peering.Discovery/Dhcpr.Peering.Discovery.csproj" />
   </ItemGroup>
 
 </Project>

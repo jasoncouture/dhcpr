@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
+    <ProjectReference Include="..\..\src\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
   </ItemGroup>
 
 </Project>

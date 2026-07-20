@@ -2,19 +2,19 @@
 
 public sealed class PooledList<T> : List<T>, IDisposable
 {
-    private long _token;
+    private bool _disposed;
 
     internal void Reset()
     {
         Clear();
-        Interlocked.Exchange(ref _token, 0);
+        _disposed = false;
     }
 
     public void Dispose()
     {
-        // 0 = in use / checked out; 1 = returned (or returning) to the pool.
-        if (Interlocked.CompareExchange(ref _token, 1, 0) != 0)
+        if (_disposed)
             return;
+        _disposed = true;
         ListPool<T>.Default.Return(this);
     }
 }

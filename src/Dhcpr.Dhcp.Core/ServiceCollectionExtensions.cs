@@ -34,8 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDhcpRequestHandler, DhcpSelectRequestHandler>();
 
         services.AddHostedService<DhcpServerHostedService>();
-        services.AddQueueProcessor<QueuedDhcpMessage, DhcpMessageQueueProcessor>(
-            lifetime: ServiceLifetime.Singleton);
+        services.AddQueueProcessor<QueuedDhcpMessage, DhcpMessageQueueProcessor>();
         return services;
     }
 }

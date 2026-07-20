@@ -14,7 +14,6 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
     private readonly IServiceProvider _serviceProvider;
     private readonly QueueProcessorConfiguration _options;
     private readonly ConcurrentQueue<CancellationTokenSource> _cancellationTokenSourceQueue = new();
-    private IQueueMessageProcessor<T>[]? _processors;
 
     public QueueProcessorService(string configurationName, IOptionsFactory<QueueProcessorConfiguration> optionsFactory,
         IMessageQueue<T> messageQueue, IServiceProvider serviceProvider)
@@ -54,8 +53,9 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         try
         {
             var token = rentedCancellationTokenSource.cancellationTokenSource.Token;
-            var processors = _processors ??= _serviceProvider.GetServices<IQueueMessageProcessor<T>>().ToArray();
-            await RunMessageProcessorsAsync(message, processors, token);
+            await using var scope = _serviceProvider.CreateAsyncScope();
+            var messageProcessors = scope.ServiceProvider.GetServices<IQueueMessageProcessor<T>>();
+            await RunMessageProcessorsAsync(message, messageProcessors, token);
         }
         finally
         {
@@ -64,25 +64,16 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
     }
 
     private static async Task RunMessageProcessorsAsync(T message,
-        IReadOnlyList<IQueueMessageProcessor<T>> messageProcessors,
+        IEnumerable<IQueueMessageProcessor<T>> messageProcessors,
         CancellationToken token
     )
     {
         using var disposable = message as IDisposable;
-        if (messageProcessors.Count == 1)
-        {
-            await messageProcessors[0].ProcessMessageAsync(message, token);
-            return;
-        }
-
         await Task.WhenAll(messageProcessors.Select(i => i.ProcessMessageAsync(message, token)));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Resolve once — processors are singletons for the DNS hot path.
-        _processors = _serviceProvider.GetServices<IQueueMessageProcessor<T>>().ToArray();
-
         var tasks = ListPool<Task>.Default.Get();
         try
         {

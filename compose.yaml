@@ -1,0 +1,25 @@
+services:
+  dns:
+    image: harbor.instigaterevolution.com/instigaterevolution/dhcpr/dns:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # cache_from:
+      #   - type=registry,ref=harbor.instigaterevolution.com/instigaterevolution/markdown-blog/app:buildcache
+      # cache_to:
+      #   - type=registry,ref=harbor.instigaterevolution.com/instigaterevolution/markdown-blog/app:buildcache,mode=max
+      x-bake:
+        platforms:
+          - linux/amd64
+          - linux/arm64
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    ports:
+      - "8080:8080"
+      - "65353:53"
+    volumes:
+      - blog-data:/data
+
+volumes:
+  blog-data:

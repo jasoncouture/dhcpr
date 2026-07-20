@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+.git/
+.vs/
+.idea/
+.github/
+**/Dockerfile
+**/compose.yaml
+**/compose.yml
+**/app-content/

@@ -35,7 +35,14 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         {
             if (question.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
                 continue;
-            _logger.LogDebug("[{QueryId:n}] {QueryType} {Name}", queryId, question.Type, question.Name.ToString());
+
+            _logger.LogDebug("[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}",
+                context.ClientEndPoint,
+                context.ServerEndPoint,
+                queryId,
+                question.Type,
+                question.Name.ToString()
+            );
         }
 
         var result = await _inner.ProcessAsync(context, cancellationToken);
@@ -47,7 +54,14 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         {
             var addresses = FormatAnswerAddresses(result, question.Type);
             if (addresses.Length > 0)
-                _logger.LogInformation("[{QueryId:n}] {QueryType} {Name} {Answers}", queryId, question.Type, question.Name.ToString(), addresses);
+                _logger.LogInformation("[{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+                    context.ClientEndPoint,
+                    context.ServerEndPoint,
+                    queryId,
+                    question.Type,
+                    question.Name.ToString(),
+                    addresses
+                );
         }
 
         return result;

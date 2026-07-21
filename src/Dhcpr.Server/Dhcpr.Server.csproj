@@ -7,8 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Dhcpr.Dhcp.Core\Dhcpr.Dhcp.Core.csproj"/>
-        <ProjectReference Include="..\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj"/>
+        <ProjectReference Include="..\Dhcpr.Dhcp.Core\Dhcpr.Dhcp.Core.csproj" />
+        <ProjectReference Include="..\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.17.0-beta.1" />
+      <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     </ItemGroup>
 
 </Project>

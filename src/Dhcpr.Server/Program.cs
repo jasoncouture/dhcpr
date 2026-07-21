@@ -1,6 +1,7 @@
 using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
+using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
 using Dhcpr.Server.Data;
 
@@ -8,6 +9,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.Options;
+
+using OpenTelemetry.Metrics;
 
 ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
 ThreadPool.GetMinThreads(out var workerMinThreads, out _);
@@ -42,6 +45,13 @@ builder.Services.AddCoreServices();
 builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
 builder.Services.AddDhcp(builder.Configuration.GetSection("Dhcp"));
 
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddMeter(DnsMetrics.MeterName);
+        metrics.AddPrometheusExporter();
+    });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -56,6 +66,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.MapPrometheusScrapingEndpoint();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

@@ -30,6 +30,8 @@ public static class DnsServiceProviderExtensions
         // Outermost last: Cache → CanonicalName → resolver (shared cache hits on first middleware)
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
+        // Registered after Decorate so this is not wrapped by cache/CNAME decorators.
+        services.AddSingleton<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();

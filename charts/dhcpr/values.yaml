@@ -13,12 +13,14 @@ service:
   dnsPort: 53
 
 # Prometheus Operator ServiceMonitor for /metrics on the http port.
+# `release` must match kube-prometheus-stack's serviceMonitorSelector.
 serviceMonitor:
   enabled: true
   path: /metrics
   interval: 30s
   scrapeTimeout: ""
-  labels: {}
+  labels:
+    release: monitoring-kube-prometheus-stack
   annotations: {}
 
 # In-namespace Gateway. Controllers matching gateway.className merge it onto

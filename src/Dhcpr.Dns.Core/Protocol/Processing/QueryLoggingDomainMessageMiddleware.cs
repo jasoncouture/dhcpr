@@ -30,20 +30,24 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        var queryId = Guid.CreateVersion7();
+        foreach (var question in context.DomainMessage.Questions)
+        {
+            if (question.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+                continue;
+            _logger.LogDebug("[{QueryId:n}] {QueryType} {Name}", queryId, question.Type, question.Name.ToString());
+        }
+
         var result = await _inner.ProcessAsync(context, cancellationToken);
-        if (result is null || IsInternalRequest(context))
+
+        if (result is null)
             return result;
 
         foreach (var question in context.DomainMessage.Questions)
         {
-            _logger.LogInformation("{QueryType} {Name}", question.Type, question.Name);
-
-            if (question.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
-                continue;
-
             var addresses = FormatAnswerAddresses(result, question.Type);
             if (addresses.Length > 0)
-                _logger.LogInformation("{Addresses}", addresses);
+                _logger.LogInformation("[{QueryId:n}] {QueryType} {Name} {Answers}", queryId, question.Type, question.Name.ToString(), addresses);
         }
 
         return result;

@@ -4,7 +4,6 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 
@@ -12,7 +11,7 @@ namespace Dhcpr.Dns.Core;
 
 public static class DnsServiceProviderExtensions
 {
-    public static IServiceCollection AddDns(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDns(this IServiceCollection services)
     {
         services.AddMemoryCache(o =>
         {
@@ -41,14 +40,12 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
 
-        services.AddOptions<DnsConfiguration>()
-            .Bind(configuration)
-            .Validate(o => o.Validate(), "Invalid DNS configuration")
-            .ValidateOnStart();
-        services.AddOptions<RootServerConfiguration>()
-            .Bind(configuration.GetSection(nameof(DnsConfiguration.RootServers)))
-            .Validate(o => o.Validate(), "Invalid DNS root server configuration")
-            .ValidateOnStart();
+        services.AddOptionsWithValidateOnStart<DnsConfiguration>()
+            .BindConfiguration("DNS")
+            .Validate(o => o.Validate(), "Invalid DNS configuration");
+        services.AddOptionsWithValidateOnStart<RootServerConfiguration>()
+            .BindConfiguration("DNS:RootServers")
+            .Validate(o => o.Validate(), "Invalid DNS root server configuration");
         return services;
     }
 }

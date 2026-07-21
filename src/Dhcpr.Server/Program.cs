@@ -42,8 +42,8 @@ builder.Services.AddOptions<KeyManagementOptions>()
     });
 
 builder.Services.AddCoreServices();
-builder.Services.AddDns(builder.Configuration.GetSection("DNS"));
-builder.Services.AddDhcp(builder.Configuration.GetSection("Dhcp"));
+builder.Services.AddDns();
+builder.Services.AddDhcp();
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>

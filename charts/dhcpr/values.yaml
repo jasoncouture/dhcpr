@@ -12,6 +12,15 @@ service:
   httpPort: 8080
   dnsPort: 53
 
+# Prometheus Operator ServiceMonitor for /metrics on the http port.
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: ""
+  labels: {}
+  annotations: {}
+
 # In-namespace Gateway. Controllers matching gateway.className merge it onto
 # their dataplane. For cert-manager gateway-shim, set annotations e.g.
 #   cert-manager.io/cluster-issuer: <your-issuer>

@@ -8,6 +8,8 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnsResponseCacheTests
@@ -134,24 +136,25 @@ public class DnsResponseCacheTests
     public async Task DecoratorServesCachedResponseWithoutCallingInner()
     {
         var cache = CreateCache();
-        var calls = 0;
         var address = IPAddress.Parse("1.2.3.4");
-        var inner = new StubMiddleware(request =>
-        {
-            calls++;
-            return DomainMessage.CreateResponse(
-                request,
-                new[]
-                {
-                    new DomainResourceRecord(
-                        new DomainLabels("cached.example"),
-                        DomainRecordType.A,
-                        DomainRecordClass.IN,
-                        TimeSpan.FromSeconds(120),
-                        new IPAddressData(address))
-                },
-                responseCode: DomainResponseCode.NoError);
-        });
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var context = callInfo.ArgAt<DomainMessageContext>(0);
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    context.DomainMessage,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("cached.example"),
+                            DomainRecordType.A,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(120),
+                            new IPAddressData(address))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
 
         var decorator = new CacheResolverDecorator(inner, cache);
         var request = DomainMessage.CreateRequest("cached.example", DomainRecordType.A);
@@ -162,23 +165,10 @@ public class DnsResponseCacheTests
 
         Assert.NotNull(first);
         Assert.NotNull(second);
-        Assert.Equal(1, calls);
+        await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
         Assert.Equal(address, ((IPAddressData)second!.Records.Answers[0].Data).Address);
     }
 
     private static DnsResponseCache CreateCache()
         => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-
-    private sealed class StubMiddleware : IDomainMessageMiddleware
-    {
-        private readonly Func<DomainMessage, DomainMessage> _handler;
-
-        public StubMiddleware(Func<DomainMessage, DomainMessage> handler) => _handler = handler;
-
-        public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
-            => ValueTask.FromResult<DomainMessage?>(_handler(context.DomainMessage));
-
-        public string Name => "stub";
-        public int Priority => 0;
-    }
 }

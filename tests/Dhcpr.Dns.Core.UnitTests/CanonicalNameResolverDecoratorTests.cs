@@ -1,10 +1,11 @@
-using System.Collections.Immutable;
 using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+
+using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -16,23 +17,26 @@ public class CanonicalNameResolverDecoratorTests
         var cnameTarget = "star-mini.c10r.facebook.com";
         var address = IPAddress.Parse("157.240.3.35");
 
-        var inner = new StubMiddleware(request =>
-        {
-            return DomainMessage.CreateResponse(
-                request,
-                new[]
-                {
-                    new DomainResourceRecord(
-                        new DomainLabels("www.facebook.com"),
-                        DomainRecordType.CNAME,
-                        DomainRecordClass.IN,
-                        TimeSpan.FromSeconds(60),
-                        new NameData(new DomainLabels(cnameTarget)))
-                },
-                responseCode: DomainResponseCode.NoError);
-        });
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("www.facebook.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels(cnameTarget)))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
 
-        var factory = new FixedInternalClientFactory(request =>
+        var factory = CreateClientFactory(request =>
         {
             Assert.Equal(cnameTarget, request.Questions[0].Name.ToString());
             Assert.Equal(DomainRecordType.A, request.Questions[0].Type);
@@ -64,7 +68,7 @@ public class CanonicalNameResolverDecoratorTests
     [Fact]
     public async Task NestedCnameChainIsPreservedInAnswers()
     {
-        var factory = new FixedInternalClientFactory(request =>
+        var factory = CreateClientFactory(request =>
         {
             var name = request.Questions[0].Name.ToString();
             if (name.Equals("alias1.example", StringComparison.OrdinalIgnoreCase))
@@ -92,18 +96,24 @@ public class CanonicalNameResolverDecoratorTests
             return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.NameError);
         });
 
-        var inner = new StubMiddleware(request => DomainMessage.CreateResponse(
-            request,
-            new[]
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
             {
-                new DomainResourceRecord(
-                    new DomainLabels("www.example"),
-                    DomainRecordType.CNAME,
-                    DomainRecordClass.IN,
-                    TimeSpan.FromSeconds(60),
-                    new NameData(new DomainLabels("alias1.example")))
-            },
-            responseCode: DomainResponseCode.NoError));
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("www.example"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels("alias1.example")))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
 
         var decorator = new CanonicalNameResolverDecorator(inner, factory);
         var request = DomainMessage.CreateRequest("www.example", DomainRecordType.A);
@@ -116,40 +126,16 @@ public class CanonicalNameResolverDecoratorTests
         Assert.Equal(DomainRecordType.A, result.Records.Answers[2].Type);
     }
 
-    private sealed class StubMiddleware : IDomainMessageMiddleware
+    private static IDomainClientFactory CreateClientFactory(Func<DomainMessage, DomainMessage> handler)
     {
-        private readonly Func<DomainMessage, DomainMessage> _handler;
+        var client = Substitute.For<IDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(0))));
 
-        public StubMiddleware(Func<DomainMessage, DomainMessage> handler) => _handler = handler;
+        var factory = Substitute.For<IDomainClientFactory>();
+        factory.GetDomainClient(Arg.Any<DomainClientOptions>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<IDomainClient>(client));
 
-        public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
-            => ValueTask.FromResult<DomainMessage?>(_handler(context.DomainMessage));
-
-        public string Name => "stub";
-        public int Priority => 0;
-    }
-
-    private sealed class FixedInternalClientFactory : IDomainClientFactory
-    {
-        private readonly Func<DomainMessage, DomainMessage> _handler;
-
-        public FixedInternalClientFactory(Func<DomainMessage, DomainMessage> handler) => _handler = handler;
-
-        public ValueTask<IDomainClient> GetParallelDomainClient(IEnumerable<DomainClientOptions> options,
-            CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public ValueTask<IDomainClient> GetDomainClient(DomainClientOptions options,
-            CancellationToken cancellationToken = default)
-            => ValueTask.FromResult<IDomainClient>(new DelegateClient(_handler));
-
-        private sealed class DelegateClient : IDomainClient
-        {
-            private readonly Func<DomainMessage, DomainMessage> _handler;
-            public DelegateClient(Func<DomainMessage, DomainMessage> handler) => _handler = handler;
-
-            public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-                => ValueTask.FromResult(_handler(message));
-        }
+        return factory;
     }
 }

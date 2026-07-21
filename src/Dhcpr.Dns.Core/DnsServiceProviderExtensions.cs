@@ -27,10 +27,11 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
-        // Outermost last: Cache → CanonicalName → resolver (shared cache hits on first middleware)
+        // Outermost last: Logging → Cache → CanonicalName → resolver
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
-        // Registered after Decorate so this is not wrapped by cache/CNAME decorators.
+        services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
+        // Registered after Decorate so this is not wrapped by cache/CNAME/logging decorators.
         services.AddSingleton<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();

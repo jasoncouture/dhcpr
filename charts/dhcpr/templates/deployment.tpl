@@ -4,6 +4,10 @@ metadata:
   name: {{ include "dhcpr.fullname" . }}
   labels:
     {{- include "dhcpr.labels" . | nindent 4 }}
+  {{- with (include "dhcpr.annotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy:
@@ -18,6 +22,10 @@ spec:
     metadata:
       labels:
         {{- include "dhcpr.labels" . | nindent 8 }}
+      {{- with (include "dhcpr.annotations" .) }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "dhcpr.fullname" . }}
       containers:

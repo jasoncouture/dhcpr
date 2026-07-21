@@ -3,6 +3,9 @@ replicaCount: 1
 nameOverride: ""
 fullnameOverride: ""
 
+# Applied to both Deployment and Pod metadata when non-empty.
+annotations: {}
+
 image:
   repository: harbor.instigaterevolution.com/instigaterevolution/dhcpr/dns
   pullPolicy: IfNotPresent

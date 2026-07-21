@@ -15,3 +15,9 @@
 app.kubernetes.io/name: dhcpr
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{- define "dhcpr.annotations" -}}
+{{- with .Values.annotations }}
+{{- toYaml . }}
+{{- end }}
+{{- end }}

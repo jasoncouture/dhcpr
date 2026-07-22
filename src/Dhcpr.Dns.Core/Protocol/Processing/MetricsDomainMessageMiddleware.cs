@@ -4,12 +4,12 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 {
-    private readonly ICacheState _cacheState;
+    private readonly IDomainMessageMiddleware _inner;
     private readonly Counter<long> _queries;
 
-    public MetricsDomainMessageMiddleware(IMeterFactory meterFactory, ICacheState cacheState)
+    public MetricsDomainMessageMiddleware(IDomainMessageMiddleware inner, IMeterFactory meterFactory)
     {
-        _cacheState = cacheState;
+        _inner = inner;
         var meter = meterFactory.Create(DnsMetrics.MeterName);
         _queries = meter.CreateCounter<long>(
             DnsMetrics.QueriesInstrumentName,
@@ -17,17 +17,24 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
             description: "DNS queries received by the server");
     }
 
-    public string Name => "DNS Metrics";
-    public int Priority => int.MinValue;
+    public string Name => _inner.Name;
+    public int Priority => _inner.Priority;
 
-    public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
+    public async ValueTask<DomainMessage?> ProcessAsync(
+        DomainMessageContext context,
+        CancellationToken cancellationToken)
     {
-        var count = context.DomainMessage.Questions.Length;
-        if (count > 0)
-            _queries.Add(count, new KeyValuePair<string, object?>("cache_hit", _cacheState.CacheHit));
-        else
-            _queries.Add(1, new KeyValuePair<string, object?>("cache_hit", _cacheState.CacheHit));
+        context.CacheHit = false;
+        var result = await _inner.ProcessAsync(context, cancellationToken);
 
-        return default;
+        if (!context.IsInternal)
+        {
+            var count = context.DomainMessage.Questions.Length;
+            if (count <= 0)
+                count = 1;
+            _queries.Add(count, new KeyValuePair<string, object?>("cache_hit", context.CacheHit));
+        }
+
+        return result;
     }
 }

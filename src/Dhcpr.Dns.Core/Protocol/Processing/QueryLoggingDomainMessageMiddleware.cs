@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
@@ -8,34 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public interface ICacheState
-{
-    bool CacheHit { get; }
-}
-
-public sealed class CacheState : ICacheState
-{
-    private readonly AsyncLocal<bool?> _cacheHit = new AsyncLocal<bool?>();
-
-    public bool CacheHit
-    {
-        get => _cacheHit.Value ??= false;
-        set => _cacheHit.Value = value;
-    }
-}
 public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;
-    private readonly ICacheState _cacheState;
     private readonly ILogger<QueryLoggingDomainMessageMiddleware> _logger;
 
     public QueryLoggingDomainMessageMiddleware(
         IDomainMessageMiddleware inner,
-        ICacheState cacheState,
         ILogger<QueryLoggingDomainMessageMiddleware> logger)
     {
         _inner = inner;
-        _cacheState = cacheState;
         _logger = logger;
     }
 
@@ -58,7 +39,7 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
 
     private void LogResponse(DomainMessageContext context, DomainMessage result, Guid queryId)
     {
-        var hitString = _cacheState.CacheHit ? "HIT" : "MISS";
+        var hitString = context.CacheHit ? "HIT" : "MISS";
         foreach (var question in context.DomainMessage.Questions)
         {
             var addresses = FormatAnswerAddresses(result, question.Type);

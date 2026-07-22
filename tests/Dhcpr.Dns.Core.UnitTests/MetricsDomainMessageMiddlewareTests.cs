@@ -6,6 +6,8 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class MetricsDomainMessageMiddlewareTests
@@ -48,11 +50,17 @@ public class MetricsDomainMessageMiddlewareTests
         Assert.Equal(0, observed);
     }
 
-    private static MetricsDomainMessageMiddleware CreateMiddleware()
+    private static MetricsDomainMessageMiddleware CreateMiddleware(IDomainMessageMiddleware? inner = null)
     {
+        inner ??= Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>((DomainMessage?)null));
+
         var services = new ServiceCollection();
         services.AddMetrics();
-        return new MetricsDomainMessageMiddleware(services.BuildServiceProvider().GetRequiredService<IMeterFactory>());
+        return new MetricsDomainMessageMiddleware(
+            inner,
+            services.BuildServiceProvider().GetRequiredService<IMeterFactory>());
     }
 
     private static MeterListener CreateListener(Action<long> onMeasurement)

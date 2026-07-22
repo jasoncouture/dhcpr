@@ -18,4 +18,11 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// Client/server endpoints are preserved from the originating request for logging.
     /// </summary>
     public bool IsInternal { get; init; }
+
+    /// <summary>
+    /// Set by the cache decorator when the response was served from cache.
+    /// Stored on the context so the flag is visible to outer middleware after await
+    /// (AsyncLocal does not flow mutations back to the caller).
+    /// </summary>
+    public bool CacheHit { get; set; }
 }

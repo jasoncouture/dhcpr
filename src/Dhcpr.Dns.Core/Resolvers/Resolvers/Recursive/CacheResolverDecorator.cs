@@ -8,13 +8,11 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _innerMiddleware;
     private readonly IDnsResponseCache _cache;
-    private readonly CacheState _cacheState;
 
-    public CacheResolverDecorator(IDomainMessageMiddleware innerMiddleware, IDnsResponseCache cache, CacheState cacheState)
+    public CacheResolverDecorator(IDomainMessageMiddleware innerMiddleware, IDnsResponseCache cache)
     {
         _innerMiddleware = innerMiddleware;
         _cache = cache;
-        _cacheState = cacheState;
     }
 
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
@@ -22,7 +20,7 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
     {
         if (_cache.TryGet(context.DomainMessage, out var cached) && cached is not null)
         {
-            _cacheState.CacheHit = true;
+            context.CacheHit = true;
             return cached;
         }
 

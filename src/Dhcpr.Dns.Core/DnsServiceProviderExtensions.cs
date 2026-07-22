@@ -22,8 +22,6 @@ public static class DnsServiceProviderExtensions
             o.ExpirationScanFrequency = TimeSpan.FromMinutes(1);
         });
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
-        services.AddSingleton<CacheState>();
-        services.AddSingleton<ICacheState>(sp => sp.GetRequiredService<CacheState>());
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);

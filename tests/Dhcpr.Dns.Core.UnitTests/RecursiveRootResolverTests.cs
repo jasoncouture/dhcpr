@@ -408,9 +408,20 @@ public class RecursiveRootResolverTests
         public List<string> InternalQueries { get; } = new();
 
         public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => SendAsync(message, upstreamEndpoints: default, cancellationToken);
+            => SendAsync(
+                new DomainMessageContext(null, null, message) { IsInternal = true },
+                message,
+                upstreamEndpoints: default,
+                cancellationToken);
 
         public ValueTask<DomainMessage> SendAsync(
+            DomainMessageContext parentContext,
+            DomainMessage message,
+            CancellationToken cancellationToken)
+            => SendAsync(parentContext, message, upstreamEndpoints: default, cancellationToken);
+
+        public ValueTask<DomainMessage> SendAsync(
+            DomainMessageContext parentContext,
             DomainMessage message,
             ImmutableArray<IPEndPoint> upstreamEndpoints,
             CancellationToken cancellationToken)

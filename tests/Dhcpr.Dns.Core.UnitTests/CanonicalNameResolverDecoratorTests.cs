@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
@@ -36,7 +37,7 @@ public class CanonicalNameResolverDecoratorTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        var factory = CreateClientFactory(request =>
+        var internalClient = CreateInternalClient(request =>
         {
             Assert.Equal(cnameTarget, request.Questions[0].Name.ToString());
             Assert.Equal(DomainRecordType.A, request.Questions[0].Type);
@@ -54,7 +55,7 @@ public class CanonicalNameResolverDecoratorTests
                 responseCode: DomainResponseCode.NoError);
         });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, factory);
+        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.facebook.com", DomainRecordType.A);
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -68,7 +69,7 @@ public class CanonicalNameResolverDecoratorTests
     [Fact]
     public async Task NestedCnameChainIsPreservedInAnswers()
     {
-        var factory = CreateClientFactory(request =>
+        var internalClient = CreateInternalClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             if (name.Equals("alias1.example", StringComparison.OrdinalIgnoreCase))
@@ -115,7 +116,7 @@ public class CanonicalNameResolverDecoratorTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, factory);
+        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.example", DomainRecordType.A);
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -126,16 +127,22 @@ public class CanonicalNameResolverDecoratorTests
         Assert.Equal(DomainRecordType.A, result.Records.Answers[2].Type);
     }
 
-    private static IDomainClientFactory CreateClientFactory(Func<DomainMessage, DomainMessage> handler)
+    private static IInternalDomainClient CreateInternalClient(Func<DomainMessage, DomainMessage> handler)
     {
-        var client = Substitute.For<IDomainClient>();
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(1))));
+        client.SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<ImmutableArray<IPEndPoint>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(1))));
         client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(0))));
-
-        var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetDomainClient(Arg.Any<DomainClientOptions>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<IDomainClient>(client));
-
-        return factory;
+        return client;
     }
 }

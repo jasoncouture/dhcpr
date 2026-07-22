@@ -65,7 +65,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var responseMessage = await QueryUpstreamAsync(message, endPoints, cancellationToken);
+                var responseMessage = await QueryUpstreamAsync(context, message, endPoints, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
@@ -76,7 +76,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 addressRecords.AddRange(GetGlueAddresses(responseMessage.Records, nsNameSet));
 
                 if (addressRecords.Count == 0)
-                    addressRecords.AddRange(await ResolveNameserverAddressesAsync(nsNames, cancellationToken));
+                    addressRecords.AddRange(
+                        await ResolveNameserverAddressesAsync(context, nsNames, cancellationToken));
 
                 // Could not resolve NS addresses — keep current endpoints.
                 if (addressRecords.Count == 0)
@@ -87,7 +88,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             }
 
             var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
-            var result = await QueryFollowingReferralsAsync(clonedRequest, endPoints, cancellationToken);
+            var result = await QueryFollowingReferralsAsync(context, clonedRequest, endPoints, cancellationToken);
 
             if (result.Records.Answers.Length != 0 ||
                 clonedRequest.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
@@ -100,7 +101,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 Questions = clonedRequest.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
                     .ToImmutableArray()
             };
-            var cnameResponse = await QueryFollowingReferralsAsync(clonedRequest, endPoints, cancellationToken);
+            var cnameResponse =
+                await QueryFollowingReferralsAsync(context, clonedRequest, endPoints, cancellationToken);
             if (cnameResponse.Records.Answers.Length > 0 &&
                 cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
             {
@@ -122,15 +124,17 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     }
 
     private async ValueTask<DomainMessage> QueryUpstreamAsync(
+        DomainMessageContext parentContext,
         DomainMessage message,
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
         var upstream = SelectQueryEndpoints(endPoints);
-        return await _internalClient.SendAsync(message, upstream, cancellationToken);
+        return await _internalClient.SendAsync(parentContext, message, upstream, cancellationToken);
     }
 
     private async ValueTask<DomainMessage> QueryFollowingReferralsAsync(
+        DomainMessageContext parentContext,
         DomainMessage request,
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
@@ -140,7 +144,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
         for (var depth = 0; depth < maxReferralDepth; depth++)
         {
-            last = await QueryUpstreamAsync(request, endPoints, cancellationToken);
+            last = await QueryUpstreamAsync(parentContext, request, endPoints, cancellationToken);
 
             if (last.Records.Answers.Length > 0)
                 return last;
@@ -153,7 +157,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             using var referralAddresses = GetGlueAddresses(last.Records, nsNameSet).ToPooledList();
             if (referralAddresses.Count == 0)
             {
-                referralAddresses.AddRange(await ResolveNameserverAddressesAsync(nsNames, cancellationToken));
+                referralAddresses.AddRange(
+                    await ResolveNameserverAddressesAsync(parentContext, nsNames, cancellationToken));
                 if (referralAddresses.Count == 0)
                     return last;
             }
@@ -166,6 +171,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     }
 
     private async ValueTask<List<IPAddress>> ResolveNameserverAddressesAsync(
+        DomainMessageContext parentContext,
         PooledList<string> nsNames,
         CancellationToken cancellationToken)
     {
@@ -174,10 +180,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 new[]
                 {
                     _internalClient
-                        .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.A),
+                        .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.A),
                             cancellationToken).AsTask(),
                     _internalClient
-                        .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
+                        .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
                             cancellationToken).AsTask()
                 })
             .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())

@@ -1,12 +1,9 @@
 using System.Diagnostics.Metrics;
-using System.Net;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 {
-    private static readonly IPAddress InternalAddress = IPAddress.Any;
-
     private readonly Counter<long> _queries;
 
     public MetricsDomainMessageMiddleware(IMeterFactory meterFactory)
@@ -23,7 +20,7 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 
     public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
     {
-        if (!IsInternalRequest(context))
+        if (!context.IsInternal)
         {
             var count = context.DomainMessage.Questions.Length;
             if (count > 0)
@@ -34,8 +31,4 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 
         return default;
     }
-
-    private static bool IsInternalRequest(DomainMessageContext context) =>
-        context.ClientEndPoint is { Port: 53 } endpoint &&
-        endpoint.Address.Equals(InternalAddress);
 }

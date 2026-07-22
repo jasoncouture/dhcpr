@@ -11,12 +11,14 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _innerMiddleware;
-    private readonly IDomainClientFactory _clientFactory;
+    private readonly IInternalDomainClient _internalClient;
 
-    public CanonicalNameResolverDecorator(IDomainMessageMiddleware innerMiddleware, IDomainClientFactory clientFactory)
+    public CanonicalNameResolverDecorator(
+        IDomainMessageMiddleware innerMiddleware,
+        IInternalDomainClient internalClient)
     {
-        this._innerMiddleware = innerMiddleware;
-        _clientFactory = clientFactory;
+        _innerMiddleware = innerMiddleware;
+        _internalClient = internalClient;
     }
 
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
@@ -43,15 +45,11 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
             .Where(i => i.Type == DomainRecordType.CNAME)
             .ToPooledList();
 
-        var internalClient =
-            await _clientFactory.GetDomainClient(new DomainClientOptions() { Type = DomainClientType.Internal },
-                cancellationToken);
-
         foreach (var record in cnameRecords)
         {
             var nextRequest = DomainMessage.CreateRequest(((NameData)record.Data).Name, questionType);
 
-            var nextResponse = await internalClient.SendAsync(nextRequest, cancellationToken)
+            var nextResponse = await _internalClient.SendAsync(context, nextRequest, cancellationToken)
                 .AsTask()
                 .ConvertExceptionsToNull();
 

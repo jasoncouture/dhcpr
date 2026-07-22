@@ -35,11 +35,13 @@ public class MetricsDomainMessageMiddlewareTests
         using var listener = CreateListener(measurement => observed += measurement);
 
         var middleware = CreateMiddleware();
-        var internalEndPoint = new IPEndPoint(IPAddress.Any, 53);
         var context = new DomainMessageContext(
-            internalEndPoint,
-            internalEndPoint,
-            DomainMessage.CreateRequest("example.com"));
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            DomainMessage.CreateRequest("example.com"))
+        {
+            IsInternal = true
+        };
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 

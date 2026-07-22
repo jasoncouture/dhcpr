@@ -17,10 +17,19 @@ public class InternalDomainClient : IInternalDomainClient
     private static readonly IPEndPoint InternalEndPoint = new(IPAddress.Any, 53);
 
     public ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
-        => SendAsync(domainMessage, upstreamEndpoints: default, cancellationToken);
+        => EnqueueAsync(
+            new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage) { IsInternal = true },
+            cancellationToken);
 
-    public async ValueTask<DomainMessage> SendAsync(
-        DomainMessage domainMessage,
+    public ValueTask<DomainMessage> SendAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        CancellationToken cancellationToken)
+        => SendAsync(parentContext, message, upstreamEndpoints: default, cancellationToken);
+
+    public ValueTask<DomainMessage> SendAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
         ImmutableArray<IPEndPoint> upstreamEndpoints,
         CancellationToken cancellationToken)
     {
@@ -28,12 +37,23 @@ public class InternalDomainClient : IInternalDomainClient
             ? null
             : upstreamEndpoints;
 
-        var message =
-            new InternalDnsRequestReceivedMessage(
-                new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage)
-                {
-                    UpstreamEndpoints = endpoints
-                });
+        var context = new DomainMessageContext(
+            parentContext.ClientEndPoint,
+            parentContext.ServerEndPoint,
+            message)
+        {
+            UpstreamEndpoints = endpoints,
+            IsInternal = true
+        };
+
+        return EnqueueAsync(context, cancellationToken);
+    }
+
+    private async ValueTask<DomainMessage> EnqueueAsync(
+        DomainMessageContext context,
+        CancellationToken cancellationToken)
+    {
+        var message = new InternalDnsRequestReceivedMessage(context);
         await using var registration = cancellationToken.Register(
             static state =>
             {

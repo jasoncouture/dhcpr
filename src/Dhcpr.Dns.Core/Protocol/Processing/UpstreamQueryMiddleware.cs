@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
@@ -39,22 +38,11 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 
     private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
     {
-        // Prefer IPv4 — IPv6 blackholes often ignore CancelAfter and stall the whole query.
-        var preferred = endPoints.Where(i => i.AddressFamily == AddressFamily.InterNetwork).ToPooledList();
-        var pool = preferred.Count > 0 ? preferred : endPoints;
-        try
-        {
-            IEnumerable<IPEndPoint> selected = pool.Count <= MaxParallelNameservers
-                ? pool
-                : pool.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
+        IEnumerable<IPEndPoint> selected = endPoints.Count <= MaxParallelNameservers
+            ? endPoints
+            : endPoints.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
 
-            return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp })
-                .ToArray();
-        }
-        finally
-        {
-            if (!ReferenceEquals(preferred, endPoints))
-                preferred.Dispose();
-        }
+        return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp })
+            .ToArray();
     }
 }

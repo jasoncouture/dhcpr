@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Net.Sockets;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
@@ -204,22 +203,13 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
     private static ImmutableArray<IPEndPoint> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
     {
-        // Prefer IPv4 — IPv6 blackholes often ignore CancelAfter and stall the whole query.
-        var preferred = endPoints.Where(i => i.AddressFamily == AddressFamily.InterNetwork).ToPooledList();
-        var pool = preferred.Count > 0 ? preferred : endPoints;
-        try
-        {
-            IEnumerable<IPEndPoint> selected = pool.Count <= MaxParallelNameservers
-                ? pool
-                : pool.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
+        if (endPoints.Count <= MaxParallelNameservers)
+            return endPoints.ToImmutableArray();
 
-            return selected.ToImmutableArray();
-        }
-        finally
-        {
-            if (!ReferenceEquals(preferred, endPoints))
-                preferred.Dispose();
-        }
+        return endPoints
+            .OrderBy(_ => Random.Shared.Next())
+            .Take(MaxParallelNameservers)
+            .ToImmutableArray();
     }
 
     private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

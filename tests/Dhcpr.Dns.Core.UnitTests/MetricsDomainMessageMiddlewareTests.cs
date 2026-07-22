@@ -13,12 +13,32 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class MetricsDomainMessageMiddlewareTests
 {
     [Fact]
-    public async Task CountsExternalQueries()
+    public async Task CountsWhenInnerAnswers()
     {
         long observed = 0;
         using var listener = CreateListener(measurement => observed += measurement);
 
-        var middleware = CreateMiddleware();
+        var request = DomainMessage.CreateRequest("example.com");
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        var middleware = CreateMiddleware(response);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(response, result);
+        Assert.Equal(1, observed);
+    }
+
+    [Fact]
+    public async Task DoesNotCountCoRPassThrough()
+    {
+        long observed = 0;
+        using var listener = CreateListener(measurement => observed += measurement);
+
+        var middleware = CreateMiddleware(response: null);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -27,20 +47,22 @@ public class MetricsDomainMessageMiddlewareTests
         var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.Null(result);
-        Assert.Equal(1, observed);
+        Assert.Equal(0, observed);
     }
 
     [Fact]
-    public async Task CountsInternalRecursiveRequests()
+    public async Task CountsInternalAnswers()
     {
         long observed = 0;
         using var listener = CreateListener(measurement => observed += measurement);
 
-        var middleware = CreateMiddleware();
+        var request = DomainMessage.CreateRequest("example.com");
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        var middleware = CreateMiddleware(response);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
             new IPEndPoint(IPAddress.Loopback, 53),
-            DomainMessage.CreateRequest("example.com"))
+            request)
         {
             IsInternal = true
         };
@@ -50,11 +72,11 @@ public class MetricsDomainMessageMiddlewareTests
         Assert.Equal(1, observed);
     }
 
-    private static MetricsDomainMessageMiddleware CreateMiddleware(IDomainMessageMiddleware? inner = null)
+    private static MetricsDomainMessageMiddleware CreateMiddleware(DomainMessage? response)
     {
-        inner ??= Substitute.For<IDomainMessageMiddleware>();
+        var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>((DomainMessage?)null));
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
 
         var services = new ServiceCollection();
         services.AddMetrics();

@@ -27,12 +27,16 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        var queryId = Guid.CreateVersion7();
-        LogQuery(context, queryId);
+
         var result = await _inner.ProcessAsync(context, cancellationToken);
 
-        if (result is not null)
-            LogResponse(context, result, queryId);
+        if (result is null)
+        {
+            return result;
+        }
+
+        var queryId = Guid.CreateVersion7();
+        LogResponse(context, result, queryId);
 
         return result;
     }

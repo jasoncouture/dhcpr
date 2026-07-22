@@ -51,14 +51,20 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            // Walk every label including the QNAME. Non-zone cuts typically return NODATA/SOA
-            // (no NS) and we keep the parent nameservers.
+            // Descend label by label looking for zone cuts. For A/AAAA/CNAME we do not NS-probe
+            // the leaf itself — parent nameservers are enough to answer the final QTYPE.
             while (remainingLabels.Length > 0)
             {
                 addressRecords.Clear();
                 var next = remainingLabels[^1];
                 remainingLabels = remainingLabels[..^1];
                 zoneLabels.Insert(0, next);
+
+                if (remainingLabels.Length == 0 &&
+                    question.Type is not DomainRecordType.NS)
+                {
+                    break;
+                }
 
                 var message = DomainMessage.CreateRequest(
                     new DomainLabels(zoneLabels.ToImmutableArray()),
@@ -76,7 +82,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
                 if (addressRecords.Count == 0)
                     addressRecords.AddRange(
-                        await ResolveNameserverAddressesAsync(context, nsNames, cancellationToken));
+                        await ResolveNameserverAddressesAsync(context, nsNames, endPoints, cancellationToken));
 
                 // Could not resolve NS addresses — keep current endpoints.
                 if (addressRecords.Count == 0)
@@ -160,7 +166,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             if (referralAddresses.Count == 0)
             {
                 referralAddresses.AddRange(
-                    await ResolveNameserverAddressesAsync(parentContext, nsNames, cancellationToken));
+                    await ResolveNameserverAddressesAsync(parentContext, nsNames, endPoints, cancellationToken));
                 if (referralAddresses.Count == 0)
                     return last;
             }
@@ -175,18 +181,26 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private async ValueTask<List<IPAddress>> ResolveNameserverAddressesAsync(
         DomainMessageContext parentContext,
         PooledList<string> nsNames,
+        PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
+        // Ask the *current* nameservers for A/AAAA of NS hostnames (directed upstream).
+        // Full recursive here re-walks from the root for every glue name and explodes.
+        var upstream = endPoints
+            .OrderBy(_ => Random.Shared.Next())
+            .Take(MaxParallelNameservers)
+            .ToImmutableArray();
+
         using var nameserverQueries = nsNames
             .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
                 new[]
                 {
                     _internalClient
                         .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.A),
-                            cancellationToken).AsTask(),
+                            upstream, cancellationToken).AsTask(),
                     _internalClient
                         .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
-                            cancellationToken).AsTask()
+                            upstream, cancellationToken).AsTask()
                 })
             .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
             .ToPooledList();

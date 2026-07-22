@@ -167,7 +167,7 @@ public class RecursiveRootResolverTests
 
         Assert.NotNull(result);
         Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
-        Assert.Contains(internalClient.InternalQueries,
+        Assert.Contains(internalClient.Queries,
             q => q.Equals("a.gtld-servers.net/A", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -384,8 +384,8 @@ public class RecursiveRootResolverTests
     }
 
     /// <summary>
-    /// Stands in for the middleware pipeline: upstream endpoints simulate UpstreamQueryMiddleware;
-    /// bare SendAsync simulates a normal internal (glue) resolution.
+    /// Stands in for the middleware pipeline: upstream endpoints simulate UpstreamQueryMiddleware.
+    /// Glue A/AAAA are directed at the current nameserver set (same as production).
     /// </summary>
     private sealed class ScriptedInternalDomainClient : IInternalDomainClient
     {
@@ -405,7 +405,7 @@ public class RecursiveRootResolverTests
         }
 
         public List<IPEndPoint> QueriedEndPoints { get; } = new();
-        public List<string> InternalQueries { get; } = new();
+        public List<string> Queries { get; } = new();
 
         public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
             => SendAsync(
@@ -426,11 +426,10 @@ public class RecursiveRootResolverTests
             ImmutableArray<IPEndPoint> upstreamEndpoints,
             CancellationToken cancellationToken)
         {
+            Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
+
             if (upstreamEndpoints.IsDefaultOrEmpty)
-            {
-                InternalQueries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
                 return ValueTask.FromResult(Handle(message));
-            }
 
             foreach (var endPoint in upstreamEndpoints)
             {

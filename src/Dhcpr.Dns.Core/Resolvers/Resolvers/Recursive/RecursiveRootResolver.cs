@@ -184,6 +184,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
+        // We only want to query upstream if the nameserver is in-bailiwick.
+        // If it's out-of-bailiwick, we MUST do a full recursive lookup from the root.
+        // Otherwise, we end up querying the current nameservers for a domain they don't own,
+        // and they will return REFUSED or NXDOMAIN.
+        
         using var nameserverQueries = nsNames
             .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
                 new[]

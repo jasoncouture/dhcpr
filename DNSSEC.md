@@ -4,6 +4,8 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working.
 
+**Next up: Phase 1.**
+
 ---
 
 ## Current state
@@ -44,15 +46,39 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ---
 
-## Phase 0 — Protocol foundation
+## Phase 1 — Re-enter the pipeline for all internal queries
 
-**Goal:** Wire-accurate types so later phases can parse and sign-verify. No behavior change to recursion yet (except correct SOA / OPT round-trip).
+**Goal:** Every recursive hop (NS, referral, answer) and missing-glue lookup goes through the middleware chain via `InternalDomainClient`. No DNSSEC validation yet. No requirement for typed DNSSEC RRs or EDNS DO in this phase (UDP queries work as today).
+
+**Done when:**
+
+- `DomainMessageContext` has `UpstreamEndpoints` (optional placeholder for later `DnssecScope`)
+- `InternalDomainClient` can send with upstream endpoints (and later scope)
+- `UpstreamQueryMiddleware` — when `UpstreamEndpoints` is set, query those nameservers over UDP/TCP (existing clients) and return the response; otherwise pass (`null`)
+- `ForwardResolver` / `RecursiveRootResolver` return `null` immediately when `UpstreamEndpoints` is set (UpstreamQuery owns the hop)
+- `RecursiveRootResolver` uses **only** internal re-entry — no direct `GetParallelDomainClient` UDP
+- Removed from `RecursiveRootResolver`:
+  - `CacheReferralAsNs`
+  - `GetCachedNameserverAddresses`
+  - direct `_cache` use in `QueryNsAsync` (Cache decorator covers re-entered queries)
+- Missing NS glue: normal internal `A`/`AAAA` (no `UpstreamEndpoints`) — same path a client uses
+- Prefer in-message glue when present
+- Recursion still resolves correctly end-to-end
+
+**Stop here.**
+
+---
+
+## Phase 2 — Protocol foundation
+
+**Goal:** Wire-accurate types for EDNS and DNSSEC RRs (needed before validation).
 
 **Done when:**
 
 - Typed EDNS(0) OPT RR with DO bit; encode/decode tests
-- UDP reply size uses client OPT payload size (replace `1024` hardcode in `DomainMessageContextMessageProcessor`)
-- Record types + `IDomainResourceRecordData` parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
+- `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
+- UDP reply size uses client OPT payload size (replace `1024` hardcode)
+- Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
 - `StartOfAuthorityData` includes MNAME / RNAME
 - Canonicalization helpers (RFC 4034 §6) with unit tests
 
@@ -60,29 +86,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ---
 
-## Phase 1 — Upstream middleware + recurse refactor
-
-**Goal:** Every recursive hop re-enters the middleware chain. No DNSSEC validation yet.
-
-**Done when:**
-
-- `DomainMessageContext` has `UpstreamEndpoints` (and a placeholder for later `DnssecScope`)
-- `InternalDomainClient` can send with upstream endpoints (+ optional scope later)
-- `UpstreamQueryMiddleware` sends UDP/TCP (+ DO once Phase 0 OPT exists) when `UpstreamEndpoints` is set; otherwise passes
-- `ForwardResolver` / `RecursiveRootResolver` return `null` when `UpstreamEndpoints` is set
-- `RecursiveRootResolver` uses **only** internal re-entry (no direct UDP)
-- Removed from `RecursiveRootResolver`:
-  - `CacheReferralAsNs`
-  - `GetCachedNameserverAddresses`
-  - direct `_cache` use in `QueryNsAsync`
-- Missing NS glue resolved as normal internal `A`/`AAAA` (no `UpstreamEndpoints`) — same path a client uses
-- Recursion still resolves correctly end-to-end
-
-**Stop here.**
-
----
-
-## Phase 2 — Validator + DnssecValidationMiddleware
+## Phase 3 — Validator + DnssecValidationMiddleware
 
 **Goal:** Local validation on middleware hops; set AD / honor CD / SERVFAIL.
 
@@ -101,7 +105,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ---
 
-## Phase 3 — Cache / CNAME DNSSEC semantics
+## Phase 4 — Cache / CNAME DNSSEC semantics
 
 **Goal:** Cache and CNAME chase respect validation state.
 
@@ -115,7 +119,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ---
 
-## Phase 4 — Hardening
+## Phase 5 — Hardening
 
 **Goal:** Production-ready coverage and ops knobs.
 
@@ -123,7 +127,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 - Integration tests: multi-hop signed zone (fixtures or live); AD / SERVFAIL / CD
 - Config: enable/disable validation, trust-anchor list, algorithm allow/deny
-- NSEC3 support (if deferred from Phase 2)
+- NSEC3 support (if deferred from Phase 3)
 - Logging of validation failures without drowning in internal-hop noise
 
 **Stop here.** (Further work is follow-ups, not this plan.)

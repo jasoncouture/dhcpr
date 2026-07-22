@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Immutable;
+using System.Net;
 
 using Dhcpr.Core.Queue;
 
@@ -15,12 +16,24 @@ public class InternalDomainClient : IInternalDomainClient
 
     private static readonly IPEndPoint InternalEndPoint = new(IPAddress.Any, 53);
 
-    public async ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
+    public ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
+        => SendAsync(domainMessage, upstreamEndpoints: default, cancellationToken);
+
+    public async ValueTask<DomainMessage> SendAsync(
+        DomainMessage domainMessage,
+        ImmutableArray<IPEndPoint> upstreamEndpoints,
+        CancellationToken cancellationToken)
     {
+        ImmutableArray<IPEndPoint>? endpoints = upstreamEndpoints.IsDefaultOrEmpty
+            ? null
+            : upstreamEndpoints;
+
         var message =
             new InternalDnsRequestReceivedMessage(
-                new DomainMessageContext(InternalEndPoint, InternalEndPoint,
-                    domainMessage));
+                new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage)
+                {
+                    UpstreamEndpoints = endpoints
+                });
         await using var registration = cancellationToken.Register(
             static state =>
             {

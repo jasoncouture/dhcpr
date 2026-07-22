@@ -42,6 +42,10 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
 
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
     {
+        // Directed upstream hops are owned by UpstreamQueryMiddleware.
+        if (context.UpstreamEndpoints is { Length: > 0 })
+            return null;
+
         var endPoints = _currentConfiguration.Forwarders.GetForwarderEndpoints();
         if (endPoints.Length == 0) return null;
 

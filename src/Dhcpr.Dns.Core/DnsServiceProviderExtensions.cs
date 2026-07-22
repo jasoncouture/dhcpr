@@ -23,6 +23,7 @@ public static class DnsServiceProviderExtensions
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
+        services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();

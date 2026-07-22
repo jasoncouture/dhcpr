@@ -40,7 +40,7 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
                 foreach (var question in context.DomainMessage.Questions)
                 {
                     tags["query_type"] = question.Type.ToString("G");
-                    tags["query_class"] = question.Type.ToString("G");
+                    tags["query_class"] = question.Class.ToString("G");
                     _queries.Add(1, tags.ToArray());
                 }
             }

@@ -7,6 +7,7 @@ using Dhcpr.Server;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 using OpenTelemetry.Metrics;
@@ -25,6 +26,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
 Console.WriteLine($"Content root: {builder.Environment.ContentRootPath}");
 Console.WriteLine($"Base directory: {AppContext.BaseDirectory}");
+
+builder.Services.Configure<HostOptions>(options =>
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
 
 builder.Services.AddMemoryCache(o =>
 {

@@ -17,7 +17,6 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DnsServer : BackgroundService
 {
-    private static readonly IPEndPoint AnyEndPoint = new(IPAddress.Any, 0);
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> LocalAddressCache =
         new();
 
@@ -40,6 +39,10 @@ public sealed class DnsServer : BackgroundService
         var listenEndPoints = _options.CurrentValue.GetListenEndpoints();
         if (listenEndPoints.Length == 0)
             throw new InvalidOperationException("DNS ListenAddresses must contain at least one listen URI.");
+
+        // Shared token: if any listener dies, cancel the rest so the host fails closed.
+        using var listenerCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var listenerToken = listenerCts.Token;
 
         try
         {
@@ -66,8 +69,8 @@ public sealed class DnsServer : BackgroundService
                     {
                         tasks.Add(protocol switch
                         {
-                            DnsListenProtocol.Udp => ServeUdpDnsAsync(endPoint, stoppingToken),
-                            DnsListenProtocol.Tcp => ServeTcpDnsAsync(endPoint, stoppingToken),
+                            DnsListenProtocol.Udp => ServeUdpDnsAsync(endPoint, listenerToken),
+                            DnsListenProtocol.Tcp => ServeTcpDnsAsync(endPoint, listenerToken),
                             _ => throw new InvalidOperationException($"Unsupported listen protocol: {protocol}")
                         });
                         _logger.LogInformation(
@@ -79,7 +82,19 @@ public sealed class DnsServer : BackgroundService
                 }
             }
 
-            await Task.WhenAll(tasks);
+            var completed = await Task.WhenAny(tasks);
+            if (stoppingToken.IsCancellationRequested)
+            {
+                listenerCts.Cancel();
+                await Task.WhenAll(tasks).IgnoreExceptionsAsync();
+                return;
+            }
+
+            // A listener exited while the host is still running — tear down everything.
+            listenerCts.Cancel();
+            await Task.WhenAll(tasks).IgnoreExceptionsAsync();
+            await completed;
+            throw new InvalidOperationException("DNS listener stopped unexpectedly.");
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -130,10 +145,15 @@ public sealed class DnsServer : BackgroundService
 
             udpClient.Client.Bind(listenEndPoint);
             var buffer = new byte[16384];
+            // ReceiveMessageFrom requires a remote endpoint template matching the socket family.
+            // Per-listener instance: the API may mutate this endpoint.
+            EndPoint remoteEndPoint = listenEndPoint.AddressFamily == AddressFamily.InterNetworkV6
+                ? new IPEndPoint(IPAddress.IPv6Any, 0)
+                : new IPEndPoint(IPAddress.Any, 0);
             while (!cancellationToken.IsCancellationRequested)
             {
                 var result =
-                    await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), AnyEndPoint, cancellationToken);
+                    await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), remoteEndPoint, cancellationToken);
 
                 CreateContextAndQueueForProcessing(
                     result.RemoteEndPoint,
@@ -317,10 +337,12 @@ public sealed class DnsServer : BackgroundService
     {
         var tcpServer = new TcpListener(listenEndPoint);
         var activeTasks = new List<Task>();
-        var acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
+        Task<TcpClient?>? acceptTask = null;
         try
         {
+            // Must Start before Accept — AcceptTcpClientAsync throws if not listening.
             tcpServer.Start(ushort.MaxValue);
+            acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
                 var completedTask = await Task.WhenAny(activeTasks.Append(acceptTask));
@@ -340,7 +362,8 @@ public sealed class DnsServer : BackgroundService
         finally
         {
             tcpServer.Stop();
-            await Task.WhenAll(activeTasks.Append(acceptTask)).IgnoreExceptionsAsync();
+            var pending = acceptTask is null ? activeTasks : activeTasks.Append(acceptTask);
+            await Task.WhenAll(pending).IgnoreExceptionsAsync();
         }
     }
 }

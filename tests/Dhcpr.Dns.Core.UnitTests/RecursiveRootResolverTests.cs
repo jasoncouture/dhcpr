@@ -353,7 +353,10 @@ public class RecursiveRootResolverTests
                     DomainRecordType.SOA,
                     DomainRecordClass.IN,
                     TimeSpan.FromSeconds(60),
-                    new StartOfAuthorityData(1, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60),
+                    new StartOfAuthorityData(
+                        new DomainLabels("ns1.example.com"),
+                        new DomainLabels("hostmaster.example.com"),
+                        1, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60),
                         TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60)))),
                 ImmutableArray<DomainResourceRecord>.Empty));
 

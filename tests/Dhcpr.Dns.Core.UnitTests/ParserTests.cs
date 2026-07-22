@@ -191,6 +191,37 @@ public class ParserTests
     }
 
     [Fact]
+    public void SoaRecordEncodesAndDecodesCorrectly()
+    {
+        var soaData = new StartOfAuthorityData(
+            new DomainLabels("ns1.example.com"),
+            new DomainLabels("hostmaster.example.com"),
+            12345,
+            TimeSpan.FromSeconds(3600),
+            TimeSpan.FromSeconds(600),
+            TimeSpan.FromSeconds(86400),
+            TimeSpan.FromSeconds(3600)
+        );
+        var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.SOA, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), soaData);
+        var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
+
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
+        var bytesWritten = DomainMessageEncoder.Encode(data, message);
+
+        var decodedMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
+        var decodedRecord = decodedMessage.Records.Answers[0];
+        
+        var decodedSoaData = Assert.IsType<StartOfAuthorityData>(decodedRecord.Data);
+        Assert.Equal("ns1.example.com", decodedSoaData.MasterName.ToString());
+        Assert.Equal("hostmaster.example.com", decodedSoaData.ResponsibleName.ToString());
+        Assert.Equal(12345, decodedSoaData.SerialNumber);
+        Assert.Equal(TimeSpan.FromSeconds(3600), decodedSoaData.RefreshInterval);
+        Assert.Equal(TimeSpan.FromSeconds(600), decodedSoaData.RetryInterval);
+        Assert.Equal(TimeSpan.FromSeconds(86400), decodedSoaData.ExpireInterval);
+        Assert.Equal(TimeSpan.FromSeconds(3600), decodedSoaData.MinimumTimeToLive);
+    }
+
+    [Fact]
     public void RrSigRecordEncodesAndDecodesCorrectly()
     {
         var rrsigData = new RrSigData(DomainRecordType.A, 8, 2, 3600, 1690000000, 1680000000, 12345, new DomainLabels("example.com"), ImmutableArray.Create<byte>(1, 3, 5, 7));

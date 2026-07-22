@@ -15,5 +15,11 @@ public enum DomainRecordType : ushort
     TXT = 0x10, // 0x00000010
     AAAA = 0x1C, // 0x0000001C
     SRV = 0x21, // 0x00000021
-    OPT = 0x29, // 0x00000029    
+    OPT = 0x29, // 0x00000029
+    DS = 0x2B, // 43
+    RRSIG = 0x2E, // 46
+    NSEC = 0x2F, // 47
+    DNSKEY = 0x30, // 48
+    NSEC3 = 0x32, // 50
+    NSEC3PARAM = 0x33, // 51
 }

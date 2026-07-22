@@ -28,6 +28,18 @@ public static class ResourceRecordExtensions
                 return CreateData<ServiceData>(ref parsingSpan, dataLength);
             case DomainRecordType.OPT:
                 return CreateData<OptData>(ref parsingSpan, dataLength);
+            case DomainRecordType.DNSKEY:
+                return CreateData<DnsKeyData>(ref parsingSpan, dataLength);
+            case DomainRecordType.DS:
+                return CreateData<DsData>(ref parsingSpan, dataLength);
+            case DomainRecordType.RRSIG:
+                return CreateData<RrSigData>(ref parsingSpan, dataLength);
+            case DomainRecordType.NSEC:
+                return CreateData<NsecData>(ref parsingSpan, dataLength);
+            case DomainRecordType.NSEC3:
+                return CreateData<Nsec3Data>(ref parsingSpan, dataLength);
+            case DomainRecordType.NSEC3PARAM:
+                return CreateData<Nsec3ParamData>(ref parsingSpan, dataLength);
             default:
                 return CreateData<BlobData>(ref parsingSpan, dataLength);
         }

@@ -150,6 +150,71 @@ public class ParserTests
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, decodedOption.Data.ToArray());
     }
 
+    [Fact]
+    public void DnsKeyRecordEncodesAndDecodesCorrectly()
+    {
+        var keyData = new DnsKeyData(256, 3, 8, ImmutableArray.Create<byte>(1, 2, 3, 4, 5));
+        var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.DNSKEY, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), keyData);
+        var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
+
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
+        var bytesWritten = DomainMessageEncoder.Encode(data, message);
+
+        var decodedMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
+        var decodedRecord = decodedMessage.Records.Answers[0];
+        
+        var decodedKeyData = Assert.IsType<DnsKeyData>(decodedRecord.Data);
+        Assert.Equal(256, decodedKeyData.Flags);
+        Assert.Equal(3, decodedKeyData.Protocol);
+        Assert.Equal(8, decodedKeyData.Algorithm);
+        Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, decodedKeyData.PublicKey.ToArray());
+    }
+
+    [Fact]
+    public void DsRecordEncodesAndDecodesCorrectly()
+    {
+        var dsData = new DsData(12345, 8, 2, ImmutableArray.Create<byte>(9, 8, 7, 6));
+        var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.DS, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), dsData);
+        var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
+
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
+        var bytesWritten = DomainMessageEncoder.Encode(data, message);
+
+        var decodedMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
+        var decodedRecord = decodedMessage.Records.Answers[0];
+        
+        var decodedDsData = Assert.IsType<DsData>(decodedRecord.Data);
+        Assert.Equal(12345, decodedDsData.KeyTag);
+        Assert.Equal(8, decodedDsData.Algorithm);
+        Assert.Equal(2, decodedDsData.DigestType);
+        Assert.Equal(new byte[] { 9, 8, 7, 6 }, decodedDsData.Digest.ToArray());
+    }
+
+    [Fact]
+    public void RrSigRecordEncodesAndDecodesCorrectly()
+    {
+        var rrsigData = new RrSigData(DomainRecordType.A, 8, 2, 3600, 1690000000, 1680000000, 12345, new DomainLabels("example.com"), ImmutableArray.Create<byte>(1, 3, 5, 7));
+        var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.RRSIG, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), rrsigData);
+        var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
+
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
+        var bytesWritten = DomainMessageEncoder.Encode(data, message);
+
+        var decodedMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
+        var decodedRecord = decodedMessage.Records.Answers[0];
+        
+        var decodedRrSigData = Assert.IsType<RrSigData>(decodedRecord.Data);
+        Assert.Equal(DomainRecordType.A, decodedRrSigData.TypeCovered);
+        Assert.Equal(8, decodedRrSigData.Algorithm);
+        Assert.Equal(2, decodedRrSigData.Labels);
+        Assert.Equal(3600u, decodedRrSigData.OriginalTtl);
+        Assert.Equal(1690000000u, decodedRrSigData.SignatureExpiration);
+        Assert.Equal(1680000000u, decodedRrSigData.SignatureInception);
+        Assert.Equal(12345, decodedRrSigData.KeyTag);
+        Assert.Equal("example.com", decodedRrSigData.SignersName.ToString());
+        Assert.Equal(new byte[] { 1, 3, 5, 7 }, decodedRrSigData.Signature.ToArray());
+    }
+
     public static IEnumerable<object[]> GetSamplePackets()
     {
         foreach (var sample in SampleData.SamplePackets)

@@ -128,7 +128,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        var upstream = SelectQueryEndpoints(endPoints);
+        var upstream = endPoints
+            .OrderBy(_ => Random.Shared.Next())
+            .Take(MaxParallelNameservers)
+            .ToImmutableArray();
         return await _internalClient.SendAsync(parentContext, message, upstream, cancellationToken);
     }
 
@@ -199,17 +202,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
 
         return addresses;
-    }
-
-    private static ImmutableArray<IPEndPoint> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
-    {
-        if (endPoints.Count <= MaxParallelNameservers)
-            return endPoints.ToImmutableArray();
-
-        return endPoints
-            .OrderBy(_ => Random.Shared.Next())
-            .Take(MaxParallelNameservers)
-            .ToImmutableArray();
     }
 
     private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

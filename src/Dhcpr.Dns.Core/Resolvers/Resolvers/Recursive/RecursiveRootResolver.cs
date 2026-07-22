@@ -184,23 +184,16 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        // Ask the *current* nameservers for A/AAAA of NS hostnames (directed upstream).
-        // Full recursive here re-walks from the root for every glue name and explodes.
-        var upstream = endPoints
-            .OrderBy(_ => Random.Shared.Next())
-            .Take(MaxParallelNameservers)
-            .ToImmutableArray();
-
         using var nameserverQueries = nsNames
             .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
                 new[]
                 {
                     _internalClient
                         .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.A),
-                            upstream, cancellationToken).AsTask(),
+                            cancellationToken).AsTask(),
                     _internalClient
                         .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
-                            upstream, cancellationToken).AsTask()
+                            cancellationToken).AsTask()
                 })
             .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
             .ToPooledList();

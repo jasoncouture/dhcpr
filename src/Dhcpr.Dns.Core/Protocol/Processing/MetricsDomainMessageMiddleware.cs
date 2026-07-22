@@ -4,10 +4,12 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 {
+    private readonly ICacheState _cacheState;
     private readonly Counter<long> _queries;
 
-    public MetricsDomainMessageMiddleware(IMeterFactory meterFactory)
+    public MetricsDomainMessageMiddleware(IMeterFactory meterFactory, ICacheState cacheState)
     {
+        _cacheState = cacheState;
         var meter = meterFactory.Create(DnsMetrics.MeterName);
         _queries = meter.CreateCounter<long>(
             DnsMetrics.QueriesInstrumentName,
@@ -20,14 +22,11 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 
     public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
     {
-        if (!context.IsInternal)
-        {
-            var count = context.DomainMessage.Questions.Length;
-            if (count > 0)
-                _queries.Add(count);
-            else
-                _queries.Add(1);
-        }
+        var count = context.DomainMessage.Questions.Length;
+        if (count > 0)
+            _queries.Add(count, new KeyValuePair<string, object?>("cache_hit", _cacheState.CacheHit));
+        else
+            _queries.Add(1, new KeyValuePair<string, object?>("cache_hit", _cacheState.CacheHit));
 
         return default;
     }

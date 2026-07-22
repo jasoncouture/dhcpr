@@ -8,18 +8,34 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
+public interface ICacheState
+{
+    bool CacheHit { get; }
+}
+
+public sealed class CacheState : ICacheState
+{
+    private readonly AsyncLocal<bool?> _cacheHit = new AsyncLocal<bool?>();
+
+    public bool CacheHit
+    {
+        get => _cacheHit.Value ??= false;
+        set => _cacheHit.Value = value;
+    }
+}
 public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddleware
 {
-    private static readonly IPAddress InternalAddress = IPAddress.Any;
-
     private readonly IDomainMessageMiddleware _inner;
+    private readonly ICacheState _cacheState;
     private readonly ILogger<QueryLoggingDomainMessageMiddleware> _logger;
 
     public QueryLoggingDomainMessageMiddleware(
         IDomainMessageMiddleware inner,
+        ICacheState cacheState,
         ILogger<QueryLoggingDomainMessageMiddleware> logger)
     {
         _inner = inner;
+        _cacheState = cacheState;
         _logger = logger;
     }
 
@@ -32,7 +48,6 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
     {
         var queryId = Guid.CreateVersion7();
         LogQuery(context, queryId);
-
         var result = await _inner.ProcessAsync(context, cancellationToken);
 
         if (result is not null)
@@ -43,10 +58,12 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
 
     private void LogResponse(DomainMessageContext context, DomainMessage result, Guid queryId)
     {
+        var hitString = _cacheState.CacheHit ? "HIT" : "MISS";
         foreach (var question in context.DomainMessage.Questions)
         {
             var addresses = FormatAnswerAddresses(result, question.Type);
-            _logger.LogInformation("[{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+            _logger.LogInformation("{CacheState} [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+                hitString,
                 queryId,
                 context.ClientEndPoint,
                 context.ServerEndPoint,

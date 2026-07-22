@@ -174,63 +174,55 @@ public sealed class DnsServer : BackgroundService
     private async Task HandleTcpClient(TcpClient client, CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
-        var bufferSegment = new ArraySegment<byte>(buffer, 0, 2);
-        int length = -1;
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
             while (client.Connected && !cancellationTokenSource.IsCancellationRequested)
             {
-                // To prevent DOS attacks, limit how long the connection can idle to a very short period of time.
+                // Idle timeout to limit how long a client can hold the connection open.
                 cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(10));
-                var receivedLength = await client.Client.ReceiveAsync(bufferSegment, cancellationToken);
+                var token = cancellationTokenSource.Token;
+
+                await ReadExactAsync(client.Client, buffer.AsMemory(0, 2), token);
+                var length = BitConverter.ToUInt16(buffer.AsSpan(0, 2)).ToHostByteOrder();
+                if (length == 0 || length > buffer.Length)
+                    return;
+
+                await ReadExactAsync(client.Client, buffer.AsMemory(0, length), token);
+                CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
+
                 if (!cancellationTokenSource.TryReset())
                 {
                     cancellationTokenSource.Dispose();
                     cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 }
-
-                // ReSharper disable once ConvertIfStatementToSwitchStatement
-                if (receivedLength < 0) return;
-                if (receivedLength == 0) continue;
-                var nextSegment = new ArraySegment<byte>(buffer, bufferSegment.Offset + receivedLength,
-                    bufferSegment.Count - receivedLength);
-                if (length < 0)
-                {
-                    // Grab the first 2 bytes to get the message length.
-                    length = BitConverter.ToUInt16(buffer).ToHostByteOrder();
-                    if (length > 16384)
-                    {
-                        return;
-                    }
-
-                    bufferSegment = new ArraySegment<byte>(buffer, 0, length);
-                    continue;
-                }
-
-                if (bufferSegment.Count + bufferSegment.Offset < length)
-                {
-                    // Need more data.
-                    bufferSegment = nextSegment;
-                    continue;
-                }
-
-                CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
-                // We sized our buffer so that we only asked for the exact amount we needed.
-                // So we can just reset the buffer here without any risk of losing data.
-                bufferSegment = new ArraySegment<byte>(buffer, 0, 2);
-                length = -1;
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Host is shutting down.
         }
         catch
         {
-            // Ignored.
+            // Idle timeout, remote close, or malformed client — drop the connection.
         }
         finally
         {
             cancellationTokenSource.Dispose();
             ArrayPool<byte>.Shared.Return(buffer);
             client.Dispose();
+        }
+    }
+
+    private static async Task ReadExactAsync(Socket socket, Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        var offset = 0;
+        while (offset < buffer.Length)
+        {
+            var received = await socket.ReceiveAsync(buffer[offset..], cancellationToken);
+            if (received == 0)
+                throw new IOException("DNS TCP client closed the connection.");
+            offset += received;
         }
     }
 

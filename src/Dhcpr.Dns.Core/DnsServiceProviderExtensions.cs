@@ -17,11 +17,13 @@ public static class DnsServiceProviderExtensions
     {
         services.AddMemoryCache(o =>
         {
-            o.SizeLimit = 100_000;
+            o.SizeLimit = 100_000_000;
             o.CompactionPercentage = 0.25;
             o.ExpirationScanFrequency = TimeSpan.FromMinutes(1);
         });
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
+        services.AddSingleton<CacheState>();
+        services.AddSingleton<ICacheState>(sp => sp.GetRequiredService<CacheState>());
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
@@ -34,7 +36,7 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
         // Registered after Decorate so this is not wrapped by cache/CNAME/logging decorators.
-        services.AddSingleton<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();

@@ -78,15 +78,21 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         CancellationToken cancellationToken
     )
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(response.EstimatedSize);
+        var isTcp = message is TcpDnsPacketReceivedMessage;
+        // DNS-over-TCP prefixes every message with a 2-byte big-endian length.
+        var lengthPrefix = isTcp ? 2 : 0;
+        var buffer = ArrayPool<byte>.Shared.Rent(response.EstimatedSize + lengthPrefix);
         try
         {
             var byteCount = TruncateAndEncodeMessage(
                 response,
-                message is UdpDnsPacketReceivedMessage ? 1024 : int.MaxValue,
-                buffer
+                isTcp ? int.MaxValue : 1024,
+                buffer.AsSpan(lengthPrefix)
             );
-            var segment = new ArraySegment<byte>(buffer, 0, byteCount);
+            if (isTcp)
+                BitConverter.TryWriteBytes(buffer.AsSpan(0, 2), ((ushort)byteCount).ToNetworkByteOrder());
+
+            var segment = new ArraySegment<byte>(buffer, 0, byteCount + lengthPrefix);
             await SendResponseAsync(message, segment, cancellationToken);
         }
         finally

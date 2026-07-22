@@ -30,6 +30,8 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
             try
             {
                 UpdateSignalState();
+                if (_queueWaitTask.Task.IsCompleted)
+                    return;
                 await _queueWaitTask.Task.WaitAsync(cancellationToken);
 
                 return;
@@ -69,7 +71,7 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
     private void SetSignal(bool signaled)
     {
         var waitSource = _queueWaitTask;
-        if (_queueWaitTask.Task.IsCompleted == signaled && waitSource.Task.IsCompleted == signaled) return;
+        if (waitSource.Task.IsCompleted == signaled) return;
 
         lock (waitSource)
         {
@@ -77,21 +79,10 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
             {
                 waitSource.TrySetResult();
             }
-
-            var newSource = new TaskCompletionSource();
-
-            lock (newSource)
+            else
             {
-                // Make sure no one else can change the new source either.
-                if (waitSource == Interlocked.CompareExchange
-                    (
-                        ref _queueWaitTask,
-                        newSource,
-                        waitSource
-                    ))
-                {
-                    waitSource.TrySetResult();
-                }
+                var newSource = new TaskCompletionSource();
+                Interlocked.CompareExchange(ref _queueWaitTask, newSource, waitSource);
             }
         }
     }

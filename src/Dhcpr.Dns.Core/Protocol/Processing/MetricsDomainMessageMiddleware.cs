@@ -1,5 +1,7 @@
 using System.Diagnostics.Metrics;
 
+using Dhcpr.Core;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
@@ -25,15 +27,24 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         context.CacheHit = false;
+        Dictionary<string, object?> tags = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var result = await _inner.ProcessAsync(context, cancellationToken);
+        // ReSharper disable once MethodSupportsCancellation - Intentional
+        Task.Run(() =>
+            {
+                var count = context.DomainMessage.Questions.Length;
+                if (count == 0) return;
 
-        if (!context.IsInternal)
-        {
-            var count = context.DomainMessage.Questions.Length;
-            if (count <= 0)
-                count = 1;
-            _queries.Add(count, new KeyValuePair<string, object?>("cache_hit", context.CacheHit));
-        }
+                tags.Add("cache_hit", context.CacheHit);
+                tags.Add("error", result is null);
+                foreach (var question in context.DomainMessage.Questions)
+                {
+                    tags["query_type"] = question.Type.ToString("G");
+                    tags["query_class"] = question.Type.ToString("G");
+                    _queries.Add(1, tags.ToArray());
+                }
+            }
+        ).IgnoreExceptionsAsync().Orphan();
 
         return result;
     }

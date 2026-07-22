@@ -31,7 +31,7 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
-    public async Task IgnoresInternalRecursiveRequests()
+    public async Task CountsInternalRecursiveRequests()
     {
         long observed = 0;
         using var listener = CreateListener(measurement => observed += measurement);
@@ -47,7 +47,7 @@ public class MetricsDomainMessageMiddlewareTests
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Equal(0, observed);
+        Assert.Equal(1, observed);
     }
 
     private static MetricsDomainMessageMiddleware CreateMiddleware(IDomainMessageMiddleware? inner = null)

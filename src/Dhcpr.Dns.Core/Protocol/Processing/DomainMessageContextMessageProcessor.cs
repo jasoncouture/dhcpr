@@ -109,11 +109,11 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                     tcpMessage.Client,
                     cancellationToken
                 ),
-            UdpDnsPacketReceivedMessage udpMessage =>
+            UdpDnsPacketReceivedMessage { Context.ClientEndPoint: { } clientEndPoint } udpMessage =>
                 SendResponseAsync(
                     segment,
                     udpMessage.Client,
-                    udpMessage.Context.ClientEndPoint,
+                    clientEndPoint,
                     cancellationToken
                 ),
             _ => Task.CompletedTask

@@ -4,7 +4,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working.
 
-**Phase 1 complete.** Next up: Phase 2 (protocol foundation).
+**Phase 2 complete.** Next up: Phase 3 (Validator).
 
 ---
 
@@ -73,6 +73,8 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ## Phase 2 — Protocol foundation
 
+**Status: done.**
+
 **Goal:** Wire-accurate types for EDNS and DNSSEC RRs (needed before validation).
 
 **Done when:**
@@ -80,9 +82,9 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 - [x] Typed EDNS(0) OPT RR with DO bit; encode/decode tests
 - [x] `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
 - [x] UDP reply size uses client OPT payload size (replace `1024` hardcode)
-- [ ] Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
-- [ ] `StartOfAuthorityData` includes MNAME / RNAME
-- [ ] Canonicalization helpers (RFC 4034 §6) with unit tests
+- [x] Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
+- [x] `StartOfAuthorityData` includes MNAME / RNAME
+- [x] Canonicalization helpers (RFC 4034 §6) with unit tests
 
 **Stop here.**
 

@@ -145,7 +145,6 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 - Authoritative zone signing / key rollover / CDS / CDNSKEY
 - DoT / DoH
 - Blindly trusting upstream AD when forwarding
-- Replacing the message queue with sync in-process calls (optional later optimization)
 
 ---
 
@@ -153,4 +152,3 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 - Upstream-directed requests must never fall through to `RecursiveRootResolver` (infinite recursion)
 - NS glue resolution must not loop on the same referral (depth / in-progress guards)
-- Extra enqueue per hop — profile later; fast-path internal invoke is optional

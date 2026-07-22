@@ -31,11 +31,36 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         CancellationToken cancellationToken)
     {
         var queryId = Guid.CreateVersion7();
+        LogQuery(context, queryId);
+
+        var result = await _inner.ProcessAsync(context, cancellationToken);
+
+        if (result is not null)
+            LogResponse(context, result, queryId);
+
+        return result;
+    }
+
+    private void LogResponse(DomainMessageContext context, DomainMessage result, Guid queryId)
+    {
         foreach (var question in context.DomainMessage.Questions)
         {
-            if (question.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
-                continue;
+            var addresses = FormatAnswerAddresses(result, question.Type);
+            _logger.LogInformation("[{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+                context.ClientEndPoint,
+                context.ServerEndPoint,
+                queryId,
+                question.Type,
+                question.Name.ToString(),
+                addresses
+            );
+        }
+    }
 
+    private void LogQuery(DomainMessageContext context, Guid queryId)
+    {
+        foreach (var question in context.DomainMessage.Questions)
+        {
             _logger.LogDebug("[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}",
                 context.ClientEndPoint,
                 context.ServerEndPoint,
@@ -44,27 +69,6 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
                 question.Name.ToString()
             );
         }
-
-        var result = await _inner.ProcessAsync(context, cancellationToken);
-
-        if (result is null)
-            return result;
-
-        foreach (var question in context.DomainMessage.Questions)
-        {
-            var addresses = FormatAnswerAddresses(result, question.Type);
-            if (addresses.Length > 0)
-                _logger.LogInformation("[{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
-                    context.ClientEndPoint,
-                    context.ServerEndPoint,
-                    queryId,
-                    question.Type,
-                    question.Name.ToString(),
-                    addresses
-                );
-        }
-
-        return result;
     }
 
     private static string FormatAnswerAddresses(DomainMessage response, DomainRecordType type)

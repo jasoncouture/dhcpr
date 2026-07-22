@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-SERVER="${1:-149.28.47.116}"
-PORT="${2:-53}"
+SERVER="${1:-127.0.0.1}"
+PORT="${2:-65353}"
 dig @$SERVER -p $PORT fast.com
 dig @$SERVER -p $PORT www.google.com
 dig @$SERVER -p $PORT www.facebook.com

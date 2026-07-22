@@ -10,6 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 
+using Dhcpr.Dns.Core.Validation;
+
 namespace Dhcpr.Dns.Core;
 
 public static class DnsServiceProviderExtensions
@@ -40,6 +42,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
         services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
+        services.AddSingleton<IDnssecValidator, DnssecValidator>();
 
         services.AddSingleton<ISocketFactory, SocketFactory>();
 

@@ -134,8 +134,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
         var found = false;
         foreach (var record in response.Records)
         {
-            if (record.TimeToLive <= TimeSpan.Zero)
+            if (record.Type == DomainRecordType.OPT)
                 continue;
+
+            if (record.TimeToLive <= TimeSpan.Zero)
+                return TimeSpan.Zero;
+
             if (record.TimeToLive >= min)
                 continue;
             min = record.TimeToLive;
@@ -170,6 +174,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
         var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(records.Length);
         foreach (var record in records)
         {
+            if (record.Type == DomainRecordType.OPT)
+            {
+                builder.Add(record);
+                continue;
+            }
+
             var ttl = record.TimeToLive - age;
             if (ttl < TimeSpan.Zero)
                 ttl = TimeSpan.Zero;

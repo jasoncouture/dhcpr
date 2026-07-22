@@ -47,9 +47,9 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         {
             var addresses = FormatAnswerAddresses(result, question.Type);
             _logger.LogInformation("[{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+                queryId,
                 context.ClientEndPoint,
                 context.ServerEndPoint,
-                queryId,
                 question.Type,
                 question.Name.ToString(),
                 addresses
@@ -62,9 +62,9 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         foreach (var question in context.DomainMessage.Questions)
         {
             _logger.LogDebug("[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}",
+                queryId,
                 context.ClientEndPoint,
                 context.ServerEndPoint,
-                queryId,
                 question.Type,
                 question.Name.ToString()
             );

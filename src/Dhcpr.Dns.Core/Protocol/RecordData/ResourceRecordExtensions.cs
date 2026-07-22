@@ -26,6 +26,8 @@ public static class ResourceRecordExtensions
                 return CreateData<TextData>(ref parsingSpan, dataLength);
             case DomainRecordType.SRV:
                 return CreateData<ServiceData>(ref parsingSpan, dataLength);
+            case DomainRecordType.OPT:
+                return CreateData<OptData>(ref parsingSpan, dataLength);
             default:
                 return CreateData<BlobData>(ref parsingSpan, dataLength);
         }

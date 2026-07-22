@@ -114,6 +114,42 @@ public class ParserTests
         Assert.Equal(message.Questions.Length, actualMessage.Questions.Length);
     }
 
+    [Fact]
+    public void EdnsOptRecordEncodesAndDecodesCorrectly()
+    {
+        var ednsProtocolService = new EdnsProtocolService();
+        var optData = new OptData(new[] { new EdnsOption(10, ImmutableArray.Create<byte>(1, 2, 3, 4)) }.ToImmutableArray());
+        var optRecord = ednsProtocolService.CreateOptRecord(4096, dnssecOk: true, extendedRCode: 1, version: 0, optData: optData);
+
+        var message = new DomainMessage(1234,
+            new DomainMessageFlags(false, DomainOperationCode.Query, false, false, true, false, false, false,
+                DomainResponseCode.NoError),
+            new[] { new DomainQuestion(new DomainLabels("www.google.com"), DomainRecordType.A, DomainRecordClass.Any) }.ToImmutableArray(),
+            new DomainResourceRecords(
+                ImmutableArray<DomainResourceRecord>.Empty,
+                ImmutableArray<DomainResourceRecord>.Empty,
+                new[] { optRecord }.ToImmutableArray()
+            )
+        );
+
+        Span<byte> data = stackalloc byte[message.EstimatedSize];
+        var bytesWritten = DomainMessageEncoder.Encode(data, message);
+
+        var decodedMessage = DomainMessageEncoder.Decode(data[..bytesWritten]);
+        var decodedRecord = decodedMessage.Records.Additional[0];
+
+        Assert.Equal(DomainRecordType.OPT, decodedRecord.Type);
+        Assert.True(ednsProtocolService.IsDnssecOk(decodedRecord));
+        Assert.Equal(4096, ednsProtocolService.GetUdpPayloadSize(decodedRecord));
+        Assert.Equal(1, ednsProtocolService.GetExtendedRCode(decodedRecord));
+        Assert.Equal(0, ednsProtocolService.GetEdnsVersion(decodedRecord));
+        
+        var decodedOptData = Assert.IsType<OptData>(decodedRecord.Data);
+        var decodedOption = Assert.Single(decodedOptData.Options);
+        Assert.Equal(10, decodedOption.Code);
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, decodedOption.Data.ToArray());
+    }
+
     public static IEnumerable<object[]> GetSamplePackets()
     {
         foreach (var sample in SampleData.SamplePackets)

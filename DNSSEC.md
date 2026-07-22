@@ -77,12 +77,12 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 **Done when:**
 
-- Typed EDNS(0) OPT RR with DO bit; encode/decode tests
-- `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
-- UDP reply size uses client OPT payload size (replace `1024` hardcode)
-- Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
-- `StartOfAuthorityData` includes MNAME / RNAME
-- Canonicalization helpers (RFC 4034 §6) with unit tests
+- [x] Typed EDNS(0) OPT RR with DO bit; encode/decode tests
+- [x] `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
+- [x] UDP reply size uses client OPT payload size (replace `1024` hardcode)
+- [ ] Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
+- [ ] `StartOfAuthorityData` includes MNAME / RNAME
+- [ ] Canonicalization helpers (RFC 4034 §6) with unit tests
 
 **Stop here.**
 

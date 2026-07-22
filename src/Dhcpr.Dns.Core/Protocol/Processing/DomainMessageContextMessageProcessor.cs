@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -16,10 +17,15 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 {
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
+    private readonly IEdnsProtocolService _ednsProtocolService;
 
-    public DomainMessageContextMessageProcessor(IEnumerable<IDomainMessageMiddleware> middlewareChain, ILogger<DomainMessageContextMessageProcessor> logger)
+    public DomainMessageContextMessageProcessor(
+        IEnumerable<IDomainMessageMiddleware> middlewareChain,
+        IEdnsProtocolService ednsProtocolService,
+        ILogger<DomainMessageContextMessageProcessor> logger)
     {
         _logger = logger;
+        _ednsProtocolService = ednsProtocolService;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
     }
 
@@ -58,7 +64,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                 return;
             }
 
-            await SendResponseAsync(message, response, cancellationToken);
+            await SendResponseAsync(message, response, _ednsProtocolService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -75,6 +81,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
     private static async Task SendResponseAsync(
         DnsPacketReceivedMessage message,
         DomainMessage response,
+        IEdnsProtocolService ednsProtocolService,
         CancellationToken cancellationToken
     )
     {
@@ -82,11 +89,23 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         // DNS-over-TCP prefixes every message with a 2-byte big-endian length.
         var lengthPrefix = isTcp ? 2 : 0;
         var buffer = ArrayPool<byte>.Shared.Rent(response.EstimatedSize + lengthPrefix);
+
+        var udpLimit = 512;
+        var optRecord = message.Context.DomainMessage.Records.Additional.FirstOrDefault(r => r.Type == DomainRecordType.OPT);
+        if (optRecord is not null)
+        {
+            var requestedSize = ednsProtocolService.GetUdpPayloadSize(optRecord);
+            if (requestedSize >= 512)
+            {
+                udpLimit = requestedSize;
+            }
+        }
+
         try
         {
             var byteCount = TruncateAndEncodeMessage(
                 response,
-                isTcp ? int.MaxValue : 1024,
+                isTcp ? int.MaxValue : udpLimit,
                 buffer.AsSpan(lengthPrefix)
             );
             if (isTcp)

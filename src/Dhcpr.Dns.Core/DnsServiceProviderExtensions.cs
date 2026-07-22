@@ -1,4 +1,5 @@
 ﻿using Dhcpr.Core;
+using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
@@ -38,6 +39,7 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
+        services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
 
         services.AddSingleton<ISocketFactory, SocketFactory>();
 

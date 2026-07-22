@@ -1,4 +1,6 @@
-﻿using Dhcpr.Core.Queue;
+﻿using System.Diagnostics.CodeAnalysis;
+
+using Dhcpr.Core.Queue;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -6,12 +8,13 @@ namespace Dhcpr.Core;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddQueueProcessor<TMessage, TService>(
+    public static IServiceCollection AddQueueProcessor<TMessage,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TService>(
         this IServiceCollection services,
         int maximumConcurrency = -1,
         ServiceLifetime lifetime = ServiceLifetime.Scoped
     )
-        where TService : IQueueMessageProcessor<TMessage>
+        where TService : class, IQueueMessageProcessor<TMessage>
         where TMessage : class
     {
         if (maximumConcurrency == -1)
@@ -34,8 +37,12 @@ public static class ServiceCollectionExtensions
                 i.MaximumConcurrency = maximumConcurrency;
         });
 
-        services.Add(ServiceDescriptor.Describe(typeof(IQueueMessageProcessor<TMessage>), typeof(TService), lifetime));
-        services.AddHostedService<QueueProcessorService<TMessage>>(s => ActivatorUtilities.CreateInstance<QueueProcessorService<TMessage>>(s, configurationName));
+        services.Add(new ServiceDescriptor(
+            typeof(IQueueMessageProcessor<TMessage>),
+            sp => ActivatorUtilities.CreateInstance<TService>(sp),
+            lifetime));
+        services.AddHostedService<QueueProcessorService<TMessage>>(s =>
+            ActivatorUtilities.CreateInstance<QueueProcessorService<TMessage>>(s, configurationName));
         return services;
     }
 

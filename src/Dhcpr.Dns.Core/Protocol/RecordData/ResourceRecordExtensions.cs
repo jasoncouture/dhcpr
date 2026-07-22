@@ -27,19 +27,19 @@ public static class ResourceRecordExtensions
             case DomainRecordType.SRV:
                 return CreateData<ServiceData>(ref parsingSpan, dataLength);
             case DomainRecordType.OPT:
-                return CreateData<OptData>(ref parsingSpan, dataLength);
+                return CreateData<OptionData>(ref parsingSpan, dataLength);
             case DomainRecordType.DNSKEY:
-                return CreateData<DnsKeyData>(ref parsingSpan, dataLength);
+                return CreateData<DomainNameSystemKeyData>(ref parsingSpan, dataLength);
             case DomainRecordType.DS:
-                return CreateData<DsData>(ref parsingSpan, dataLength);
+                return CreateData<DelegationSignerData>(ref parsingSpan, dataLength);
             case DomainRecordType.RRSIG:
-                return CreateData<RrSigData>(ref parsingSpan, dataLength);
+                return CreateData<ResourceRecordSignatureData>(ref parsingSpan, dataLength);
             case DomainRecordType.NSEC:
-                return CreateData<NsecData>(ref parsingSpan, dataLength);
+                return CreateData<NextSecureData>(ref parsingSpan, dataLength);
             case DomainRecordType.NSEC3:
-                return CreateData<Nsec3Data>(ref parsingSpan, dataLength);
+                return CreateData<NextSecure3Data>(ref parsingSpan, dataLength);
             case DomainRecordType.NSEC3PARAM:
-                return CreateData<Nsec3ParamData>(ref parsingSpan, dataLength);
+                return CreateData<NextSecure3ParameterData>(ref parsingSpan, dataLength);
             default:
                 return CreateData<BlobData>(ref parsingSpan, dataLength);
         }

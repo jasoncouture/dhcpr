@@ -94,13 +94,13 @@ public static class DomainResourceRecordCanonicalizationExtensions
                 span = span[4..];
                 break;
                 
-            case NsecData nsecData:
+            case NextSecureData nsecData:
                 EncodeCanonicalName(ref span, nsecData.NextDomainName);
                 nsecData.TypeBitMaps.CopyTo(span);
                 span = span[nsecData.TypeBitMaps.Length..];
                 break;
 
-            case RrSigData rrsigData:
+            case ResourceRecordSignatureData rrsigData:
                 BinaryPrimitives.WriteUInt16BigEndian(span, (ushort)rrsigData.TypeCovered);
                 span = span[2..];
                 span[0] = rrsigData.Algorithm;

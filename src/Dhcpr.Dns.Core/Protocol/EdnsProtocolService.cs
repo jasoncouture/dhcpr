@@ -35,7 +35,7 @@ public sealed class EdnsProtocolService : IEdnsProtocolService
         return (byte)((ttl >> 16) & 0xFF);
     }
 
-    public DomainResourceRecord CreateOptRecord(ushort udpPayloadSize, bool dnssecOk = false, byte extendedRCode = 0, byte version = 0, OptData? optData = null)
+    public DomainResourceRecord CreateOptRecord(ushort udpPayloadSize, bool dnssecOk = false, byte extendedRCode = 0, byte version = 0, OptionData? optData = null)
     {
         int ttl = (extendedRCode << 24) | (version << 16);
         if (dnssecOk) ttl |= DnssecOkBit;
@@ -45,7 +45,7 @@ public sealed class EdnsProtocolService : IEdnsProtocolService
             DomainRecordType.OPT,
             (DomainRecordClass)udpPayloadSize,
             TimeSpan.FromSeconds(ttl),
-            optData ?? new OptData(ImmutableArray<EdnsOption>.Empty)
+            optData ?? new OptionData(ImmutableArray<EdnsOption>.Empty)
         );
     }
 }

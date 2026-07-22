@@ -10,5 +10,5 @@ public interface IEdnsProtocolService
     ushort GetUdpPayloadSize(DomainResourceRecord record);
     byte GetExtendedRCode(DomainResourceRecord record);
     byte GetEdnsVersion(DomainResourceRecord record);
-    DomainResourceRecord CreateOptRecord(ushort udpPayloadSize, bool dnssecOk = false, byte extendedRCode = 0, byte version = 0, OptData? optData = null);
+    DomainResourceRecord CreateOptRecord(ushort udpPayloadSize, bool dnssecOk = false, byte extendedRCode = 0, byte version = 0, OptionData? optData = null);
 }

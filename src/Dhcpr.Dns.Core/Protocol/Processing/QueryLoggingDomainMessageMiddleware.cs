@@ -86,8 +86,4 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
 
         return builder.ToString();
     }
-
-    private static bool IsInternalRequest(DomainMessageContext context) =>
-        context.ClientEndPoint is { Port: 53 } endpoint &&
-        endpoint.Address.Equals(InternalAddress);
 }

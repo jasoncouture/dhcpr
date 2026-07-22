@@ -8,6 +8,8 @@ public sealed class DnsConfiguration : IValidateSelf
 {
     public RootServerConfiguration RootServers { get; set; } = new();
     public ForwarderConfiguration Forwarders { get; set; } = new();
+    
+    public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
     public DnsListenEndpoint[] GetListenEndpoints() => ListenAddresses.GetListenEndpoints();
 
@@ -53,6 +55,18 @@ public sealed class DnsConfiguration : IValidateSelf
         {
             error = "DNS:RootServers is invalid";
             return false;
+        }
+
+        if (TrustAnchors is not null)
+        {
+            foreach (var anchor in TrustAnchors)
+            {
+                if (!anchor.TryValidate(out error))
+                {
+                    error = $"DNS:TrustAnchors contains an invalid entry: {error}";
+                    return false;
+                }
+            }
         }
 
         error = null;

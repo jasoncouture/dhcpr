@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <PublishAot>true</PublishAot>
         <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+        <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.Extensions.Configuration.Binder.SourceGeneration</InterceptorsNamespaces>
     </PropertyGroup>
 
     <ItemGroup>

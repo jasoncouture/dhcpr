@@ -4,14 +4,16 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core;
 
 public static class DnsServiceProviderExtensions
 {
-    public static IServiceCollection AddDns(this IServiceCollection services)
+    public static IServiceCollection AddDns(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddMemoryCache(o =>
         {
@@ -41,12 +43,20 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
 
+        services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()
-            .BindConfiguration("DNS")
-            .Validate(o => o.Validate(), "Invalid DNS configuration");
+            .Bind(configuration.GetSection("DNS"));
         services.AddOptionsWithValidateOnStart<RootServerConfiguration>()
-            .BindConfiguration("DNS:RootServers")
-            .Validate(o => o.Validate(), "Invalid DNS root server configuration");
+            .Bind(configuration.GetSection("DNS:RootServers"))
+            .Validate(static o => o.Validate(), "Invalid DNS root server configuration");
         return services;
     }
+}
+
+file sealed class DnsConfigurationValidator : IValidateOptions<DnsConfiguration>
+{
+    public ValidateOptionsResult Validate(string? name, DnsConfiguration options)
+        => options.TryValidate(out var error)
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(error!);
 }

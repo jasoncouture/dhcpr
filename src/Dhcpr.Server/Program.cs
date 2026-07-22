@@ -16,7 +16,15 @@ ThreadPool.GetMinThreads(out var workerMinThreads, out _);
 ThreadPool.SetMaxThreads(workerMaxThreads, 16384);
 ThreadPool.SetMinThreads(workerMinThreads, 256);
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+});
+
+Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+Console.WriteLine($"Content root: {builder.Environment.ContentRootPath}");
+Console.WriteLine($"Base directory: {AppContext.BaseDirectory}");
 
 builder.Services.AddMemoryCache(o =>
 {
@@ -25,7 +33,7 @@ builder.Services.AddMemoryCache(o =>
 });
 
 builder.Services.AddOptionsWithValidateOnStart<DataProtectionKeyOptions>()
-    .BindConfiguration("DataProtection:Keys");
+    .Bind(builder.Configuration.GetSection("DataProtection:Keys"));
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
 
@@ -38,8 +46,8 @@ builder.Services.AddOptions<KeyManagementOptions>()
     });
 
 builder.Services.AddCoreServices();
-builder.Services.AddDns();
-builder.Services.AddDhcp();
+builder.Services.AddDns(builder.Configuration);
+builder.Services.AddDhcp(builder.Configuration);
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>

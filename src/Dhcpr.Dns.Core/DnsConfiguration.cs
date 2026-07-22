@@ -20,13 +20,42 @@ public sealed class DnsConfiguration : IValidateSelf
     public string[] ListenAddresses { get; set; } = Array.Empty<string>();
 
     [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract",
-        Justification = "Values are set by reflection")]
-    public bool Validate()
-    {
-        if (Forwarders is null) return false;
-        if (ListenAddresses is null || ListenAddresses.Length == 0) return false;
-        if (!ListenAddresses.AreAllListenAddressesValid()) return false;
+        Justification = "Values are set by configuration binding")]
+    public bool Validate() => TryValidate(out _);
 
-        return Forwarders.Validate() && RootServers.Validate();
+    public bool TryValidate([NotNullWhen(false)] out string? error)
+    {
+        if (Forwarders is null)
+        {
+            error = "DNS:Forwarders is missing";
+            return false;
+        }
+
+        if (ListenAddresses is null || ListenAddresses.Length == 0)
+        {
+            error = "DNS:ListenAddresses is missing or empty (set per environment in appsettings)";
+            return false;
+        }
+
+        if (!ListenAddresses.AreAllListenAddressesValid())
+        {
+            error = "DNS:ListenAddresses contains an invalid listen URI";
+            return false;
+        }
+
+        if (!Forwarders.Validate())
+        {
+            error = "DNS:Forwarders is invalid";
+            return false;
+        }
+
+        if (RootServers is null || !RootServers.Validate())
+        {
+            error = "DNS:RootServers is invalid";
+            return false;
+        }
+
+        error = null;
+        return true;
     }
 }

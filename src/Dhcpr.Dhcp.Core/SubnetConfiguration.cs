@@ -8,7 +8,7 @@ namespace Dhcpr.Dhcp.Core;
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class SubnetConfiguration : IValidateSelf
 {
-    public required string CIDR { get; set; }
+    public string CIDR { get; set; } = string.Empty;
     public int TimeToLiveSeconds { get; set; }
     public bool Enabled { get; set; }
 

@@ -4,7 +4,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working.
 
-**Next up: Phase 1.**
+**Phase 1 complete.** Next up: Phase 2 (protocol foundation).
 
 ---
 
@@ -48,22 +48,24 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ## Phase 1 — Re-enter the pipeline for all internal queries
 
+**Status: done.**
+
 **Goal:** Every recursive hop (NS, referral, answer) and missing-glue lookup goes through the middleware chain via `InternalDomainClient`. No DNSSEC validation yet. No requirement for typed DNSSEC RRs or EDNS DO in this phase (UDP queries work as today).
 
 **Done when:**
 
-- `DomainMessageContext` has `UpstreamEndpoints` (optional placeholder for later `DnssecScope`)
-- `InternalDomainClient` can send with upstream endpoints (and later scope)
-- `UpstreamQueryMiddleware` — when `UpstreamEndpoints` is set, query those nameservers over UDP/TCP (existing clients) and return the response; otherwise pass (`null`)
-- `ForwardResolver` / `RecursiveRootResolver` return `null` immediately when `UpstreamEndpoints` is set (UpstreamQuery owns the hop)
-- `RecursiveRootResolver` uses **only** internal re-entry — no direct `GetParallelDomainClient` UDP
-- Removed from `RecursiveRootResolver`:
+- [x] `DomainMessageContext` has `UpstreamEndpoints` (optional placeholder for later `DnssecScope`)
+- [x] `InternalDomainClient` can send with upstream endpoints (and later scope)
+- [x] `UpstreamQueryMiddleware` — when `UpstreamEndpoints` is set, query those nameservers over UDP/TCP (existing clients) and return the response; otherwise pass (`null`)
+- [x] `ForwardResolver` / `RecursiveRootResolver` return `null` immediately when `UpstreamEndpoints` is set (UpstreamQuery owns the hop)
+- [x] `RecursiveRootResolver` uses **only** internal re-entry — no direct `GetParallelDomainClient` UDP
+- [x] Removed from `RecursiveRootResolver`:
   - `CacheReferralAsNs`
   - `GetCachedNameserverAddresses`
   - direct `_cache` use in `QueryNsAsync` (Cache decorator covers re-entered queries)
-- Missing NS glue: normal internal `A`/`AAAA` (no `UpstreamEndpoints`) — same path a client uses
-- Prefer in-message glue when present
-- Recursion still resolves correctly end-to-end
+- [x] Missing NS glue: normal internal `A`/`AAAA` (no `UpstreamEndpoints`) — same path a client uses
+- [x] Prefer in-message glue when present
+- [x] Recursion still resolves correctly end-to-end
 
 **Stop here.**
 

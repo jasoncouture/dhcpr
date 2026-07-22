@@ -4,10 +4,8 @@ using System.Net;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
-using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -25,7 +23,7 @@ public class RecursiveRootResolverTests
     [Fact]
     public async Task GoogleLikeNodataKeepsParentNameservers()
     {
-        var factory = new ScriptedDomainClientFactory(request =>
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -54,7 +52,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(factory);
+        var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("www.google.com");
         var context = new DomainMessageContext(null, null, request);
 
@@ -65,15 +63,15 @@ public class RecursiveRootResolverTests
         Assert.Contains(result.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
             ((IPAddressData)r.Data).Address.Equals(GoogleWwwAddress));
-        Assert.DoesNotContain(factory.QueriedEndPoints, ep => ep.Address.Equals(GoogleWwwAddress));
-        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleWwwAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
     }
 
     [Fact]
     public async Task ReferralUsesMatchingGlueOnly()
     {
         IPEndPoint? nextHopAfterCom = null;
-        var factory = new ScriptedDomainClientFactory(request =>
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -104,26 +102,26 @@ public class RecursiveRootResolverTests
             }
 
             return EmptyNoError(request);
-        }, onUdpQuery: (_, endPoint) =>
+        }, onUpstreamQuery: (_, endPoint) =>
         {
             if (endPoint.Address.Equals(ComServer.Address))
                 nextHopAfterCom = endPoint;
         });
 
-        var resolver = CreateResolver(factory);
+        var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
-        Assert.DoesNotContain(factory.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
         Assert.NotNull(nextHopAfterCom);
     }
 
     [Fact]
     public async Task ReferralWithoutGlueResolvesNsNamesInternally()
     {
-        var factory = new ScriptedDomainClientFactory(request =>
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -163,20 +161,20 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(factory);
+        var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
-        Assert.Contains(factory.InternalQueries,
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
+        Assert.Contains(internalClient.InternalQueries,
             q => q.Equals("a.gtld-servers.net/A", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
     public async Task UnrelatedAddressInAdditionalIsNotUsedAsNameserver()
     {
-        var factory = new ScriptedDomainClientFactory(request =>
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -210,19 +208,19 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(factory);
+        var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("www.facebook.com");
         await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
-        Assert.DoesNotContain(factory.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
-        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
     }
 
     [Fact]
     public async Task TwoLabelNameQueriesZoneNsThenAnswers()
     {
         var queried = new List<IPEndPoint>();
-        var factory = new ScriptedDomainClientFactory(request =>
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -242,9 +240,9 @@ public class RecursiveRootResolverTests
             }
 
             return EmptyNoError(request);
-        }, onUdpQuery: (_, endPoint) => queried.Add(endPoint));
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(factory);
+        var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("google.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -252,15 +250,17 @@ public class RecursiveRootResolverTests
         Assert.Contains(result!.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
             ((IPAddressData)r.Data).Address.Equals(GoogleWwwAddress));
-        Assert.Contains(factory.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
     }
 
     [Fact]
     public async Task SecondLookupReusesCachedComNs()
     {
-        var cache = CreateCache();
+        // Caching of upstream NS queries is owned by CacheResolverDecorator on the pipeline.
+        // This unit tests the resolver in isolation; simulate cache by memoizing NS/com responses.
         var comNsQueries = 0;
-        var factory = new ScriptedDomainClientFactory(request =>
+        var comNsResponse = Referral("com", "a.gtld-servers.net", ComServer.Address);
+        var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
             var type = request.Questions[0].Type;
@@ -268,7 +268,7 @@ public class RecursiveRootResolverTests
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
             {
                 comNsQueries++;
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return comNsResponse;
             }
 
             if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
@@ -288,9 +288,9 @@ public class RecursiveRootResolverTests
                 return NodataWithSoa(name);
 
             return EmptyNoError(request);
-        });
+        }, cacheUpstreamNs: true);
 
-        var resolver = CreateResolver(factory, cache);
+        var resolver = CreateResolver(internalClient);
         await resolver.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.google.com")),
             CancellationToken.None);
@@ -302,9 +302,24 @@ public class RecursiveRootResolverTests
         Assert.Equal(1, comNsQueries);
     }
 
-    private static RecursiveRootResolver CreateResolver(
-        ScriptedDomainClientFactory factory,
-        IDnsResponseCache? cache = null)
+    [Fact]
+    public async Task UpstreamDirectedContextIsIgnored()
+    {
+        var internalClient = new ScriptedInternalDomainClient(_ =>
+            throw new InvalidOperationException("should not query"));
+        var resolver = CreateResolver(internalClient);
+        var request = DomainMessage.CreateRequest("example.com");
+        var context = new DomainMessageContext(null, null, request)
+        {
+            UpstreamEndpoints = ImmutableArray.Create(RootServer)
+        };
+
+        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
     {
         var options = new TestOptionsMonitor(new RootServerConfiguration
         {
@@ -312,13 +327,9 @@ public class RecursiveRootResolverTests
         });
         return new RecursiveRootResolver(
             options,
-            factory,
-            cache ?? CreateCache(),
+            internalClient,
             NullLogger<RecursiveRootResolver>.Instance);
     }
-
-    private static DnsResponseCache CreateCache()
-        => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
 
     private static DomainMessage Referral(string zone, string nsName, IPAddress glue)
         => new(
@@ -372,73 +383,69 @@ public class RecursiveRootResolverTests
         public IDisposable? OnChange(Action<RootServerConfiguration, string?> listener) => null;
     }
 
-    private sealed class ScriptedDomainClientFactory : IDomainClientFactory
+    /// <summary>
+    /// Stands in for the middleware pipeline: upstream endpoints simulate UpstreamQueryMiddleware;
+    /// bare SendAsync simulates a normal internal (glue) resolution.
+    /// </summary>
+    private sealed class ScriptedInternalDomainClient : IInternalDomainClient
     {
         private readonly Func<DomainMessage, DomainMessage> _script;
-        private readonly Action<DomainMessage, IPEndPoint>? _onUdpQuery;
+        private readonly Action<DomainMessage, IPEndPoint>? _onUpstreamQuery;
+        private readonly bool _cacheUpstreamNs;
+        private readonly Dictionary<string, DomainMessage> _nsCache = new(StringComparer.OrdinalIgnoreCase);
 
-        public ScriptedDomainClientFactory(
+        public ScriptedInternalDomainClient(
             Func<DomainMessage, DomainMessage> script,
-            Action<DomainMessage, IPEndPoint>? onUdpQuery = null)
+            Action<DomainMessage, IPEndPoint>? onUpstreamQuery = null,
+            bool cacheUpstreamNs = false)
         {
             _script = script;
-            _onUdpQuery = onUdpQuery;
+            _onUpstreamQuery = onUpstreamQuery;
+            _cacheUpstreamNs = cacheUpstreamNs;
         }
 
         public List<IPEndPoint> QueriedEndPoints { get; } = new();
         public List<string> InternalQueries { get; } = new();
 
-        public ValueTask<IDomainClient> GetParallelDomainClient(IEnumerable<DomainClientOptions> options,
-            CancellationToken cancellationToken = default)
-        {
-            var endPoints = options.Select(o => o.EndPoint).ToArray();
-            return ValueTask.FromResult<IDomainClient>(new ScriptedClient(this, endPoints, internalClient: false));
-        }
+        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
+            => SendAsync(message, upstreamEndpoints: default, cancellationToken);
 
-        public ValueTask<IDomainClient> GetDomainClient(DomainClientOptions options,
-            CancellationToken cancellationToken = default)
+        public ValueTask<DomainMessage> SendAsync(
+            DomainMessage message,
+            ImmutableArray<IPEndPoint> upstreamEndpoints,
+            CancellationToken cancellationToken)
         {
-            if (options.Type == DomainClientType.Internal)
-                return ValueTask.FromResult<IDomainClient>(new ScriptedClient(this, Array.Empty<IPEndPoint>(), true));
-
-            return ValueTask.FromResult<IDomainClient>(
-                new ScriptedClient(this, new[] { options.EndPoint }, false));
-        }
-
-        private DomainMessage Handle(DomainMessage request, IPEndPoint[] endPoints, bool internalClient)
-        {
-            if (internalClient)
+            if (upstreamEndpoints.IsDefaultOrEmpty)
             {
-                InternalQueries.Add($"{request.Questions[0].Name}/{request.Questions[0].Type}");
-            }
-            else
-            {
-                foreach (var endPoint in endPoints)
-                {
-                    QueriedEndPoints.Add(endPoint);
-                    _onUdpQuery?.Invoke(request, endPoint);
-                }
+                InternalQueries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
+                return ValueTask.FromResult(Handle(message));
             }
 
+            foreach (var endPoint in upstreamEndpoints)
+            {
+                QueriedEndPoints.Add(endPoint);
+                _onUpstreamQuery?.Invoke(message, endPoint);
+            }
+
+            if (_cacheUpstreamNs &&
+                message.Questions[0].Type == DomainRecordType.NS)
+            {
+                var key = message.Questions[0].Name.ToString();
+                if (_nsCache.TryGetValue(key, out var cached))
+                    return ValueTask.FromResult(cached with { Id = message.Id });
+
+                var response = Handle(message);
+                _nsCache[key] = response;
+                return ValueTask.FromResult(response);
+            }
+
+            return ValueTask.FromResult(Handle(message));
+        }
+
+        private DomainMessage Handle(DomainMessage request)
+        {
             var response = _script(request);
             return response with { Id = request.Id };
-        }
-
-        private sealed class ScriptedClient : IDomainClient
-        {
-            private readonly ScriptedDomainClientFactory _factory;
-            private readonly IPEndPoint[] _endPoints;
-            private readonly bool _internalClient;
-
-            public ScriptedClient(ScriptedDomainClientFactory factory, IPEndPoint[] endPoints, bool internalClient)
-            {
-                _factory = factory;
-                _endPoints = endPoints;
-                _internalClient = internalClient;
-            }
-
-            public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-                => ValueTask.FromResult(_factory.Handle(message, _endPoints, _internalClient));
         }
     }
 }

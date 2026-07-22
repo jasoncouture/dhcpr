@@ -8,7 +8,6 @@ using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
-using Dhcpr.Dns.Core.Resolvers.Caching;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,15 +18,13 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
     private const int MaxParallelNameservers = 3;
 
-    private readonly IDomainClientFactory _clientFactory;
-    private readonly IDnsResponseCache _cache;
+    private readonly IInternalDomainClient _internalClient;
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
         IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
-        IDomainClientFactory clientFactory,
-        IDnsResponseCache cache,
+        IInternalDomainClient internalClient,
         ILogger<RecursiveRootResolver> logger
     )
     {
@@ -36,14 +33,17 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             .Cast<IPEndPoint>()
             .OrderBy(_ => Random.Shared.Next())
             .ToImmutableArray();
-        _clientFactory = clientFactory;
-        _cache = cache;
+        _internalClient = internalClient;
         _logger = logger;
     }
 
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        // Directed upstream hops are owned by UpstreamQueryMiddleware.
+        if (context.UpstreamEndpoints is { Length: > 0 })
+            return null;
+
         var question = context.DomainMessage.Questions[0];
         var remainingLabels = question.Name.Labels;
         using var endPoints = ListPool<IPEndPoint>.Default.Get();
@@ -65,7 +65,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var responseMessage = await QueryNsAsync(message, endPoints, cancellationToken);
+                var responseMessage = await QueryUpstreamAsync(message, endPoints, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
@@ -76,38 +76,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 addressRecords.AddRange(GetGlueAddresses(responseMessage.Records, nsNameSet));
 
                 if (addressRecords.Count == 0)
-                    addressRecords.AddRange(GetCachedNameserverAddresses(nsNames));
-
-                if (addressRecords.Count == 0)
-                {
-                    var internalClient =
-                        await _clientFactory.GetDomainClient(
-                            new DomainClientOptions() { Type = DomainClientType.Internal },
-                            cancellationToken);
-
-                    using var nameserverQueries = nsNames
-                        .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
-                            new[]
-                            {
-                                internalClient
-                                    .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.A),
-                                        cancellationToken).AsTask(),
-                                internalClient
-                                    .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
-                                        cancellationToken).AsTask()
-                            })
-                        .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
-                        .ToPooledList();
-
-                    var responses = await Task.WhenAll(nameserverQueries);
-                    foreach (var nextMessage in responses)
-                    {
-                        if (nextMessage is null) continue;
-                        addressRecords.AddRange(nextMessage.Records
-                            .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                            .Select(i => ((IPAddressData)i.Data).Address));
-                    }
-                }
+                    addressRecords.AddRange(await ResolveNameserverAddressesAsync(nsNames, cancellationToken));
 
                 // Could not resolve NS addresses — keep current endpoints.
                 if (addressRecords.Count == 0)
@@ -152,20 +121,13 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
     }
 
-    private async ValueTask<DomainMessage> QueryNsAsync(
+    private async ValueTask<DomainMessage> QueryUpstreamAsync(
         DomainMessage message,
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        if (_cache.TryGet(message, out var cached) && cached is not null)
-            return cached;
-
-        var resolver = await _clientFactory.GetParallelDomainClient(
-            SelectQueryEndpoints(endPoints),
-            cancellationToken);
-        var responseMessage = await resolver.SendAsync(message, cancellationToken);
-        _cache.Set(message, responseMessage);
-        return responseMessage;
+        var upstream = SelectQueryEndpoints(endPoints);
+        return await _internalClient.SendAsync(message, upstream, cancellationToken);
     }
 
     private async ValueTask<DomainMessage> QueryFollowingReferralsAsync(
@@ -178,10 +140,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
         for (var depth = 0; depth < maxReferralDepth; depth++)
         {
-            var resolver = await _clientFactory.GetParallelDomainClient(
-                SelectQueryEndpoints(endPoints),
-                cancellationToken);
-            last = await resolver.SendAsync(request, cancellationToken);
+            last = await QueryUpstreamAsync(request, endPoints, cancellationToken);
 
             if (last.Records.Answers.Length > 0)
                 return last;
@@ -190,13 +149,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             if (nsNames.Count == 0)
                 return last;
 
-            CacheReferralAsNs(last);
-
             var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
             using var referralAddresses = GetGlueAddresses(last.Records, nsNameSet).ToPooledList();
             if (referralAddresses.Count == 0)
             {
-                referralAddresses.AddRange(GetCachedNameserverAddresses(nsNames));
+                referralAddresses.AddRange(await ResolveNameserverAddressesAsync(nsNames, cancellationToken));
                 if (referralAddresses.Count == 0)
                     return last;
             }
@@ -208,47 +165,38 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         return last!;
     }
 
-    private void CacheReferralAsNs(DomainMessage referral)
+    private async ValueTask<List<IPAddress>> ResolveNameserverAddressesAsync(
+        PooledList<string> nsNames,
+        CancellationToken cancellationToken)
     {
-        DomainLabels? zone = null;
-        foreach (var record in referral.Records)
-        {
-            if (record.Type is not DomainRecordType.NS)
-                continue;
-            zone = record.Name;
-            break;
-        }
-
-        if (zone is null)
-            return;
-
-        var nsRequest = DomainMessage.CreateRequest(zone, DomainRecordType.NS);
-        _cache.Set(nsRequest, referral with { Questions = nsRequest.Questions });
-    }
-
-    private IEnumerable<IPAddress> GetCachedNameserverAddresses(IEnumerable<string> nsNames)
-    {
-        foreach (var name in nsNames)
-        {
-            foreach (var type in new[] { DomainRecordType.A, DomainRecordType.AAAA })
-            {
-                var lookup = DomainMessage.CreateRequest(name, type);
-                if (!_cache.TryGet(lookup, out var cached) || cached is null)
-                    continue;
-
-                foreach (var record in cached.Records.Answers)
+        using var nameserverQueries = nsNames
+            .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
+                new[]
                 {
-                    if (record.Type is not (DomainRecordType.A or DomainRecordType.AAAA))
-                        continue;
-                    if (record.Data is not IPAddressData addressData)
-                        continue;
-                    yield return addressData.Address;
-                }
-            }
+                    _internalClient
+                        .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.A),
+                            cancellationToken).AsTask(),
+                    _internalClient
+                        .SendAsync(DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
+                            cancellationToken).AsTask()
+                })
+            .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
+            .ToPooledList();
+
+        var responses = await Task.WhenAll(nameserverQueries);
+        var addresses = new List<IPAddress>();
+        foreach (var nextMessage in responses)
+        {
+            if (nextMessage is null) continue;
+            addresses.AddRange(nextMessage.Records
+                .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                .Select(i => ((IPAddressData)i.Data).Address));
         }
+
+        return addresses;
     }
 
-    private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
+    private static ImmutableArray<IPEndPoint> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
     {
         // Prefer IPv4 — IPv6 blackholes often ignore CancelAfter and stall the whole query.
         var preferred = endPoints.Where(i => i.AddressFamily == AddressFamily.InterNetwork).ToPooledList();
@@ -259,8 +207,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 ? pool
                 : pool.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
 
-            return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp })
-                .ToArray();
+            return selected.ToImmutableArray();
         }
         finally
         {

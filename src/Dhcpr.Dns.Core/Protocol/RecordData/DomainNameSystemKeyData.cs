@@ -6,7 +6,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 public sealed record DomainNameSystemKeyData(
     ushort Flags,
     byte Protocol,
-    byte Algorithm,
+    DnssecAlgorithmType Algorithm,
     ImmutableArray<byte> PublicKey
 ) : IDomainResourceRecordData
 {
@@ -18,7 +18,7 @@ public sealed record DomainNameSystemKeyData(
         span = span[2..];
         DomainMessageEncoder.EncodeAndAdvance(ref span, Flags);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Protocol);
-        DomainMessageEncoder.EncodeAndAdvance(ref span, Algorithm);
+        DomainMessageEncoder.EncodeAndAdvance(ref span, (byte)Algorithm);
         PublicKey.CopyTo(span);
         span = span[PublicKey.Length..];
         DomainMessageEncoder.EncodeAndAdvance(ref origin, (ushort)(span.Offset - (origin.Offset + 2)));
@@ -28,7 +28,7 @@ public sealed record DomainNameSystemKeyData(
     {
         var flags = DomainMessageEncoder.ReadUnsignedShortAndAdvance(ref bytes);
         var protocol = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
-        var algorithm = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
+        var algorithm = (DnssecAlgorithmType)DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
         var keyLength = dataLength - 4;
         var keyData = bytes.CurrentSpan[..keyLength].ToImmutableArray();
         bytes = bytes[keyLength..];

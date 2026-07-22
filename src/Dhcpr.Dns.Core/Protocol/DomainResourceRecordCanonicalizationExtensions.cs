@@ -103,7 +103,7 @@ public static class DomainResourceRecordCanonicalizationExtensions
             case ResourceRecordSignatureData rrsigData:
                 BinaryPrimitives.WriteUInt16BigEndian(span, (ushort)rrsigData.TypeCovered);
                 span = span[2..];
-                span[0] = rrsigData.Algorithm;
+                span[0] = (byte)rrsigData.Algorithm;
                 span = span[1..];
                 span[0] = rrsigData.Labels;
                 span = span[1..];

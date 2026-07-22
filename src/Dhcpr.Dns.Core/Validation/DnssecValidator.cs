@@ -32,10 +32,10 @@ public sealed class DnssecValidator : IDnssecValidator
             canonicalRrsetData.CopyTo(payload.AsSpan(rrsigWireDataExcludingSignature.Length));
             var payloadSpan = payload.AsSpan(0, payloadSize);
 
-            return dnsKey.Algorithm switch
+            return (DnssecAlgorithmType)dnsKey.Algorithm switch
             {
-                8 => VerifyRsaSha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
-                13 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
+                DnssecAlgorithmType.RsaSha256 => VerifyRsaSha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
+                DnssecAlgorithmType.EcdsaP256Sha256 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 _ => false
             };
         }
@@ -80,15 +80,19 @@ public sealed class DnssecValidator : IDnssecValidator
 
     private static bool VerifyEcdsaP256Sha256(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
     {
-        if (publicKeyData.Length != 64 || signature.Length != 64) return false;
+        const int expectedKeySize = 64;
+        const int expectedSignatureSize = 64;
+        const int coordinateSize = 32;
+
+        if (publicKeyData.Length != expectedKeySize || signature.Length != expectedSignatureSize) return false;
 
         using var ecdsa = ECDsa.Create(new ECParameters
         {
             Curve = ECCurve.NamedCurves.nistP256,
             Q = new ECPoint
             {
-                X = publicKeyData[..32].ToArray(),
-                Y = publicKeyData[32..].ToArray()
+                X = publicKeyData[..coordinateSize].ToArray(),
+                Y = publicKeyData[coordinateSize..].ToArray()
             }
         });
 
@@ -107,7 +111,7 @@ public sealed class DnssecValidator : IDnssecValidator
             
             var rdata = buffer.AsSpan(2, span.Offset - 2);
 
-            if (dnsKey.Algorithm == 1)
+            if ((DnssecAlgorithmType)dnsKey.Algorithm == DnssecAlgorithmType.RsaMd5)
             {
                 if (rdata.Length < 5) return 0;
                 return BinaryPrimitives.ReadUInt16BigEndian(rdata[^3..^1]);
@@ -148,11 +152,11 @@ public sealed class DnssecValidator : IDnssecValidator
 
             var payload = buffer.AsSpan(0, offset);
 
-            byte[] digest = ds.DigestType switch
+            byte[] digest = (DelegationSignerDigestType)ds.DigestType switch
             {
-                1 => SHA1.HashData(payload),
-                2 => SHA256.HashData(payload),
-                4 => SHA384.HashData(payload),
+                DelegationSignerDigestType.Sha1 => SHA1.HashData(payload),
+                DelegationSignerDigestType.Sha256 => SHA256.HashData(payload),
+                DelegationSignerDigestType.Sha384 => SHA384.HashData(payload),
                 _ => Array.Empty<byte>()
             };
 
@@ -166,7 +170,7 @@ public sealed class DnssecValidator : IDnssecValidator
 
     public byte[] CalculateNsec3Hash(DomainLabels name, NextSecure3Data nsec3Parameters)
     {
-        if (nsec3Parameters.HashAlgorithm != 1)
+        if ((Nsec3HashAlgorithm)nsec3Parameters.HashAlgorithm != Nsec3HashAlgorithm.Sha1)
             return Array.Empty<byte>();
 
         var buffer = ArrayPool<byte>.Shared.Rent(255);

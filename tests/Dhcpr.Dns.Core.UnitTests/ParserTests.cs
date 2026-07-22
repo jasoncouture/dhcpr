@@ -153,7 +153,7 @@ public class ParserTests
     [Fact]
     public void DnsKeyRecordEncodesAndDecodesCorrectly()
     {
-        var keyData = new DomainNameSystemKeyData(256, 3, 8, ImmutableArray.Create<byte>(1, 2, 3, 4, 5));
+        var keyData = new DomainNameSystemKeyData(256, 3, DnssecAlgorithmType.RsaSha256, ImmutableArray.Create<byte>(1, 2, 3, 4, 5));
         var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.DNSKEY, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), keyData);
         var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
 
@@ -166,14 +166,14 @@ public class ParserTests
         var decodedKeyData = Assert.IsType<DomainNameSystemKeyData>(decodedRecord.Data);
         Assert.Equal(256, decodedKeyData.Flags);
         Assert.Equal(3, decodedKeyData.Protocol);
-        Assert.Equal(8, decodedKeyData.Algorithm);
+        Assert.Equal(DnssecAlgorithmType.RsaSha256, decodedKeyData.Algorithm);
         Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, decodedKeyData.PublicKey.ToArray());
     }
 
     [Fact]
     public void DsRecordEncodesAndDecodesCorrectly()
     {
-        var dsData = new DelegationSignerData(12345, 8, 2, ImmutableArray.Create<byte>(9, 8, 7, 6));
+        var dsData = new DelegationSignerData(12345, DnssecAlgorithmType.RsaSha256, DelegationSignerDigestType.Sha256, ImmutableArray.Create<byte>(9, 8, 7, 6));
         var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.DS, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), dsData);
         var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
 
@@ -185,8 +185,8 @@ public class ParserTests
         
         var decodedDelegationSignerData = Assert.IsType<DelegationSignerData>(decodedRecord.Data);
         Assert.Equal(12345, decodedDelegationSignerData.KeyTag);
-        Assert.Equal(8, decodedDelegationSignerData.Algorithm);
-        Assert.Equal(2, decodedDelegationSignerData.DigestType);
+        Assert.Equal(DnssecAlgorithmType.RsaSha256, decodedDelegationSignerData.Algorithm);
+        Assert.Equal(DelegationSignerDigestType.Sha256, decodedDelegationSignerData.DigestType);
         Assert.Equal(new byte[] { 9, 8, 7, 6 }, decodedDelegationSignerData.Digest.ToArray());
     }
 
@@ -224,7 +224,7 @@ public class ParserTests
     [Fact]
     public void RrSigRecordEncodesAndDecodesCorrectly()
     {
-        var rrsigData = new ResourceRecordSignatureData(DomainRecordType.A, 8, 2, 3600, 1690000000, 1680000000, 12345, new DomainLabels("example.com"), ImmutableArray.Create<byte>(1, 3, 5, 7));
+        var rrsigData = new ResourceRecordSignatureData(DomainRecordType.A, DnssecAlgorithmType.RsaSha256, 2, 3600, 1690000000, 1680000000, 12345, new DomainLabels("example.com"), ImmutableArray.Create<byte>(1, 3, 5, 7));
         var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.RRSIG, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), rrsigData);
         var message = DomainMessage.CreateResponse(DomainMessage.CreateRequest("example.com"), new[] { record });
 
@@ -236,7 +236,7 @@ public class ParserTests
         
         var decodedResourceRecordSignatureData = Assert.IsType<ResourceRecordSignatureData>(decodedRecord.Data);
         Assert.Equal(DomainRecordType.A, decodedResourceRecordSignatureData.TypeCovered);
-        Assert.Equal(8, decodedResourceRecordSignatureData.Algorithm);
+        Assert.Equal(DnssecAlgorithmType.RsaSha256, decodedResourceRecordSignatureData.Algorithm);
         Assert.Equal(2, decodedResourceRecordSignatureData.Labels);
         Assert.Equal(3600u, decodedResourceRecordSignatureData.OriginalTtl);
         Assert.Equal(1690000000u, decodedResourceRecordSignatureData.SignatureExpiration);

@@ -24,7 +24,7 @@ public class DnssecValidatorTests
     {
         var salt = "there is no salt"u8.ToArray();
         var nsec3Param = new NextSecure3Data(
-            1,
+            Nsec3HashAlgorithm.Sha1,
             0,
             12,
             salt.ToImmutableArray(),
@@ -52,7 +52,7 @@ public class DnssecValidatorTests
 
         var rrsigData = new ResourceRecordSignatureData(
             DomainRecordType.A,
-            13,
+            DnssecAlgorithmType.EcdsaP256Sha256,
             2,
             3600,
             (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
@@ -65,7 +65,7 @@ public class DnssecValidatorTests
         var dnsKeyData = new DomainNameSystemKeyData(
             256,
             3,
-            13,
+            DnssecAlgorithmType.EcdsaP256Sha256,
             pubKey.ToImmutableArray()
         );
 
@@ -92,7 +92,7 @@ public class DnssecValidatorTests
 
         var rrsigData = new ResourceRecordSignatureData(
             DomainRecordType.A,
-            8,
+            DnssecAlgorithmType.RsaSha256,
             2,
             3600,
             (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
@@ -105,7 +105,7 @@ public class DnssecValidatorTests
         var dnsKeyData = new DomainNameSystemKeyData(
             256,
             3,
-            8,
+            DnssecAlgorithmType.RsaSha256,
             pubKey.ToImmutableArray()
         );
 
@@ -119,7 +119,7 @@ public class DnssecValidatorTests
         var dnsKeyData = new DomainNameSystemKeyData(
             256,
             3,
-            8,
+            DnssecAlgorithmType.RsaSha256,
             new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }.ToImmutableArray()
         );
         var record = new DomainResourceRecord(new DomainLabels("example.com"), DomainRecordType.DNSKEY, DomainRecordClass.IN, TimeSpan.FromSeconds(3600), dnsKeyData);

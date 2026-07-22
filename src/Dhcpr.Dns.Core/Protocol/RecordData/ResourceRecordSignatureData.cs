@@ -7,7 +7,7 @@ namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record ResourceRecordSignatureData(
     DomainRecordType TypeCovered,
-    byte Algorithm,
+    DnssecAlgorithmType Algorithm,
     byte Labels,
     uint OriginalTtl,
     uint SignatureExpiration,
@@ -27,7 +27,7 @@ public sealed record ResourceRecordSignatureData(
         var origin = span;
         span = span[2..];
         DomainMessageEncoder.EncodeAndAdvance(ref span, (ushort)TypeCovered);
-        DomainMessageEncoder.EncodeAndAdvance(ref span, Algorithm);
+        DomainMessageEncoder.EncodeAndAdvance(ref span, (byte)Algorithm);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Labels);
         
         // Use custom encoding for uint/network byte order since standard EncodeAndAdvance uses int for 4 bytes.
@@ -58,7 +58,7 @@ public sealed record ResourceRecordSignatureData(
     {
         var startOffset = bytes.Offset;
         var typeCovered = (DomainRecordType)DomainMessageEncoder.ReadUnsignedShortAndAdvance(ref bytes);
-        var algorithm = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
+        var algorithm = (DnssecAlgorithmType)DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
         var labels = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
         
         // Read uints

@@ -4,7 +4,7 @@ using Dhcpr.Dns.Core.Protocol.Parser;
 namespace Dhcpr.Dns.Core.Protocol.RecordData;
 
 public sealed record NextSecure3ParameterData(
-    byte HashAlgorithm,
+    Nsec3HashAlgorithm HashAlgorithm,
     byte Flags,
     ushort Iterations,
     ImmutableArray<byte> Salt
@@ -17,7 +17,7 @@ public sealed record NextSecure3ParameterData(
     {
         var origin = span;
         span = span[2..];
-        DomainMessageEncoder.EncodeAndAdvance(ref span, HashAlgorithm);
+        DomainMessageEncoder.EncodeAndAdvance(ref span, (byte)HashAlgorithm);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Flags);
         DomainMessageEncoder.EncodeAndAdvance(ref span, Iterations);
         
@@ -29,7 +29,7 @@ public sealed record NextSecure3ParameterData(
 
     public static IDomainResourceRecordData ReadFrom(ref ReadOnlyDnsParsingSpan bytes, int dataLength)
     {
-        var hashAlg = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
+        var hashAlg = (Nsec3HashAlgorithm)DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
         var flags = DomainMessageEncoder.ReadByteAndAdvance(ref bytes);
         var iterations = DomainMessageEncoder.ReadUnsignedShortAndAdvance(ref bytes);
         

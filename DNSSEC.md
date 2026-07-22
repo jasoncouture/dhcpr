@@ -4,7 +4,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working.
 
-**Phase 2 complete.** Next up: Phase 3 (Validator).
+**Phase 3 complete.** Next up: Phase 4 (Cache / CNAME).
 
 ---
 
@@ -92,18 +92,20 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ## Phase 3 — Validator + DnssecValidationMiddleware
 
+**Status: done.**
+
 **Goal:** Local validation on middleware hops; set AD / honor CD / SERVFAIL.
 
 **Done when:**
 
-- Trust anchors in DNS config (default root DS)
-- `IDnssecValidator` with BCL crypto: RSASHA256 (8), ECDSAP256SHA256 (13); NSEC proofs (NSEC3 can wait)
-- `DnssecScope` created per client query, passed on every re-entry
-- `DnssecValidationMiddleware` decorator:
+- [x] Trust anchors in DNS config (default root DS)
+- [x] `IDnssecValidator` with BCL crypto: RSASHA256 (8), ECDSAP256SHA256 (13); NSEC proofs (NSEC3 can wait)
+- [x] `DnssecScope` created per client query, passed on every re-entry
+- [x] `DnssecValidationMiddleware` decorator:
   - Upstream hops: validate into scope
   - Client-facing: set AD; CD=1 returns data if bogus; CD=0 + bogus → SERVFAIL
   - Do not copy forwarder upstream AD
-- Basic unit tests with known signature vectors
+- [x] Basic unit tests with known signature vectors
 
 **Stop here.**
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-dig @127.0.0.1 -p 65353 fast.com
-dig @127.0.0.1 -p 65353 www.google.com
-dig @127.0.0.1 -p 65353 www.facebook.com
-dig @127.0.0.1 -p 65353 telecom-transcription-service.wus2-01.telecom.devtest.telecom.srv.st.dev
+SERVER="${1:-149.28.47.116}"
+PORT="${2:-53}"
+dig @$SERVER -p $PORT fast.com
+dig @$SERVER -p $PORT www.google.com
+dig @$SERVER -p $PORT www.facebook.com
+dig @$SERVER -p $PORT telecom-transcription-service.wus2-01.telecom.devtest.telecom.srv.st.dev

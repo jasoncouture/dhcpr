@@ -17,4 +17,8 @@
       <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <TrimmerRootAssembly Include="Scrutor" />
+    </ItemGroup>
+
 </Project>

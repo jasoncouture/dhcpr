@@ -237,11 +237,12 @@ public sealed class DnsServer : BackgroundService
         {
             return;
         }
-        // We don't catch exceptions here like we do with UDP
-        // because we want to disconnect the client if they send something that doesn't work.
 
         var message = DomainMessageEncoder.Decode(buffer);
-        var context = new DomainMessageContext(remoteIPEndPoint, localEndPoint, message);
+        var context = new DomainMessageContext(remoteIPEndPoint, localEndPoint, message)
+        {
+            DnssecScope = new DnssecScope()
+        };
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient);
         _messageQueue.Enqueue(messageToQueue, cancellationToken);
@@ -263,7 +264,10 @@ public sealed class DnsServer : BackgroundService
             var message = DomainMessageEncoder.Decode(bytes);
             var localAddress = ResolveLocalAddress(listenEndPoint, networkInterface, remoteIPEndPoint.AddressFamily);
             var endPoint = new IPEndPoint(localAddress, listenEndPoint.Port);
-            var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message);
+            var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message)
+            {
+                DnssecScope = new DnssecScope()
+            };
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);
             _messageQueue.Enqueue(messageToQueue, cancellationToken);

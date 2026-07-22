@@ -24,7 +24,6 @@ public sealed class DnssecValidator : IDnssecValidator
         if (rrsig.Algorithm != dnsKey.Algorithm)
             return false;
 
-        // Signature covers: rrsigWireDataExcludingSignature + canonicalRrsetData
         var payloadSize = rrsigWireDataExcludingSignature.Length + canonicalRrsetData.Length;
         var payload = ArrayPool<byte>.Shared.Rent(payloadSize);
         try
@@ -37,7 +36,7 @@ public sealed class DnssecValidator : IDnssecValidator
             {
                 8 => VerifyRsaSha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 13 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
-                _ => false // Unsupported algorithm
+                _ => false
             };
         }
         catch (Exception ex)
@@ -53,8 +52,6 @@ public sealed class DnssecValidator : IDnssecValidator
 
     private static bool VerifyRsaSha256(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
     {
-        // RFC 3110 Section 2: RSA Public Key representation
-        // length(Exponent) is 1 or 3 bytes (depending on first byte).
         if (publicKeyData.Length < 1) return false;
         
         int exponentLength = publicKeyData[0];
@@ -83,7 +80,6 @@ public sealed class DnssecValidator : IDnssecValidator
 
     private static bool VerifyEcdsaP256Sha256(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
     {
-        // RFC 6605: ECDSA P-256 public key is 64 bytes (X and Y). Signature is 64 bytes (R and S).
         if (publicKeyData.Length != 64 || signature.Length != 64) return false;
 
         using var ecdsa = ECDsa.Create(new ECParameters
@@ -96,7 +92,6 @@ public sealed class DnssecValidator : IDnssecValidator
             }
         });
 
-        // The BCL ECDsa.VerifyData expects IEEE P1363 format (which is just R || S for P-256 in standard format)
         return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
     }
 
@@ -110,16 +105,14 @@ public sealed class DnssecValidator : IDnssecValidator
             var span = new DnsParsingSpan(dict, buffer);
             dnsKey.WriteTo(ref span);
             
-            // WriteTo prepends the 2-byte RDLENGTH, we skip it
             var rdata = buffer.AsSpan(2, span.Offset - 2);
 
-            if (dnsKey.Algorithm == 1) // RSA/MD5 (deprecated, but keeping rule for correctness)
+            if (dnsKey.Algorithm == 1)
             {
                 if (rdata.Length < 5) return 0;
                 return BinaryPrimitives.ReadUInt16BigEndian(rdata[^3..^1]);
             }
 
-            // RFC 4034 Appendix B: Key Tag Calculation
             long ac = 0;
             for (var i = 0; i < rdata.Length; i++)
             {
@@ -148,7 +141,6 @@ public sealed class DnssecValidator : IDnssecValidator
             {
                 var parsingSpan = new DnsParsingSpan(dict, buffer.AsSpan(offset));
                 dnsKeyRecord.Data.WriteTo(ref parsingSpan);
-                // Strip the RDLENGTH (2 bytes)
                 var rdataLen = parsingSpan.Offset - 2;
                 buffer.AsSpan(offset + 2, rdataLen).CopyTo(buffer.AsSpan(offset));
                 offset += rdataLen;
@@ -158,9 +150,9 @@ public sealed class DnssecValidator : IDnssecValidator
 
             byte[] digest = ds.DigestType switch
             {
-                1 => SHA1.HashData(payload), // SHA-1
-                2 => SHA256.HashData(payload), // SHA-256
-                4 => SHA384.HashData(payload), // SHA-384
+                1 => SHA1.HashData(payload),
+                2 => SHA256.HashData(payload),
+                4 => SHA384.HashData(payload),
                 _ => Array.Empty<byte>()
             };
 
@@ -174,10 +166,9 @@ public sealed class DnssecValidator : IDnssecValidator
 
     public byte[] CalculateNsec3Hash(DomainLabels name, NextSecure3Data nsec3Parameters)
     {
-        if (nsec3Parameters.HashAlgorithm != 1) // Only SHA-1 is standard for NSEC3
+        if (nsec3Parameters.HashAlgorithm != 1)
             return Array.Empty<byte>();
 
-        // Canonicalize name
         var buffer = ArrayPool<byte>.Shared.Rent(255);
         try
         {
@@ -222,8 +213,6 @@ public sealed class DnssecValidator : IDnssecValidator
 
     public bool CoversName(NextSecureData nsec, DomainLabels nsecOwner, DomainLabels nameToVerify)
     {
-        // Simple canonical ordering check: nsecOwner < nameToVerify < nsec.NextDomainName
-        // Wrapping is allowed (if nsecOwner > nsec.NextDomainName, it's the last record in zone)
         var owner = nsecOwner.ToString().ToLowerInvariant();
         var next = nsec.NextDomainName.ToString().ToLowerInvariant();
         var target = nameToVerify.ToString().ToLowerInvariant();
@@ -234,7 +223,6 @@ public sealed class DnssecValidator : IDnssecValidator
         if (string.CompareOrdinal(owner, next) < 0)
             return ownerToTarget < 0 && targetToNext < 0;
         
-        // Wrap-around case
         return ownerToTarget < 0 || targetToNext < 0;
     }
 
@@ -248,7 +236,6 @@ public sealed class DnssecValidator : IDnssecValidator
         if (nsec3OwnerHash.SequenceCompareTo(nextHash) < 0)
             return ownerToTarget < 0 && targetToNext < 0;
 
-        // Wrap-around case
         return ownerToTarget < 0 || targetToNext < 0;
     }
 }

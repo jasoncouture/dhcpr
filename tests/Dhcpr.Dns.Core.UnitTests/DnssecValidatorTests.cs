@@ -22,26 +22,19 @@ public class DnssecValidatorTests
     [Fact]
     public void Nsec3HashCalculationIsCorrect()
     {
-        // Vector from RFC 5155 Appendix A
-        // Name: example.
-        // Salt: 7468657265206973206E6F2073616C74 ("there is no salt" = 16 bytes)
-        // Iterations: 12
         var salt = "there is no salt"u8.ToArray();
         var nsec3Param = new NextSecure3Data(
-            1, // SHA-1
+            1,
             0,
             12,
             salt.ToImmutableArray(),
-            ImmutableArray<byte>.Empty, // Next hash doesn't matter here
+            ImmutableArray<byte>.Empty,
             ImmutableArray<byte>.Empty
         );
 
         var name = new DomainLabels("example");
         var hash = _validator.CalculateNsec3Hash(name, nsec3Param);
 
-        // From RFC 5155 A.1. (example.)
-        // Hash should be 0p9mhaveqvm6t7vebugqw5i9c3edq3rs in Base32Hex
-        // We'll just ensure it runs and produces a 20 byte SHA-1 hash.
         Assert.Equal(20, hash.Length);
     }
 
@@ -59,7 +52,7 @@ public class DnssecValidatorTests
 
         var rrsigData = new ResourceRecordSignatureData(
             DomainRecordType.A,
-            13, // ECDSAP256SHA256
+            13,
             2,
             3600,
             (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
@@ -76,7 +69,6 @@ public class DnssecValidatorTests
             pubKey.ToImmutableArray()
         );
 
-        // We bypass the canonical wire data splitting and just pass our payload as canonicalRrsetData, and empty for rrsigWireDataExcludingSignature
         var result = _validator.VerifySignature(rrsigData, ReadOnlySpan<byte>.Empty, payload, dnsKeyData);
         Assert.True(result);
     }
@@ -90,7 +82,6 @@ public class DnssecValidatorTests
         var exponent = pubParams.Exponent!;
         var modulus = pubParams.Modulus!;
         
-        // DNSKEY RSA encoding: Exponent Length (1 or 3 bytes), Exponent, Modulus
         var pubKey = new byte[1 + exponent.Length + modulus.Length];
         pubKey[0] = (byte)exponent.Length;
         exponent.CopyTo(pubKey, 1);
@@ -101,7 +92,7 @@ public class DnssecValidatorTests
 
         var rrsigData = new ResourceRecordSignatureData(
             DomainRecordType.A,
-            8, // RSASHA256
+            8,
             2,
             3600,
             (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
@@ -125,8 +116,6 @@ public class DnssecValidatorTests
     [Fact]
     public void KeyTagCalculationMatchesRfc()
     {
-        // Example from RFC 4034, or we can just verify the logic runs correctly
-        // We'll construct a dummy DNSKEY and ensure it returns a consistent KeyTag
         var dnsKeyData = new DomainNameSystemKeyData(
             256,
             3,

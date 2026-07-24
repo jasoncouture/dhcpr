@@ -33,9 +33,11 @@ public class InternalDomainClientTests
     {
         var queue = new CountingQueue();
         var client = new InternalDomainClient(queue);
+        var budget = new QueryWorkBudget();
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
-            InternalHopDepth = 3
+            InternalHopDepth = 3,
+            WorkBudget = budget
         };
 
         var sendTask = client.SendAsync(
@@ -47,6 +49,7 @@ public class InternalDomainClientTests
         Assert.Equal(1, queue.EnqueueCount);
         Assert.NotNull(queue.LastMessage);
         Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
+        Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
         Assert.True(queue.LastMessage.Context.IsInternal);
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(
@@ -56,6 +59,25 @@ public class InternalDomainClientTests
                 DomainResponseCode.NoError));
 
         await sendTask;
+    }
+
+    [Fact]
+    public async Task SendAsync_AbortsWithServerFailure_WhenWorkBudgetExhausted()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
+        {
+            WorkBudget = new QueryWorkBudget(limit: 0)
+        };
+
+        var result = await client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("a2.info.afilias-nst.info"),
+            CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
+        Assert.Equal(0, queue.EnqueueCount);
     }
 
     private sealed class CountingQueue : IMessageQueue<DnsPacketReceivedMessage>

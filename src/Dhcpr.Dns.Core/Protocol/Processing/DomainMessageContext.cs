@@ -31,6 +31,12 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public DnssecScope? DnssecScope { get; init; }
 
     /// <summary>
+    /// Shared across a client query and all internal re-entries. Caps fan-out
+    /// from glue / parallel NS lookups that hop-depth alone cannot stop.
+    /// </summary>
+    public QueryWorkBudget? WorkBudget { get; init; }
+
+    /// <summary>
     /// Set by the cache decorator when the response was served from cache.
     /// Stored on the context so the flag is visible to outer middleware after await
     /// (AsyncLocal does not flow mutations back to the caller).

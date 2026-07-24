@@ -241,7 +241,8 @@ public sealed class DnsServer : BackgroundService
         var message = DomainMessageEncoder.Decode(buffer);
         var context = new DomainMessageContext(remoteIPEndPoint, localEndPoint, message)
         {
-            DnssecScope = new DnssecScope()
+            DnssecScope = new DnssecScope(),
+            WorkBudget = new QueryWorkBudget()
         };
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient);
@@ -266,7 +267,8 @@ public sealed class DnsServer : BackgroundService
             var endPoint = new IPEndPoint(localAddress, listenEndPoint.Port);
             var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message)
             {
-                DnssecScope = new DnssecScope()
+                DnssecScope = new DnssecScope(),
+                WorkBudget = new QueryWorkBudget()
             };
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);

@@ -41,13 +41,10 @@ public class InternalDomainClient : IInternalDomainClient
     {
         var depth = parentContext.InternalHopDepth + 1;
         if (depth > MaxInternalHops)
-        {
-            return ValueTask.FromResult(
-                DomainMessage.CreateResponse(
-                    message,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.ServerFailure));
-        }
+            return ServFail(message);
+
+        if (parentContext.WorkBudget is { } budget && !budget.TryConsume())
+            return ServFail(message);
 
         ImmutableArray<IPEndPoint>? endpoints = upstreamEndpoints.IsDefaultOrEmpty
             ? null
@@ -61,11 +58,19 @@ public class InternalDomainClient : IInternalDomainClient
             UpstreamEndpoints = endpoints,
             IsInternal = true,
             InternalHopDepth = depth,
-            DnssecScope = parentContext.DnssecScope
+            DnssecScope = parentContext.DnssecScope,
+            WorkBudget = parentContext.WorkBudget
         };
 
         return EnqueueAsync(context, cancellationToken);
     }
+
+    private static ValueTask<DomainMessage> ServFail(DomainMessage message)
+        => ValueTask.FromResult(
+            DomainMessage.CreateResponse(
+                message,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
 
     private async ValueTask<DomainMessage> EnqueueAsync(
         DomainMessageContext context,

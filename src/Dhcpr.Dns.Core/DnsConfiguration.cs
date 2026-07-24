@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Net;
+using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core;
 
@@ -7,7 +8,11 @@ namespace Dhcpr.Dns.Core;
 public sealed class DnsConfiguration : IValidateSelf
 {
     public RootServerConfiguration RootServers { get; set; } = new();
-    public ForwarderConfiguration Forwarders { get; set; } = new();
+    public Dictionary<string, string[]> Routes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    private Dictionary<string, IPEndPoint[]> _parsedRoutes = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyDictionary<string, IPEndPoint[]> GetParsedRoutes() => _parsedRoutes;
     
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
@@ -27,10 +32,44 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public bool TryValidate([NotNullWhen(false)] out string? error)
     {
-        if (Forwarders is null)
+        if (RootServers is null || !RootServers.Validate())
         {
-            error = "DNS:Forwarders is missing";
+            error = "DNS:RootServers is invalid";
             return false;
+        }
+
+        if (Routes is null || Routes.Count == 0)
+        {
+            error = "DNS:Routes is missing or empty";
+            return false;
+        }
+
+        _parsedRoutes = new Dictionary<string, IPEndPoint[]>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var route in Routes)
+        {
+            if (route.Value is null || route.Value.Length == 0)
+            {
+                error = $"DNS:Routes[\"{route.Key}\"] is missing or empty";
+                return false;
+            }
+
+            var endpoints = new IPEndPoint[route.Value.Length];
+            for (var i = 0; i < route.Value.Length; i++)
+            {
+                if (!route.Value[i].TryGetEndPoint(53, out var endpoint))
+                {
+                    error = $"DNS:Routes[\"{route.Key}\"] contains an invalid endpoint URI: {route.Value[i]}";
+                    return false;
+                }
+                endpoints[i] = (IPEndPoint)endpoint;
+            }
+            _parsedRoutes[route.Key] = endpoints;
+        }
+
+        if (!_parsedRoutes.ContainsKey("."))
+        {
+            _parsedRoutes["."] = RootServers.Addresses.GetEndPoints();
         }
 
         if (ListenAddresses is null || ListenAddresses.Length == 0)
@@ -45,17 +84,6 @@ public sealed class DnsConfiguration : IValidateSelf
             return false;
         }
 
-        if (!Forwarders.Validate())
-        {
-            error = "DNS:Forwarders is invalid";
-            return false;
-        }
-
-        if (RootServers is null || !RootServers.Validate())
-        {
-            error = "DNS:RootServers is invalid";
-            return false;
-        }
 
         if (TrustAnchors is not null)
         {

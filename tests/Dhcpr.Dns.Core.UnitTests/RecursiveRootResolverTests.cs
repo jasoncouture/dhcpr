@@ -23,6 +23,7 @@ public class RecursiveRootResolverTests
     [Fact]
     public async Task GoogleLikeNodataKeepsParentNameservers()
     {
+        var queried = new List<IPEndPoint>();
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -46,11 +47,13 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
+                    return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+                return EmptyNoError(request);
             }
 
             return EmptyNoError(request);
-        });
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
         var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("www.google.com");
@@ -71,6 +74,7 @@ public class RecursiveRootResolverTests
     public async Task ReferralUsesMatchingGlueOnly()
     {
         IPEndPoint? nextHopAfterCom = null;
+        var queried = new List<IPEndPoint>();
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -98,12 +102,15 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
             }
 
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) =>
         {
+            queried.Add(endPoint);
             if (endPoint.Address.Equals(ComServer.Address))
                 nextHopAfterCom = endPoint;
         });
@@ -121,6 +128,7 @@ public class RecursiveRootResolverTests
     [Fact]
     public async Task ReferralWithoutGlueResolvesNsNamesInternally()
     {
+        var queried = new List<IPEndPoint>();
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -155,11 +163,13 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                if (queried.Any(ep => ep.Address.Equals(NsResolvedAddress)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
             }
 
             return EmptyNoError(request);
-        });
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
         var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("example.com");
@@ -174,6 +184,7 @@ public class RecursiveRootResolverTests
     [Fact]
     public async Task UnrelatedAddressInAdditionalIsNotUsedAsNameserver()
     {
+        var queried = new List<IPEndPoint>();
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -202,11 +213,13 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("www.facebook.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Answer(request, ARecord("www.facebook.com", IPAddress.Parse("157.240.3.35")));
+                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                    return Answer(request, ARecord("www.facebook.com", IPAddress.Parse("157.240.3.35")));
+                return EmptyNoError(request);
             }
 
             return EmptyNoError(request);
-        });
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
         var resolver = CreateResolver(internalClient);
         var request = DomainMessage.CreateRequest("www.facebook.com");
@@ -259,6 +272,7 @@ public class RecursiveRootResolverTests
         // Caching of upstream NS queries is owned by CacheResolverDecorator on the pipeline.
         // This unit tests the resolver in isolation; simulate cache by memoizing NS/com responses.
         var comNsQueries = 0;
+        var queried = new List<IPEndPoint>();
         var comNsResponse = Referral("com", "a.gtld-servers.net", ComServer.Address);
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
@@ -267,7 +281,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
             {
-                comNsQueries++;
+                Interlocked.Increment(ref comNsQueries);
                 return comNsResponse;
             }
 
@@ -278,17 +292,25 @@ public class RecursiveRootResolverTests
                 return NodataWithSoa("example.com");
 
             if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
-                return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+            {
+                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
+                    return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+                return EmptyNoError(request);
+            }
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
-                return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+            {
+                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
+            }
 
             if (type == DomainRecordType.NS &&
-                (name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase)))
+                name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
                 return NodataWithSoa(name);
 
             return EmptyNoError(request);
-        }, cacheUpstreamNs: true);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint), cacheUpstreamNs: true);
 
         var resolver = CreateResolver(internalClient);
         await resolver.ProcessAsync(
@@ -321,12 +343,23 @@ public class RecursiveRootResolverTests
 
     private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
     {
-        var options = new TestOptionsMonitor(new RootServerConfiguration
+        var configuration = new DnsConfiguration
         {
-            Addresses = new[] { RootServer.ToString() }
-        });
+            RootServers = new RootServerConfiguration
+            {
+                Addresses = new[] { RootServer.ToString() }
+            },
+            Routes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["."] = new[] { RootServer.ToString() }
+            },
+            ListenAddresses = new[] { "udp://127.0.0.1:5353" }
+        };
+
+        Assert.True(configuration.Validate());
+
         return new RecursiveRootResolver(
-            options,
+            new TestOptionsMonitor(configuration),
             internalClient,
             NullLogger<RecursiveRootResolver>.Instance);
     }
@@ -378,12 +411,12 @@ public class RecursiveRootResolverTests
         => new(new DomainLabels(owner), DomainRecordType.A, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new IPAddressData(address));
 
-    private sealed class TestOptionsMonitor : IOptionsMonitor<RootServerConfiguration>
+    private sealed class TestOptionsMonitor : IOptionsMonitor<DnsConfiguration>
     {
-        public TestOptionsMonitor(RootServerConfiguration current) => CurrentValue = current;
-        public RootServerConfiguration CurrentValue { get; }
-        public RootServerConfiguration Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<RootServerConfiguration, string?> listener) => null;
+        public TestOptionsMonitor(DnsConfiguration current) => CurrentValue = current;
+        public DnsConfiguration CurrentValue { get; }
+        public DnsConfiguration Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<DnsConfiguration, string?> listener) => null;
     }
 
     /// <summary>
@@ -440,8 +473,7 @@ public class RecursiveRootResolverTests
                 _onUpstreamQuery?.Invoke(message, endPoint);
             }
 
-            if (_cacheUpstreamNs &&
-                message.Questions[0].Type == DomainRecordType.NS)
+            if (_cacheUpstreamNs && message.Questions[0].Type == DomainRecordType.NS)
             {
                 var key = message.Questions[0].Name.ToString();
                 if (_nsCache.TryGetValue(key, out var cached))

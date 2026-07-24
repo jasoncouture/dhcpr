@@ -7,6 +7,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public class InternalDomainClient : IInternalDomainClient
 {
+    public const int MaxInternalHops = 20;
+
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
 
     public InternalDomainClient(IMessageQueue<DnsPacketReceivedMessage> messageQueue)
@@ -18,7 +20,11 @@ public class InternalDomainClient : IInternalDomainClient
 
     public ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
         => EnqueueAsync(
-            new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage) { IsInternal = true },
+            new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage)
+            {
+                IsInternal = true,
+                InternalHopDepth = 1
+            },
             cancellationToken);
 
     public ValueTask<DomainMessage> SendAsync(
@@ -33,6 +39,16 @@ public class InternalDomainClient : IInternalDomainClient
         ImmutableArray<IPEndPoint> upstreamEndpoints,
         CancellationToken cancellationToken)
     {
+        var depth = parentContext.InternalHopDepth + 1;
+        if (depth > MaxInternalHops)
+        {
+            return ValueTask.FromResult(
+                DomainMessage.CreateResponse(
+                    message,
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure));
+        }
+
         ImmutableArray<IPEndPoint>? endpoints = upstreamEndpoints.IsDefaultOrEmpty
             ? null
             : upstreamEndpoints;
@@ -43,7 +59,9 @@ public class InternalDomainClient : IInternalDomainClient
             message)
         {
             UpstreamEndpoints = endpoints,
-            IsInternal = true
+            IsInternal = true,
+            InternalHopDepth = depth,
+            DnssecScope = parentContext.DnssecScope
         };
 
         return EnqueueAsync(context, cancellationToken);

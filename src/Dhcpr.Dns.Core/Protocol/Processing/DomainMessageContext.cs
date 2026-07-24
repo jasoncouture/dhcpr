@@ -20,6 +20,12 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public bool IsInternal { get; init; }
 
     /// <summary>
+    /// Depth of internal pipeline re-entry. Client requests are 0; each
+    /// <see cref="IInternalDomainClient"/> hop increments by one.
+    /// </summary>
+    public int InternalHopDepth { get; init; }
+
+    /// <summary>
     /// DNSSEC validation tracking for the lifetime of a query and its internal hops.
     /// </summary>
     public DnssecScope? DnssecScope { get; init; }

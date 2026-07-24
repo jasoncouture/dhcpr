@@ -5,3 +5,4 @@ dig @$SERVER -p $PORT fast.com
 dig @$SERVER -p $PORT www.google.com
 dig @$SERVER -p $PORT www.facebook.com
 dig @$SERVER -p $PORT telecom-transcription-service.wus2-01.telecom.devtest.telecom.srv.st.dev
+dig @$SERVER -p $PORT nas.nebula

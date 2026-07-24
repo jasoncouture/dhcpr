@@ -21,7 +21,7 @@ public static class DomainMessageEncoder
     private const int OperationCodeBitIndex = 11;
 
     // AA - Bit 9
-    private const int AuthorativeBitIndex = 10;
+    private const int AuthoritativeBitIndex = 10;
 
     // TC - Bit 8
     private const int TruncatedBitIndex = 9;
@@ -102,7 +102,7 @@ public static class DomainMessageEncoder
         return new DomainMessageFlags(
             ReadBit(flags, ResponseBitIndex),
             (DomainOperationCode)ReadBits(flags, OperationCodeBitIndex, OperationCodeBitCount),
-            ReadBit(flags, AuthorativeBitIndex),
+            ReadBit(flags, AuthoritativeBitIndex),
             ReadBit(flags, TruncatedBitIndex),
             ReadBit(flags, RecursionDesiredBitIndex),
             ReadBit(flags, RecursionAvailableBitIndex),
@@ -401,7 +401,7 @@ public static class DomainMessageEncoder
         ushort flags = 0;
         SetBit(ref flags, messageFlags.Response, ResponseBitIndex);
         SetBits(ref flags, (ushort)messageFlags.Operation, OperationCodeBitIndex, OperationCodeBitCount);
-        SetBit(ref flags, messageFlags.Authorative, AuthorativeBitIndex);
+        SetBit(ref flags, messageFlags.Authoritative, AuthoritativeBitIndex);
         SetBit(ref flags, messageFlags.Truncated, TruncatedBitIndex);
         SetBit(ref flags, messageFlags.RecursionDesired, RecursionDesiredBitIndex);
         SetBit(ref flags, messageFlags.RecursionAvailable, RecursionAvailableBitIndex);

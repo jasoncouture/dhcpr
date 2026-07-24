@@ -10,15 +10,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 ## Current state
 
-Middleware chain: Forward → Recursive → NXDOMAIN, with Cache / CNAME / logging decorators.
-
-| Already present | Gap |
-|-----------------|-----|
-| AD / CD header bits (unused for validation) | No EDNS DO bit |
-| `OPT = 41` enum value | OPT falls through to `BlobData` |
-| Unknown RRs as `BlobData` | No DNSKEY / DS / RRSIG / NSEC / NSEC3 |
-| `InternalDomainClient` re-enters MW for glue / CNAME | Recursive NS / referral / answer uses **direct UDP** |
-| — | SOA RDATA missing MNAME / RNAME |
+Middleware chain: RouteResolver (`RecursiveRootResolver`) → NXDOMAIN, with DNSSEC / Cache / CNAME / logging decorators. Phases 1–3 and the unified route resolver are done.
 
 ---
 
@@ -40,74 +32,22 @@ flowchart TD
 
 Decorator order (outermost last):
 
-`Logging → DnssecValidation → Cache → CanonicalName → (UpstreamQuery | Forward | Recursive | NameError)`
+`Logging → DnssecValidation → Cache → CanonicalName → (UpstreamQuery | RouteResolver | NameError)`
 
 Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers/crypto are not middleware themselves.
 
 ---
 
-## Phase 1 — Re-enter the pipeline for all internal queries
+## Foundational: Unified Route Resolver
 
 **Status: done.**
 
-**Goal:** Every recursive hop (NS, referral, answer) and missing-glue lookup goes through the middleware chain via `InternalDomainClient`. No DNSSEC validation yet. No requirement for typed DNSSEC RRs or EDNS DO in this phase (UDP queries work as today).
+**Goal:** Consolidate DNS forwarding and recursion into a single routing system capable of handling both full authoritative delegations and stub forwarders seamlessly.
 
 **Done when:**
-
-- [x] `DomainMessageContext` has `UpstreamEndpoints` (optional placeholder for later `DnssecScope`)
-- [x] `InternalDomainClient` can send with upstream endpoints (and later scope)
-- [x] `UpstreamQueryMiddleware` — when `UpstreamEndpoints` is set, query those nameservers over UDP/TCP (existing clients) and return the response; otherwise pass (`null`)
-- [x] `ForwardResolver` / `RecursiveRootResolver` return `null` immediately when `UpstreamEndpoints` is set (UpstreamQuery owns the hop)
-- [x] `RecursiveRootResolver` uses **only** internal re-entry — no direct `GetParallelDomainClient` UDP
-- [x] Removed from `RecursiveRootResolver`:
-  - `CacheReferralAsNs`
-  - `GetCachedNameserverAddresses`
-  - direct `_cache` use in `QueryNsAsync` (Cache decorator covers re-entered queries)
-- [x] Missing NS glue: normal internal `A`/`AAAA` (no `UpstreamEndpoints`) — same path a client uses
-- [x] Prefer in-message glue when present
-- [x] Recursion still resolves correctly end-to-end
-
-**Stop here.**
-
----
-
-## Phase 2 — Protocol foundation
-
-**Status: done.**
-
-**Goal:** Wire-accurate types for EDNS and DNSSEC RRs (needed before validation).
-
-**Done when:**
-
-- [x] Typed EDNS(0) OPT RR with DO bit; encode/decode tests
-- [x] `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
-- [x] UDP reply size uses client OPT payload size (replace `1024` hardcode)
-- [x] Record types + parsers: DNSKEY, DS, RRSIG, NSEC, NSEC3, NSEC3PARAM
-- [x] `StartOfAuthorityData` includes MNAME / RNAME
-- [x] Canonicalization helpers (RFC 4034 §6) with unit tests
-
-**Stop here.**
-
----
-
-## Phase 3 — Validator + DnssecValidationMiddleware
-
-**Status: done.**
-
-**Goal:** Local validation on middleware hops; set AD / honor CD / SERVFAIL.
-
-**Done when:**
-
-- [x] Trust anchors in DNS config (default root DS)
-- [x] `IDnssecValidator` with BCL crypto: RSASHA256 (8), ECDSAP256SHA256 (13); NSEC proofs (NSEC3 can wait)
-- [x] `DnssecScope` created per client query, passed on every re-entry
-- [x] `DnssecValidationMiddleware` decorator:
-  - Upstream hops: validate into scope
-  - Client-facing: set AD; CD=1 returns data if bogus; CD=0 + bogus → SERVFAIL
-  - Do not copy forwarder upstream AD
-- [x] Basic unit tests with known signature vectors
-
-**Stop here.**
+- [x] Unified configuration `Routes` mapping domains to nameserver IPs.
+- [x] Deleted `ForwardResolver` in favor of `RecursiveRootResolver` (acting as RouteResolver).
+- [x] `RecursiveRootResolver` queries for `NS` and requested target type in parallel to support stub domains natively.
 
 ---
 

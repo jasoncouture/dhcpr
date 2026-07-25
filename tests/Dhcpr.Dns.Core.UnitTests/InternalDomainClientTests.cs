@@ -29,11 +29,11 @@ public class InternalDomainClientTests
     }
 
     [Fact]
-    public async Task SendAsync_PropagatesHopDepth_OnReentry()
+    public async Task SendAsync_DirectedUpstream_DoesNotConsumeBudgetOrIncrementDepth()
     {
         var queue = new CountingQueue();
         var client = new InternalDomainClient(queue);
-        var budget = new QueryWorkBudget();
+        var budget = new QueryWorkBudget(limit: 1);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
             InternalHopDepth = 3,
@@ -48,9 +48,39 @@ public class InternalDomainClientTests
 
         Assert.Equal(1, queue.EnqueueCount);
         Assert.NotNull(queue.LastMessage);
-        Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
+        Assert.Equal(3, queue.LastMessage!.Context.InternalHopDepth);
         Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
-        Assert.True(queue.LastMessage.Context.IsInternal);
+        Assert.True(budget.TryConsume());
+
+        queue.LastMessage.TaskCompletionSource.TrySetResult(
+            DomainMessage.CreateResponse(
+                queue.LastMessage.Context.DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.NoError));
+
+        await sendTask;
+    }
+
+    [Fact]
+    public async Task SendAsync_Undirected_IncrementsHopDepthAndConsumesBudget()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue);
+        var budget = new QueryWorkBudget(limit: 1);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            InternalHopDepth = 3,
+            WorkBudget = budget
+        };
+
+        var sendTask = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("ns.example.com"),
+            CancellationToken.None).AsTask();
+
+        Assert.Equal(1, queue.EnqueueCount);
+        Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
+        Assert.False(budget.TryConsume());
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(
             DomainMessage.CreateResponse(

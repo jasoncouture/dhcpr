@@ -39,16 +39,19 @@ public class InternalDomainClient : IInternalDomainClient
         ImmutableArray<IPEndPoint> upstreamEndpoints,
         CancellationToken cancellationToken)
     {
-        var depth = parentContext.InternalHopDepth + 1;
-        if (depth > MaxInternalHops)
-            return ServFail(message);
+        var directed = !upstreamEndpoints.IsDefaultOrEmpty;
+        var depth = parentContext.InternalHopDepth + (directed ? 0 : 1);
 
-        if (parentContext.WorkBudget is { } budget && !budget.TryConsume())
-            return ServFail(message);
+        if (!directed)
+        {
+            if (depth > MaxInternalHops)
+                return ServFail(message);
 
-        ImmutableArray<IPEndPoint>? endpoints = upstreamEndpoints.IsDefaultOrEmpty
-            ? null
-            : upstreamEndpoints;
+            if (parentContext.WorkBudget is { } budget && !budget.TryConsume())
+                return ServFail(message);
+        }
+
+        ImmutableArray<IPEndPoint>? endpoints = directed ? upstreamEndpoints : null;
 
         var context = new DomainMessageContext(
             parentContext.ClientEndPoint,
@@ -57,7 +60,7 @@ public class InternalDomainClient : IInternalDomainClient
         {
             UpstreamEndpoints = endpoints,
             IsInternal = true,
-            InternalHopDepth = depth,
+            InternalHopDepth = directed ? parentContext.InternalHopDepth : depth,
             DnssecScope = parentContext.DnssecScope,
             WorkBudget = parentContext.WorkBudget
         };

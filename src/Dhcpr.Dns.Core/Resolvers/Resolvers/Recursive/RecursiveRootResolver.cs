@@ -98,7 +98,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
 
                 var targetResponse = await targetTask;
                 if (targetResponse.Records.Answers.Length > 0 ||
-                    targetResponse.Flags.ResponseCode == DomainResponseCode.NameError)
+                    (targetResponse.Flags.Authoritative &&
+                     targetResponse.Flags.ResponseCode == DomainResponseCode.NameError))
                 {
                     return targetResponse with { Id = context.DomainMessage.Id };
                 }

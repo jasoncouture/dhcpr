@@ -1,5 +1,12 @@
 replicaCount: 1
 
+# Deployment rollout strategy (apps/v1 DeploymentStrategy).
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 3
+
 nameOverride: ""
 fullnameOverride: ""
 

@@ -11,7 +11,6 @@ public sealed class DnsResponseCache : IDnsResponseCache
 {
     private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MaxCacheTtl = TimeSpan.FromHours(1);
-    private static readonly TimeSpan SlidingExpiration = TimeSpan.FromMinutes(1);
 
     private readonly IMemoryCache _memoryCache;
 
@@ -88,7 +87,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = lifetime,
-            SlidingExpiration = SlidingExpiration,
+            SlidingExpiration = lifetime / 4,
             Size = 1
         });
         return true;

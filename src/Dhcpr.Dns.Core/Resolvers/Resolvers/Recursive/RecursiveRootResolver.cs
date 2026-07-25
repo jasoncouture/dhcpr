@@ -132,7 +132,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
             if (result.Records.Answers.Length != 0 ||
                 clonedRequest.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
             {
-                return result;
+                return FinalizeRecursiveResponse(context.DomainMessage, result);
             }
 
             clonedRequest = clonedRequest with
@@ -145,10 +145,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
             if (cnameResponse.Records.Answers.Length > 0 &&
                 cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
             {
-                return cnameResponse;
+                return FinalizeRecursiveResponse(context.DomainMessage, cnameResponse);
             }
 
-            return result;
+            return FinalizeRecursiveResponse(context.DomainMessage, result);
         }
         catch (Exception ex)
         {
@@ -202,15 +202,26 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
                 referralAddresses.AddRange(
                     await ResolveNameserverAddressesAsync(parentContext, nsNames, endPoints, cancellationToken));
                 if (referralAddresses.Count == 0)
-                    return last;
+                    return ServFail(request);
             }
 
             endPoints.Clear();
             endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
         }
 
-        return last!;
+        return IsUnresolvedReferral(last!) ? ServFail(request) : last!;
     }
+
+    private static DomainMessage FinalizeRecursiveResponse(DomainMessage request, DomainMessage response)
+        => IsUnresolvedReferral(response) ? ServFail(request) : response with { Id = request.Id };
+
+    private static DomainMessage ServFail(DomainMessage request)
+        => DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+
+    private static bool IsUnresolvedReferral(DomainMessage message)
+        => message.Records.Answers.Length == 0
+           && message.Flags.ResponseCode is DomainResponseCode.NoError
+           && message.Records.Any(r => r.Type is DomainRecordType.NS);
 
     private async ValueTask<List<IPAddress>> ResolveNameserverAddressesAsync(
         DomainMessageContext parentContext,

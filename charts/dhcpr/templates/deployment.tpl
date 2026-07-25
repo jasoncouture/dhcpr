@@ -14,7 +14,7 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0
-      maxSurge: 1
+      maxSurge: 3
   selector:
     matchLabels:
       {{- include "dhcpr.labels" . | nindent 6 }}

@@ -6,6 +6,9 @@
 **/dev.db-shm
 **/dev.db-wal
 
+# Downloaded DNS root zone cache
+root.zone
+
 # User-specific files
 *.rsuser
 *.suo

@@ -2,6 +2,7 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol.Zone;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,18 +17,18 @@ public sealed class RootServerTipsBootstrapService : IHostedService
 {
     private readonly RootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
-    private readonly NamedRootHttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootServerTipsBootstrapService> _logger;
 
     public RootServerTipsBootstrapService(
         RootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
-        NamedRootHttpClient httpClient,
+        IServiceScopeFactory scopeFactory,
         ILogger<RootServerTipsBootstrapService> logger)
     {
         _tips = tips;
         _options = options;
-        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -64,7 +65,9 @@ public sealed class RootServerTipsBootstrapService : IHostedService
         {
             try
             {
-                using var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var http = scope.ServiceProvider.GetRequiredService<NamedRootHttpClient>();
+                using var response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var addresses = ZoneFileParser.ParseNamedRootAddresses(text);

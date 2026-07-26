@@ -1,5 +1,6 @@
 using Dhcpr.Dns.Core.Protocol.Zone;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,20 +12,20 @@ public sealed class RootZoneRefreshService : BackgroundService
     private readonly RootZoneStore _store;
     private readonly IRootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
-    private readonly RootZoneHttpClient _httpClient;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootZoneRefreshService> _logger;
 
     public RootZoneRefreshService(
         RootZoneStore store,
         IRootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
-        RootZoneHttpClient httpClient,
+        IServiceScopeFactory scopeFactory,
         ILogger<RootZoneRefreshService> logger)
     {
         _store = store;
         _tips = tips;
         _options = options;
-        _httpClient = httpClient;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -58,9 +59,9 @@ public sealed class RootZoneRefreshService : BackgroundService
         var path = RootZonePaths.GetRootZonePath(_options);
         try
         {
-            using var response = await _httpClient
-                .GetRootZoneAsync(cancellationToken)
-                .ConfigureAwait(false);
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var http = scope.ServiceProvider.GetRequiredService<RootZoneHttpClient>();
+            using var response = await http.GetRootZoneAsync(cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             var text = System.Text.Encoding.UTF8.GetString(bytes);

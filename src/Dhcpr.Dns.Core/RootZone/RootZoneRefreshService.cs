@@ -11,14 +11,14 @@ public sealed class RootZoneRefreshService : BackgroundService
     private readonly RootZoneStore _store;
     private readonly IRootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
-    private readonly HttpClient _httpClient;
+    private readonly RootZoneHttpClient _httpClient;
     private readonly ILogger<RootZoneRefreshService> _logger;
 
     public RootZoneRefreshService(
         RootZoneStore store,
         IRootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
-        HttpClient httpClient,
+        RootZoneHttpClient httpClient,
         ILogger<RootZoneRefreshService> logger)
     {
         _store = store;
@@ -59,7 +59,7 @@ public sealed class RootZoneRefreshService : BackgroundService
         try
         {
             using var response = await _httpClient
-                .GetAsync(RootZonePaths.RootZoneUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .GetRootZoneAsync(cancellationToken)
                 .ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);

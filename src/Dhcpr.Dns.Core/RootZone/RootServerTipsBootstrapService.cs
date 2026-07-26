@@ -16,13 +16,13 @@ public sealed class RootServerTipsBootstrapService : IHostedService
 {
     private readonly RootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
-    private readonly HttpClient _httpClient;
+    private readonly NamedRootHttpClient _httpClient;
     private readonly ILogger<RootServerTipsBootstrapService> _logger;
 
     public RootServerTipsBootstrapService(
         RootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
-        HttpClient httpClient,
+        NamedRootHttpClient httpClient,
         ILogger<RootServerTipsBootstrapService> logger)
     {
         _tips = tips;

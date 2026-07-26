@@ -25,13 +25,8 @@ public static class DnsServiceProviderExtensions
         });
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
-        services.AddSingleton(_ =>
-        {
-            // InterNIC returns 403 without a User-Agent.
-            var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("dhcpr/1.0");
-            return client;
-        });
+        services.AddHttpClient<NamedRootHttpClient>(ConfigureInternicHttpClient);
+        services.AddHttpClient<RootZoneHttpClient>(ConfigureInternicHttpClient);
         services.AddSingleton<RootServerTips>();
         services.AddSingleton<IRootServerTips>(static sp => sp.GetRequiredService<RootServerTips>());
         services.AddSingleton<RootZoneStore>();
@@ -73,6 +68,13 @@ public static class DnsServiceProviderExtensions
             .BindConfiguration("DNS:RootServers")
             .Validate(static o => o.Validate(), "Invalid DNS root server configuration");
         return services;
+    }
+
+    private static void ConfigureInternicHttpClient(HttpClient client)
+    {
+        // InterNIC returns 403 without a User-Agent.
+        client.Timeout = TimeSpan.FromMinutes(5);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("dhcpr/1.0");
     }
 }
 

@@ -39,6 +39,52 @@ public class DomainClientParallelWrapperTests
     }
 
     [Fact]
+    public async Task PrefersNoErrorOverFasterNameError()
+    {
+        var nameError = CreateResponse(DomainResponseCode.NameError, truncated: false);
+        var success = CreateResponse(DomainResponseCode.NoError, truncated: false);
+
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            new DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
+            new DelayedClient(success, TimeSpan.FromMilliseconds(50))
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        Assert.Equal(DomainResponseCode.NoError, result.Flags.ResponseCode);
+    }
+
+    [Fact]
+    public async Task NameErrorWithPeerTransportFailureDoesNotReturnNameError()
+    {
+        var nameError = CreateResponse(DomainResponseCode.NameError, truncated: false);
+
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            new DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
+            new ThrowingClient(new IOException("timed out"))
+        });
+
+        await Assert.ThrowsAnyAsync<Exception>(async () =>
+            await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AllNameErrorResponsesReturnNameError()
+    {
+        var nameError = CreateResponse(DomainResponseCode.NameError, truncated: false);
+
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            new DelayedClient(nameError, TimeSpan.Zero),
+            new DelayedClient(nameError, TimeSpan.Zero)
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        Assert.Equal(DomainResponseCode.NameError, result.Flags.ResponseCode);
+    }
+
+    [Fact]
     public async Task SkipsTruncatedResponsesWhenBetterResponseExists()
     {
         var truncated = CreateResponse(DomainResponseCode.NoError, truncated: true);
@@ -120,6 +166,16 @@ public class DomainClientParallelWrapperTests
             CallCount++;
             return ValueTask.FromResult(_response with { Id = message.Id });
         }
+    }
+
+    private sealed class ThrowingClient : IDomainClient
+    {
+        private readonly Exception _exception;
+
+        public ThrowingClient(Exception exception) => _exception = exception;
+
+        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
+            => ValueTask.FromException<DomainMessage>(_exception);
     }
 
     private sealed class TokenObservingClient : IDomainClient

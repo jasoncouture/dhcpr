@@ -23,6 +23,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         using var tasks = _innerClients.Select(i => i.SendAsync(message, source.Token).AsTask()).ToPooledList();
         using var exceptions = ListPool<Exception>.Default.Get();
         DomainMessage? truncatedFallback = null;
+        DomainMessage? nameErrorFallback = null;
 
         while (tasks.Count > 0)
         {
@@ -31,15 +32,22 @@ public sealed class DomainClientParallelWrapper : IDomainClient
             try
             {
                 var result = await completed;
-                if (!IsAcceptableResponse(result))
+                if (result.Flags.Truncated)
                 {
-                    if (result.Flags.Truncated)
-                        truncatedFallback ??= result;
+                    truncatedFallback ??= result;
                     continue;
                 }
 
-                CancelRemaining(tasks, source);
-                return result;
+                // Only NOERROR wins immediately. NXDOMAIN must wait for the rest of the race —
+                // a lame/unreachable peer timing out must not let a single NXDOMAIN win.
+                if (result.Flags.ResponseCode is DomainResponseCode.NoError)
+                {
+                    CancelRemaining(tasks, source);
+                    return result;
+                }
+
+                if (result.Flags.ResponseCode is DomainResponseCode.NameError)
+                    nameErrorFallback ??= result;
             }
             catch (AggregateException ex)
             {
@@ -55,24 +63,20 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         if (truncatedFallback is not null)
             return truncatedFallback;
 
-        // Prefer a SERVFAIL response over throwing — callers can try more nameservers.
+        // Transport failures in the batch: do not promote a raced NXDOMAIN to a final answer.
         if (exceptions.Count == 1 && NameserverSelection.IsTransportFailure(exceptions[0]))
             throw new InvalidOperationException("DNS Query failed", exceptions[0]);
         if (exceptions.Count > 1 && exceptions.All(NameserverSelection.IsTransportFailure))
             throw new AggregateException(exceptions);
 
+        if (nameErrorFallback is not null && exceptions.Count == 0)
+            return nameErrorFallback;
+
+        // Prefer a SERVFAIL response over throwing — callers can try more nameservers.
         return DomainMessage.CreateResponse(
             message,
             DomainResourceRecords.Empty,
             DomainResponseCode.ServerFailure);
-    }
-
-    private static bool IsAcceptableResponse(DomainMessage result)
-    {
-        if (result.Flags.Truncated)
-            return false;
-
-        return result.Flags.ResponseCode is DomainResponseCode.NoError or DomainResponseCode.NameError;
     }
 
     private static void CancelRemaining(PooledList<Task<DomainMessage>> tasks, CancellationTokenSource source)

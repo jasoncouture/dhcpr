@@ -30,7 +30,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
-        services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
+        services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
         // Outermost last: Metrics → Logging → Dnssec → CanonicalName → Cache → resolver
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();

@@ -42,7 +42,7 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
         IEnumerable<DomainResourceRecord>? answers = null,
         IEnumerable<DomainResourceRecord>? authorities = null,
         IEnumerable<DomainResourceRecord>? additional = null,
-        DomainResponseCode responseCode = DomainResponseCode.NameError
+        DomainResponseCode responseCode = DomainResponseCode.ServerFailure
     )
     {
 
@@ -64,7 +64,7 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
     public static DomainMessage CreateResponse(
         DomainMessage request,
         DomainResourceRecords resourceRecords,
-        DomainResponseCode responseCode = DomainResponseCode.NameError
+        DomainResponseCode responseCode = DomainResponseCode.ServerFailure
 
     )
     {

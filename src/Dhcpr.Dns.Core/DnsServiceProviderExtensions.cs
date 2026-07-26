@@ -25,7 +25,13 @@ public static class DnsServiceProviderExtensions
         });
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
-        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromMinutes(5) });
+        services.AddSingleton(_ =>
+        {
+            // InterNIC returns 403 without a User-Agent.
+            var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("dhcpr/1.0");
+            return client;
+        });
         services.AddSingleton<RootServerTips>();
         services.AddSingleton<IRootServerTips>(static sp => sp.GetRequiredService<RootServerTips>());
         services.AddSingleton<RootZoneStore>();

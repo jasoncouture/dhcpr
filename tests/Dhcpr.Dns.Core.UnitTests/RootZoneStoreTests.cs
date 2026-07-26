@@ -37,4 +37,27 @@ public class RootZoneStoreTests
 
         Assert.Equal(loadedAt + TimeSpan.FromSeconds(604800), snapshot.ExpiresAt);
     }
+
+    [Fact]
+    public void TimeUntilRefresh_SkipsDownloadWhileWithinSoaRefresh()
+    {
+        var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));
+        var loadedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
+        var snapshot = ZoneFileParser.ParseRootZone(text, loadedAt);
+
+        var delay = RootZoneRefreshService.TimeUntilRefresh(snapshot, DateTimeOffset.UtcNow);
+
+        Assert.True(delay > TimeSpan.FromMinutes(20));
+        Assert.True(delay <= snapshot.Soa.RefreshInterval);
+    }
+
+    [Fact]
+    public void TimeUntilRefresh_ZeroWhenRefreshDue()
+    {
+        var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));
+        var loadedAt = DateTimeOffset.UtcNow - TimeSpan.FromHours(2);
+        var snapshot = ZoneFileParser.ParseRootZone(text, loadedAt);
+
+        Assert.Equal(TimeSpan.Zero, RootZoneRefreshService.TimeUntilRefresh(snapshot, DateTimeOffset.UtcNow));
+    }
 }

@@ -56,6 +56,20 @@ public sealed class RootZoneRefreshService : BackgroundService
             return TimeSpan.FromSeconds(30);
         }
 
+        var current = _store.CurrentIgnoringExpiry;
+        if (current is not null)
+        {
+            var delay = TimeUntilRefresh(current, DateTimeOffset.UtcNow);
+            if (delay > TimeSpan.Zero)
+            {
+                _logger.LogInformation(
+                    "root.zone still fresh (mtime {LoadedAt:u}); next refresh in {Delay}s",
+                    current.LoadedAt,
+                    (int)delay.TotalSeconds);
+                return delay;
+            }
+        }
+
         var path = RootZonePaths.GetRootZonePath(_options);
         try
         {
@@ -77,7 +91,7 @@ public sealed class RootZoneRefreshService : BackgroundService
             _store.Set(snapshot);
 
             _logger.LogInformation(
-                "Loaded root.zone ({Count} owners, refresh={Refresh}s, expire={Expire}s)",
+                "Downloaded root.zone ({Count} owners, refresh={Refresh}s, expire={Expire}s)",
                 snapshot.RecordsByOwner.Count,
                 (int)snapshot.Soa.RefreshInterval.TotalSeconds,
                 (int)snapshot.Soa.ExpireInterval.TotalSeconds);
@@ -88,24 +102,24 @@ public sealed class RootZoneRefreshService : BackgroundService
         {
             _logger.LogWarning(ex, "Failed to refresh root.zone from {Url}", RootZonePaths.RootZoneUrl);
 
-            var current = _store.CurrentIgnoringExpiry;
-            if (current is null)
+            var cached = _store.CurrentIgnoringExpiry;
+            if (cached is null)
             {
                 await LoadFromDiskAsync(cancellationToken).ConfigureAwait(false);
-                current = _store.CurrentIgnoringExpiry;
+                cached = _store.CurrentIgnoringExpiry;
             }
 
-            if (current is null)
+            if (cached is null)
                 return TimeSpan.FromMinutes(5);
 
-            if (current.IsExpired(DateTimeOffset.UtcNow))
+            if (cached.IsExpired(DateTimeOffset.UtcNow))
             {
                 _store.Set(null);
                 _logger.LogWarning("Cached root.zone expired; falling back to live root queries");
-                return current.Soa.RetryInterval;
+                return cached.Soa.RetryInterval;
             }
 
-            return current.Soa.RetryInterval;
+            return cached.Soa.RetryInterval;
         }
     }
 
@@ -139,5 +153,12 @@ public sealed class RootZoneRefreshService : BackgroundService
         {
             _logger.LogWarning(ex, "Failed to load on-disk root.zone from {Path}", path);
         }
+    }
+
+    public static TimeSpan TimeUntilRefresh(RootZoneSnapshot snapshot, DateTimeOffset utcNow)
+    {
+        var due = snapshot.LoadedAt + snapshot.Soa.RefreshInterval;
+        var remaining = due - utcNow;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 }

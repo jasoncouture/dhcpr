@@ -33,7 +33,6 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
         // Outermost last: Metrics → Logging → Dnssec → CanonicalName → Cache → resolver
-        // CanonicalName must wrap Cache so CNAME-only hits are still chased to A/AAAA.
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();

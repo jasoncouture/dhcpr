@@ -4,6 +4,7 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using NSubstitute;
@@ -58,15 +59,62 @@ public class QueryLoggingDomainMessageMiddlewareTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage?>(response));
 
-        var middleware = new QueryLoggingDomainMessageMiddleware(
-            inner,
-            NullLogger<QueryLoggingDomainMessageMiddleware>.Instance);
+        var logger = new CountingLogger();
+        var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
 
-        var internalEndPoint = new IPEndPoint(IPAddress.Any, 53);
-        var context = new DomainMessageContext(internalEndPoint, internalEndPoint, request);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request)
+        {
+            IsInternal = true
+        };
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
+        Assert.Equal(0, logger.InformationCount);
         await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LogsExternalRequests()
+    {
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+
+        var logger = new CountingLogger();
+        var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
+
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Equal(1, logger.InformationCount);
+    }
+
+    private sealed class CountingLogger : ILogger<QueryLoggingDomainMessageMiddleware>
+    {
+        public int InformationCount { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Information)
+                InformationCount++;
+        }
     }
 }

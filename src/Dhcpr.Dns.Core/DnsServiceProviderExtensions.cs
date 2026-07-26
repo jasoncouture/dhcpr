@@ -2,6 +2,7 @@
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Configuration;
@@ -28,6 +29,7 @@ public static class DnsServiceProviderExtensions
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
+        services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, NameErrorDomainMiddleware>();
         // Outermost last: Logging → DnssecValidation → Cache → CanonicalName → resolver

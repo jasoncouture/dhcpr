@@ -8,12 +8,17 @@ namespace Dhcpr.Dns.Core;
 public sealed class DnsConfiguration : IValidateSelf
 {
     public RootServerConfiguration RootServers { get; set; } = new();
+
+    /// <summary>
+    /// Conditional forwarder map: longest domain suffix → upstream nameserver endpoints.
+    /// Empty means all names fall through to recursive resolution.
+    /// </summary>
     public Dictionary<string, string[]> Routes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     private Dictionary<string, IPEndPoint[]> _parsedRoutes = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyDictionary<string, IPEndPoint[]> GetParsedRoutes() => _parsedRoutes;
-    
+
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
     public DnsListenEndpoint[] GetListenEndpoints() => ListenAddresses.GetListenEndpoints();
@@ -38,12 +43,7 @@ public sealed class DnsConfiguration : IValidateSelf
             return false;
         }
 
-        if (Routes is null || Routes.Count == 0)
-        {
-            error = "DNS:Routes is missing or empty";
-            return false;
-        }
-
+        Routes ??= new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         _parsedRoutes = new Dictionary<string, IPEndPoint[]>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var route in Routes)
@@ -62,14 +62,11 @@ public sealed class DnsConfiguration : IValidateSelf
                     error = $"DNS:Routes[\"{route.Key}\"] contains an invalid endpoint URI: {route.Value[i]}";
                     return false;
                 }
+
                 endpoints[i] = (IPEndPoint)endpoint;
             }
-            _parsedRoutes[route.Key] = endpoints;
-        }
 
-        if (!_parsedRoutes.ContainsKey("."))
-        {
-            _parsedRoutes["."] = RootServers.Addresses.GetEndPoints();
+            _parsedRoutes[route.Key] = endpoints;
         }
 
         if (ListenAddresses is null || ListenAddresses.Length == 0)

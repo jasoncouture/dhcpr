@@ -38,16 +38,16 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ---
 
-## Foundational: Unified Route Resolver
+## Foundational: Separate Forward + Recursive Resolvers
 
 **Status: done.**
 
-**Goal:** Consolidate DNS forwarding and recursion into a single routing system capable of handling both full authoritative delegations and stub forwarders seamlessly.
+**Goal:** Keep conditional forwarding and internet recursion on separate middleware paths.
 
 **Done when:**
-- [x] Unified configuration `Routes` mapping domains to nameserver IPs.
-- [x] Deleted `ForwardResolver` in favor of `RecursiveRootResolver` (acting as RouteResolver).
-- [x] `RecursiveRootResolver` queries for `NS` and requested target type in parallel to support stub domains natively.
+- [x] `DNS:Routes` maps domain suffixes to forwarder endpoints (longest-suffix match).
+- [x] `ForwardResolver` (priority 500) handles route matches via directed upstream queries.
+- [x] `RecursiveRootResolver` (priority 5000) is roots-only sequential NS descent from `RootServers`.
 
 ---
 

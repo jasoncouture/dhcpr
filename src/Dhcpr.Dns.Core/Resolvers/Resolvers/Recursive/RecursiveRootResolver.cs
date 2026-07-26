@@ -13,41 +13,25 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposable
+public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
-    private const int MaxParallelNameservers = 3;
-
     private readonly IInternalDomainClient _internalClient;
     private readonly ILogger<RecursiveRootResolver> _logger;
-    private DnsConfiguration _configuration;
-    private readonly IDisposable? _subscription;
+    private readonly ImmutableArray<IPEndPoint> _servers;
 
     public RecursiveRootResolver(
-        IOptionsMonitor<DnsConfiguration> configuration,
+        IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
         IInternalDomainClient internalClient,
         ILogger<RecursiveRootResolver> logger
     )
     {
-        _configuration = configuration.CurrentValue;
-        _subscription = configuration.OnChange(c => _configuration = c);
+        _servers = rootServerConfiguration.CurrentValue.Addresses
+            .Select(i => i.GetEndPoint(53))
+            .Cast<IPEndPoint>()
+            .OrderBy(_ => Random.Shared.Next())
+            .ToImmutableArray();
         _internalClient = internalClient;
         _logger = logger;
-    }
-
-    private IPEndPoint[] GetBestRoute(DomainLabels name)
-    {
-        var routes = _configuration.GetParsedRoutes();
-        for (var i = 0; i < name.Labels.Length; i++)
-        {
-            var suffix = string.Join(".", name.Labels.Skip(i).Select(l => l.Label));
-            if (routes.TryGetValue(suffix, out var endpoints))
-                return endpoints;
-        }
-
-        if (routes.TryGetValue(".", out var defaultEndpoints))
-            return defaultEndpoints;
-
-        return Array.Empty<IPEndPoint>();
     }
 
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
@@ -60,11 +44,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
         var question = context.DomainMessage.Questions[0];
         var remainingLabels = question.Name.Labels;
         using var endPoints = ListPool<IPEndPoint>.Default.Get();
-        
-        // Find best matching route
-        var routeAddresses = GetBestRoute(question.Name);
-        endPoints.AddRange(routeAddresses);
-        
+        endPoints.AddRange(_servers);
         using var zoneLabels = ListPool<DomainLabel>.Default.Get();
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
@@ -84,27 +64,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
                     break;
                 }
 
-                var nsMessage = DomainMessage.CreateRequest(
+                var message = DomainMessage.CreateRequest(
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var targetMessage = DomainMessage.CreateRequest(
-                    question.Name,
-                    question.Type);
-
-                var nsTask = QueryUpstreamAsync(context, nsMessage, endPoints, cancellationToken).AsTask();
-                var targetTask = QueryUpstreamAsync(context, targetMessage, endPoints, cancellationToken).AsTask();
-                await Task.WhenAll(nsTask, targetTask);
-
-                var targetResponse = await targetTask;
-                if (targetResponse.Records.Answers.Length > 0 ||
-                    (targetResponse.Flags.Authoritative &&
-                     targetResponse.Flags.ResponseCode == DomainResponseCode.NameError))
-                {
-                    return targetResponse with { Id = context.DomainMessage.Id };
-                }
-
-                var responseMessage = await nsTask;
+                var responseMessage = await QueryUpstreamAsync(context, message, endPoints, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
@@ -168,9 +132,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
+        // Pass the full nameserver set; UpstreamQueryMiddleware races small batches and
+        // only SERVFAILs after every endpoint has failed at the transport layer.
         var upstream = endPoints
             .OrderBy(_ => Random.Shared.Next())
-            .Take(MaxParallelNameservers)
             .ToImmutableArray();
         return await _internalClient.SendAsync(parentContext, message, upstream, cancellationToken);
     }
@@ -233,7 +198,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
         // If it's out-of-bailiwick, we MUST do a full recursive lookup from the root.
         // Otherwise, we end up querying the current nameservers for a domain they don't own,
         // and they will return REFUSED or NXDOMAIN.
-        
+
         using var nameserverQueries = nsNames
             .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
                 new[]
@@ -291,9 +256,4 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware, IDisposabl
 
     public string Name { get; } = "Recursive Resolver";
     public int Priority { get; } = 5000;
-
-    public void Dispose()
-    {
-        _subscription?.Dispose();
-    }
 }

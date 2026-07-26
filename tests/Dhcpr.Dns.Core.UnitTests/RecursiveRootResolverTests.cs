@@ -343,23 +343,13 @@ public class RecursiveRootResolverTests
 
     private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
     {
-        var configuration = new DnsConfiguration
+        var rootServers = new RootServerConfiguration
         {
-            RootServers = new RootServerConfiguration
-            {
-                Addresses = new[] { RootServer.ToString() }
-            },
-            Routes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["."] = new[] { RootServer.ToString() }
-            },
-            ListenAddresses = new[] { "udp://127.0.0.1:5353" }
+            Addresses = new[] { RootServer.ToString() }
         };
 
-        Assert.True(configuration.Validate());
-
         return new RecursiveRootResolver(
-            new TestOptionsMonitor(configuration),
+            new TestOptionsMonitor(rootServers),
             internalClient,
             NullLogger<RecursiveRootResolver>.Instance);
     }
@@ -411,12 +401,12 @@ public class RecursiveRootResolverTests
         => new(new DomainLabels(owner), DomainRecordType.A, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new IPAddressData(address));
 
-    private sealed class TestOptionsMonitor : IOptionsMonitor<DnsConfiguration>
+    private sealed class TestOptionsMonitor : IOptionsMonitor<RootServerConfiguration>
     {
-        public TestOptionsMonitor(DnsConfiguration current) => CurrentValue = current;
-        public DnsConfiguration CurrentValue { get; }
-        public DnsConfiguration Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<DnsConfiguration, string?> listener) => null;
+        public TestOptionsMonitor(RootServerConfiguration current) => CurrentValue = current;
+        public RootServerConfiguration CurrentValue { get; }
+        public RootServerConfiguration Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<RootServerConfiguration, string?> listener) => null;
     }
 
     /// <summary>

@@ -208,6 +208,76 @@ public class CanonicalNameResolverDecoratorTests
         Assert.Equal(address, ((IPAddressData)result.Records.Answers[2].Data).Address);
     }
 
+    [Fact]
+    public async Task FailedChaseReturnsServerFailureNotPartialCnameChain()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("www.example"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels("missing.example")))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        var internalClient = CreateInternalClient(request =>
+            DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure));
+
+        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        var result = await decorator.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.example", DomainRecordType.A)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
+        Assert.Empty(result.Records.Answers);
+    }
+
+    [Fact]
+    public async Task TipNameErrorReturnsNxDomainWithCnameChain()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("www.example"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels("gone.example")))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        var internalClient = CreateInternalClient(request =>
+            DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.NameError));
+
+        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        var result = await decorator.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.example", DomainRecordType.A)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.CNAME);
+    }
+
     private static IInternalDomainClient CreateInternalClient(Func<DomainMessage, DomainMessage> handler)
     {
         var client = Substitute.For<IInternalDomainClient>();

@@ -8,6 +8,20 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class DomainClientParallelWrapperTests
 {
     [Fact]
+    public async Task AllUnacceptableResponsesReturnServerFailure()
+    {
+        var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            new DelayedClient(failure, TimeSpan.Zero),
+            new DelayedClient(failure, TimeSpan.Zero)
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
+    }
+
+    [Fact]
     public async Task PrefersNoErrorOverServerFailure()
     {
         var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);

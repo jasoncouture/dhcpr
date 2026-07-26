@@ -53,15 +53,14 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var existing in result.Records.Answers.Where(r => r.Type is DomainRecordType.CNAME))
-        {
-            if (existing.Data is NameData existingTarget)
-                seen.Add(existing.Name.ToString());
-        }
+            seen.Add(existing.Name.ToString());
+
+        DomainMessage? lastChase = null;
 
         for (var depth = 0; depth < MaxCnameDepth; depth++)
         {
             if (result.Records.Answers.Any(i => i.Type == questionType))
-                break;
+                return result;
 
             var nextTarget = GetTerminalCnameTarget(result.Records.Answers);
             if (nextTarget is null)
@@ -76,8 +75,14 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                 .AsTask()
                 .ConvertExceptionsToNull();
 
-            if (nextResponse is null || nextResponse.Records.Answers.Length == 0)
-                break;
+            if (nextResponse is null)
+                return ServFail(context.DomainMessage);
+
+            lastChase = nextResponse;
+
+            if (nextResponse.Flags.ResponseCode is DomainResponseCode.ServerFailure
+                or DomainResponseCode.Refused)
+                return ServFail(context.DomainMessage);
 
             var chasedCnames = nextResponse.Records.Answers
                 .Where(i => i.Type is DomainRecordType.CNAME)
@@ -85,7 +90,6 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
 
             if (chasedCnames.Length > 0)
             {
-                // Further CNAMEs: keep the chain, ignore any bundled addresses, continue.
                 result = result with
                 {
                     Records = result.Records with
@@ -102,25 +106,75 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
             var chasedAddresses = nextResponse.Records.Answers
                 .Where(i => i.Type == questionType)
                 .ToImmutableArray();
-            if (chasedAddresses.Length == 0)
-                break;
 
-            result = result with
+            if (chasedAddresses.Length > 0)
             {
+                return result with
+                {
+                    Flags = result.Flags with { ResponseCode = DomainResponseCode.NoError },
+                    Records = result.Records with
+                    {
+                        Answers = result.Records.Answers.Concat(chasedAddresses).ToImmutableArray()
+                    }
+                };
+            }
+
+            // Tip had no CNAME and no address of the requested type.
+            if (nextResponse.Flags.ResponseCode is DomainResponseCode.NameError)
+            {
+                return result with
+                {
+                    Flags = result.Flags with { ResponseCode = DomainResponseCode.NameError },
+                    Records = result.Records with
+                    {
+                        Answers = result.Records.Answers,
+                        Authorities = nextResponse.Records.Authorities,
+                        Additional = ImmutableArray<DomainResourceRecord>.Empty
+                    }
+                };
+            }
+
+            // NODATA at tip: name exists, no QTYPE — keep CNAME chain, NOERROR.
+            return result with
+            {
+                Flags = result.Flags with { ResponseCode = DomainResponseCode.NoError },
                 Records = result.Records with
                 {
-                    Answers = result.Records.Answers.Concat(chasedAddresses).ToImmutableArray()
+                    Answers = result.Records.Answers,
+                    Authorities = nextResponse.Records.Authorities,
+                    Additional = ImmutableArray<DomainResourceRecord>.Empty
                 }
             };
-            break;
         }
 
-        return result;
+        // Could not complete the chase (loop / depth / missing tip).
+        if (result.Records.Answers.Any(i => i.Type == questionType))
+            return result;
+
+        if (lastChase?.Flags.ResponseCode is DomainResponseCode.NameError)
+        {
+            return result with
+            {
+                Flags = result.Flags with { ResponseCode = DomainResponseCode.NameError },
+                Records = result.Records with
+                {
+                    Authorities = lastChase.Records.Authorities,
+                    Additional = ImmutableArray<DomainResourceRecord>.Empty
+                }
+            };
+        }
+
+        return ServFail(context.DomainMessage);
     }
+
+    private static DomainMessage ServFail(DomainMessage request)
+        => DomainMessage.CreateResponse(
+            request,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.ServerFailure);
 
     private static DomainLabels? GetTerminalCnameTarget(ImmutableArray<DomainResourceRecord> answers)
     {
-        // Follow the chain already in Answers to the current tip.
         var targets = new Dictionary<string, DomainLabels>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var record in answers)
@@ -133,7 +187,6 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         if (targets.Count == 0)
             return null;
 
-        // Start from any owner that is not itself a target of another CNAME in the set.
         var start = targets.Keys.FirstOrDefault(owner =>
             !targets.Values.Any(t => t.ToString().Equals(owner, StringComparison.OrdinalIgnoreCase)));
         start ??= targets.Keys.First();

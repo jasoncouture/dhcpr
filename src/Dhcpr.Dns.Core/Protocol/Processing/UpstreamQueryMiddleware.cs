@@ -54,7 +54,14 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 
             try
             {
-                return await client.SendAsync(queryMessage, cancellationToken);
+                var result = await client.SendAsync(queryMessage, cancellationToken);
+                // Empty SERVFAIL from a batch means "no usable peer response" — try others first.
+                if (result.Flags.ResponseCode is DomainResponseCode.ServerFailure &&
+                    result.Records.Answers.Length == 0 &&
+                    remaining.Count > 0)
+                    continue;
+
+                return result;
             }
             catch (Exception ex) when (NameserverSelection.IsTransportFailure(ex))
             {
@@ -62,7 +69,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
             }
         }
 
-        // Every nameserver endpoint failed at the transport layer.
+        // Every nameserver endpoint failed.
         return DomainMessage.CreateResponse(
             context.DomainMessage,
             DomainResourceRecords.Empty,

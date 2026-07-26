@@ -55,11 +55,16 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         if (truncatedFallback is not null)
             return truncatedFallback;
 
-        if (exceptions.Count == 1)
+        // Prefer a SERVFAIL response over throwing — callers can try more nameservers.
+        if (exceptions.Count == 1 && NameserverSelection.IsTransportFailure(exceptions[0]))
             throw new InvalidOperationException("DNS Query failed", exceptions[0]);
-        if (exceptions.Count > 1)
+        if (exceptions.Count > 1 && exceptions.All(NameserverSelection.IsTransportFailure))
             throw new AggregateException(exceptions);
-        throw new InvalidOperationException("DNS Query failed: no usable response");
+
+        return DomainMessage.CreateResponse(
+            message,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.ServerFailure);
     }
 
     private static bool IsAcceptableResponse(DomainMessage result)

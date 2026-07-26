@@ -23,7 +23,6 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
-    /// <summary>Bound from config key <c>DNS:DOH</c> (DNS Over HTTP).</summary>
     [ConfigurationKeyName("DOH")]
     public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 

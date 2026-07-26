@@ -1,7 +1,7 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Client-facing HTTP/DoH query: same middleware pipeline as UDP/TCP, response via TCS.
+/// Client-facing DNS-over-HTTP query: same middleware pipeline as UDP/TCP, response via TCS.
 /// </summary>
 public sealed record HttpDnsPacketReceivedMessage(
     DomainMessageContext Context,

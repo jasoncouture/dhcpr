@@ -21,7 +21,7 @@ spec:
   hostnames:
     - {{ .Values.httpRoute.host | quote }}
   rules:
-    # Serves Prometheus /metrics and RFC 8484 DoH at /dns-query (plain HTTP to the pod;
+    # Serves Prometheus /metrics and RFC 8484 DNS-over-HTTP at /dns-query (plain HTTP to the pod;
     # TLS terminates on the Gateway).
     - matches:
         - path:

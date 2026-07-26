@@ -12,14 +12,14 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 public sealed class DnsQueryExecutor : IDnsQueryExecutor
 {
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
-    private readonly DoHConfiguration _doH;
+    private readonly DnsOverHttpConfiguration _dnsOverHttp;
 
     public DnsQueryExecutor(
         IMessageQueue<DnsPacketReceivedMessage> messageQueue,
         IOptions<DnsConfiguration> dnsConfiguration)
     {
         _messageQueue = messageQueue;
-        _doH = dnsConfiguration.Value.DoH ?? new DoHConfiguration();
+        _dnsOverHttp = dnsConfiguration.Value.DnsOverHttp ?? new DnsOverHttpConfiguration();
     }
 
     public async ValueTask<DnsQueryExecutionResult> ExecuteAsync(
@@ -31,7 +31,7 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
         if (requestWire.Length == 0)
             return DnsQueryExecutionResult.Fail(DnsQueryExecutionStatus.EmptyRequest);
 
-        if (requestWire.Length > _doH.MaxRequestBytes)
+        if (requestWire.Length > _dnsOverHttp.MaxRequestBytes)
             return DnsQueryExecutionResult.Fail(DnsQueryExecutionStatus.RequestTooLarge);
 
         DomainMessage request;

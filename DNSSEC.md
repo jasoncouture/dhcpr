@@ -83,7 +83,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 ## Out of scope
 
 - Authoritative zone signing / key rollover / CDS / CDNSKEY
-- DoT (DoH server: RFC 8484 `POST`/`GET` `/dns-query` on the ASP.NET host)
+- DoT (DNS-over-HTTP server: RFC 8484 `POST`/`GET` `/dns-query` on the ASP.NET host)
 - Blindly trusting upstream AD when forwarding
 
 ---

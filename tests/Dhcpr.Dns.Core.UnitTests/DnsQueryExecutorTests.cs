@@ -97,7 +97,7 @@ public class DnsQueryExecutorTests
     {
         var options = Options.Create(new DnsConfiguration
         {
-            DoH = new DoHConfiguration
+            DnsOverHttp = new DnsOverHttpConfiguration
             {
                 MaxRequestBytes = maxRequestBytes
             },

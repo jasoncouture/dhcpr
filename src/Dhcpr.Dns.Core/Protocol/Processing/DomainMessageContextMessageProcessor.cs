@@ -46,7 +46,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 
             // This is a directive to ignore the message.
             // The middleware may have responded to it, or may be blocking this client.
-            // Awaitable clients (internal / DoH) treat null as failure via TrySetResult(null).
+            // Awaitable clients (internal / DNS-over-HTTP) treat null as failure via TrySetResult(null).
             if (response is null)
             {
                 awaitable?.TaskCompletionSource.TrySetResult(null);

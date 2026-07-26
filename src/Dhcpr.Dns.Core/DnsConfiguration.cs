@@ -21,7 +21,7 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
-    public DoHConfiguration DoH { get; set; } = new();
+    public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 
     public DnsListenEndpoint[] GetListenEndpoints() => ListenAddresses.GetListenEndpoints();
 
@@ -96,10 +96,10 @@ public sealed class DnsConfiguration : IValidateSelf
             }
         }
 
-        DoH ??= new DoHConfiguration();
-        if (!DoH.Validate())
+        DnsOverHttp ??= new DnsOverHttpConfiguration();
+        if (!DnsOverHttp.Validate())
         {
-            error = "DNS:DoH:MaxRequestBytes must be between 1 and 65535";
+            error = "DNS:DnsOverHttp:MaxRequestBytes must be between 1 and 65535";
             return false;
         }
 

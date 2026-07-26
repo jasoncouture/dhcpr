@@ -1,6 +1,6 @@
 namespace Dhcpr.Dns.Core;
 
-public sealed class DoHConfiguration
+public sealed class DnsOverHttpConfiguration
 {
     /// <summary>Maximum accepted DNS wire payload (POST body or GET-decoded) in bytes.</summary>
     public int MaxRequestBytes { get; set; } = 65535;

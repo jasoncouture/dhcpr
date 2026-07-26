@@ -17,7 +17,7 @@ public static class DnsOverHttpEndpointExtensions
     // nginx-style "client closed request"; not defined on ASP.NET StatusCodes.
     private const int ClientClosedRequest = 499;
 
-    public static WebApplication MapDnsOverHttps(this WebApplication app)
+    public static WebApplication MapDnsOverHttp(this WebApplication app)
     {
         app.MapPost(DnsQueryPath, HandlePostAsync);
         app.MapGet(DnsQueryPath, HandleGetAsync);
@@ -33,7 +33,7 @@ public static class DnsOverHttpEndpointExtensions
         if (!IsDnsMessageContentType(httpContext.Request.ContentType))
             return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
 
-        var maxBytes = dnsOptions.Value.DoH.MaxRequestBytes;
+        var maxBytes = dnsOptions.Value.DnsOverHttp.MaxRequestBytes;
         if (httpContext.Request.ContentLength is > 0 and var contentLength && contentLength > maxBytes)
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
 
@@ -73,7 +73,7 @@ public static class DnsOverHttpEndpointExtensions
             return Results.BadRequest();
         }
 
-        if (wire.Length > dnsOptions.Value.DoH.MaxRequestBytes)
+        if (wire.Length > dnsOptions.Value.DnsOverHttp.MaxRequestBytes)
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
 
         return await ExecuteAsync(httpContext, executor, wire, cancellationToken).ConfigureAwait(false);

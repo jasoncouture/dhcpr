@@ -5,6 +5,7 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -343,13 +344,13 @@ public class RecursiveRootResolverTests
 
     private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
     {
-        var rootServers = new RootServerConfiguration
+        var tips = new RootServerTips(new TestOptionsMonitor(new RootServerConfiguration
         {
             Addresses = new[] { RootServer.ToString() }
-        };
+        }));
 
         return new RecursiveRootResolver(
-            new TestOptionsMonitor(rootServers),
+            tips,
             internalClient,
             NullLogger<RecursiveRootResolver>.Instance);
     }

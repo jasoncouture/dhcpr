@@ -8,8 +8,9 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
+using Dhcpr.Dns.Core.RootZone;
+
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
@@ -17,19 +18,15 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 {
     private readonly IInternalDomainClient _internalClient;
     private readonly ILogger<RecursiveRootResolver> _logger;
-    private readonly ImmutableArray<IPEndPoint> _servers;
+    private readonly IRootServerTips _rootServerTips;
 
     public RecursiveRootResolver(
-        IOptionsMonitor<RootServerConfiguration> rootServerConfiguration,
+        IRootServerTips rootServerTips,
         IInternalDomainClient internalClient,
         ILogger<RecursiveRootResolver> logger
     )
     {
-        _servers = rootServerConfiguration.CurrentValue.Addresses
-            .Select(i => i.GetEndPoint(53))
-            .Cast<IPEndPoint>()
-            .OrderBy(_ => Random.Shared.Next())
-            .ToImmutableArray();
+        _rootServerTips = rootServerTips;
         _internalClient = internalClient;
         _logger = logger;
     }
@@ -44,7 +41,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         var question = context.DomainMessage.Questions[0];
         var remainingLabels = question.Name.Labels;
         using var endPoints = ListPool<IPEndPoint>.Default.Get();
-        endPoints.AddRange(_servers);
+        endPoints.AddRange(_rootServerTips.GetEndpoints().OrderBy(_ => Random.Shared.Next()));
         using var zoneLabels = ListPool<DomainLabel>.Default.Get();
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try

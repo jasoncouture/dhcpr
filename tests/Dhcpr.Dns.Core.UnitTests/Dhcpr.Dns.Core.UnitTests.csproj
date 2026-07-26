@@ -29,4 +29,10 @@
         <ProjectReference Include="..\..\src\Dhcpr.Dns.Core\Dhcpr.Dns.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Update="Fixtures\**\*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>

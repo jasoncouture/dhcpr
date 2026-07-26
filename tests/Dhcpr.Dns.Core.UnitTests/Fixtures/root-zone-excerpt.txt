@@ -1,0 +1,11 @@
+. 86400 IN SOA a.root-servers.net. nstld.verisign-grs.com. 2026072601 1800 900 604800 86400
+. 518400 IN NS a.root-servers.net.
+. 518400 IN NS b.root-servers.net.
+a.root-servers.net. 3600000 IN A 198.41.0.4
+a.root-servers.net. 3600000 IN AAAA 2001:503:ba3e::2:30
+b.root-servers.net. 3600000 IN A 170.247.170.2
+com. 172800 IN NS a.gtld-servers.net.
+com. 172800 IN NS b.gtld-servers.net.
+com. 86400 IN DS 19718 8 2 8ACBB0CD28F412267BCB9B06CACC8E5D3FBFDF5EC2D4A94CE336E8AC6F3AAB2C
+a.gtld-servers.net. 172800 IN A 192.5.6.30
+b.gtld-servers.net. 172800 IN A 192.33.14.30

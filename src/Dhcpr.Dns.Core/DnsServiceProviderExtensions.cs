@@ -4,12 +4,12 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+using Dhcpr.Dns.Core.RootZone;
+using Dhcpr.Dns.Core.Validation;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
-
-using Dhcpr.Dns.Core.Validation;
 
 namespace Dhcpr.Dns.Core;
 
@@ -25,8 +25,18 @@ public static class DnsServiceProviderExtensions
         });
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromMinutes(5) });
+        services.AddSingleton<RootServerTips>();
+        services.AddSingleton<IRootServerTips>(static sp => sp.GetRequiredService<RootServerTips>());
+        services.AddSingleton<RootZoneStore>();
+        services.AddSingleton<IRootZoneStore>(static sp => sp.GetRequiredService<RootZoneStore>());
+        // Tips bootstrap before root.zone refresh (registration order = start order).
+        services.AddHostedService<RootServerTipsBootstrapService>();
+        services.AddHostedService<RootZoneRefreshService>();
+
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
+        services.AddSingleton<IDomainMessageMiddleware, RootZoneMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();

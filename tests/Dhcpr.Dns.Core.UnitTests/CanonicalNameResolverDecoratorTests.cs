@@ -67,6 +67,68 @@ public class CanonicalNameResolverDecoratorTests
     }
 
     [Fact]
+    public async Task BundledAddressesWithCnameAreIgnoredAndTargetIsLookedUp()
+    {
+        var cnameTarget = "example.com";
+        var staleAddress = IPAddress.Parse("1.2.3.4");
+        var freshAddress = IPAddress.Parse("9.9.9.9");
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("www.example.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels(cnameTarget))),
+                        new DomainResourceRecord(
+                            new DomainLabels(cnameTarget),
+                            DomainRecordType.A,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new IPAddressData(staleAddress))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        var internalClient = CreateInternalClient(request =>
+        {
+            Assert.Equal(cnameTarget, request.Questions[0].Name.ToString());
+            Assert.Equal(DomainRecordType.A, request.Questions[0].Type);
+            return DomainMessage.CreateResponse(
+                request,
+                new[]
+                {
+                    new DomainResourceRecord(
+                        new DomainLabels(cnameTarget),
+                        DomainRecordType.A,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(60),
+                        new IPAddressData(freshAddress))
+                },
+                responseCode: DomainResponseCode.NoError);
+        });
+
+        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        var request = DomainMessage.CreateRequest("www.example.com", DomainRecordType.A);
+        var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Records.Answers, r => r.Type == DomainRecordType.CNAME);
+        Assert.DoesNotContain(result.Records.Answers, r =>
+            r.Type == DomainRecordType.A && ((IPAddressData)r.Data).Address.Equals(staleAddress));
+        Assert.Contains(result.Records.Answers, r =>
+            r.Type == DomainRecordType.A && ((IPAddressData)r.Data).Address.Equals(freshAddress));
+    }
+
+    [Fact]
     public async Task NestedCnameChainIsPreservedInAnswers()
     {
         var internalClient = CreateInternalClient(request =>

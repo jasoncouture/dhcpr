@@ -35,19 +35,28 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         if (questionType is not (DomainRecordType.A or DomainRecordType.AAAA))
             return result;
 
-        if (result.Records.All(i => i.Type != DomainRecordType.CNAME))
+        if (result.Records.Answers.All(i => i.Type != DomainRecordType.CNAME))
             return result;
 
-        if (result.Records.Answers.Any(i => i.Type == questionType))
-            return result;
+        // Never trust address RRs bundled with a CNAME — chase the target ourselves.
+        result = result with
+        {
+            Records = result.Records with
+            {
+                Answers = result.Records.Answers
+                    .Where(i => i.Type is DomainRecordType.CNAME)
+                    .ToImmutableArray()
+            }
+        };
 
-        using var cnameRecords = result.Records
-            .Where(i => i.Type == DomainRecordType.CNAME)
-            .ToPooledList();
+        using var cnameRecords = result.Records.Answers.ToPooledList();
 
         foreach (var record in cnameRecords)
         {
-            var nextRequest = DomainMessage.CreateRequest(((NameData)record.Data).Name, questionType);
+            if (record.Data is not NameData nameData)
+                continue;
+
+            var nextRequest = DomainMessage.CreateRequest(nameData.Name, questionType);
 
             var nextResponse = await _internalClient.SendAsync(context, nextRequest, cancellationToken)
                 .AsTask()

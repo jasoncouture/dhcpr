@@ -3,6 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core;
 
+using Microsoft.Extensions.Configuration;
+
 namespace Dhcpr.Dns.Core;
 
 public sealed class DnsConfiguration : IValidateSelf
@@ -21,6 +23,8 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
+    /// <summary>Bound from config key <c>DNS:DOH</c> (DNS Over HTTP).</summary>
+    [ConfigurationKeyName("DOH")]
     public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 
     public DnsListenEndpoint[] GetListenEndpoints() => ListenAddresses.GetListenEndpoints();
@@ -99,7 +103,7 @@ public sealed class DnsConfiguration : IValidateSelf
         DnsOverHttp ??= new DnsOverHttpConfiguration();
         if (!DnsOverHttp.Validate())
         {
-            error = "DNS:DnsOverHttp:MaxRequestBytes must be between 1 and 65535";
+            error = "DNS:DOH:MaxRequestBytes must be between 1 and 65535";
             return false;
         }
 

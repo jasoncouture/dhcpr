@@ -31,7 +31,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
-        var internalMessage = message as InternalDnsRequestReceivedMessage;
+        var awaitable = message as IAwaitableDnsRequest;
         try
         {
             DomainMessage? response = null;
@@ -46,10 +46,10 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 
             // This is a directive to ignore the message.
             // The middleware may have responded to it, or may be blocking this client.
-            // Internal clients treat null as failure via TrySetResult(null).
+            // Awaitable clients (internal / DoH) treat null as failure via TrySetResult(null).
             if (response is null)
             {
-                internalMessage?.TaskCompletionSource.TrySetResult(null);
+                awaitable?.TaskCompletionSource.TrySetResult(null);
                 return;
             }
 
@@ -58,9 +58,9 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                 response = response with { Id = message.Context.DomainMessage.Id };
             }
 
-            if (internalMessage is not null)
+            if (awaitable is not null)
             {
-                internalMessage.TaskCompletionSource.TrySetResult(response);
+                awaitable.TaskCompletionSource.TrySetResult(response);
                 return;
             }
 
@@ -68,9 +68,9 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         }
         catch (Exception ex)
         {
-            if (internalMessage is not null)
+            if (awaitable is not null)
             {
-                internalMessage.TaskCompletionSource.TrySetException(ex);
+                awaitable.TaskCompletionSource.TrySetException(ex);
                 return;
             }
 

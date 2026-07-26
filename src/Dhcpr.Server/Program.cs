@@ -63,6 +63,7 @@ builder.Services.AddOpenTelemetry()
 var app = builder.Build();
 
 app.MapPrometheusScrapingEndpoint();
+app.MapDnsOverHttps();
 
 Console.WriteLine("Application configuration complete, starting services.");
 app.Run();

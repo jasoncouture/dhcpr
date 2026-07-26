@@ -41,6 +41,7 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
+        services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
         services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
         services.AddSingleton<IDnssecValidator, DnssecValidator>();

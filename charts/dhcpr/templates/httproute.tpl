@@ -21,7 +21,13 @@ spec:
   hostnames:
     - {{ .Values.httpRoute.host | quote }}
   rules:
-    - backendRefs:
+    # Serves Prometheus /metrics and RFC 8484 DoH at /dns-query (plain HTTP to the pod;
+    # TLS terminates on the Gateway).
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
         - name: {{ $fullName }}
           port: {{ .Values.service.httpPort }}
 {{- end }}

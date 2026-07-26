@@ -37,6 +37,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         using var remaining = endPoints.ToPooledList();
 
         var queryMessage = AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
+        DomainMessage? nameErrorFallback = null;
 
         while (remaining.Count > 0)
         {
@@ -61,6 +62,16 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
                     remaining.Count > 0)
                     continue;
 
+                // Don't trust NXDOMAIN from a partial peer set — some NS lie AA NXDOMAIN
+                // for names delegated to other zones (seen on amazonaws.com / ELB).
+                if (result.Flags.ResponseCode is DomainResponseCode.NameError)
+                {
+                    nameErrorFallback = result;
+                    if (remaining.Count > 0)
+                        continue;
+                    return result;
+                }
+
                 return result;
             }
             catch (Exception ex) when (NameserverSelection.IsTransportFailure(ex))
@@ -68,6 +79,9 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
                 // ENETUNREACH / host unreachable / etc. — skip this batch, try remaining peers.
             }
         }
+
+        if (nameErrorFallback is not null)
+            return nameErrorFallback;
 
         // Every nameserver endpoint failed.
         return DomainMessage.CreateResponse(

@@ -31,13 +31,14 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Metrics → Logging → Dnssec → CanonicalName → Cache → resolver
+        // Outermost last: Shuffle → Metrics → Logging → Dnssec → CanonicalName → Cache → resolver
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
-        // Registered after Decorate so this is not wrapped by cache/CNAME/logging decorators.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
+        // Outside cache so HIT responses still rotate A/AAAA order per client query.
+        services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();

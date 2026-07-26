@@ -129,11 +129,16 @@ public class CanonicalNameResolverDecoratorTests
     }
 
     [Fact]
-    public async Task NestedCnameChainIsPreservedInAnswers()
+    public async Task MultiHopCnameChainIsChasedInOnePass()
     {
+        var address = IPAddress.Parse("10.0.0.1");
+        var lookups = new List<string>();
+
         var internalClient = CreateInternalClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
+            lookups.Add(name);
+
             if (name.Equals("alias1.example", StringComparison.OrdinalIgnoreCase))
             {
                 return DomainMessage.CreateResponse(
@@ -145,13 +150,23 @@ public class CanonicalNameResolverDecoratorTests
                             DomainRecordType.CNAME,
                             DomainRecordClass.IN,
                             TimeSpan.FromSeconds(60),
-                            new NameData(new DomainLabels("alias2.example"))),
+                            new NameData(new DomainLabels("alias2.example")))
+                    },
+                    responseCode: DomainResponseCode.NoError);
+            }
+
+            if (name.Equals("alias2.example", StringComparison.OrdinalIgnoreCase))
+            {
+                return DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
                         new DomainResourceRecord(
                             new DomainLabels("alias2.example"),
                             DomainRecordType.A,
                             DomainRecordClass.IN,
                             TimeSpan.FromSeconds(60),
-                            new IPAddressData(IPAddress.Parse("10.0.0.1")))
+                            new IPAddressData(address))
                     },
                     responseCode: DomainResponseCode.NoError);
             }
@@ -183,10 +198,14 @@ public class CanonicalNameResolverDecoratorTests
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
         Assert.NotNull(result);
+        Assert.Equal(2, lookups.Count);
+        Assert.Equal("alias1.example", lookups[0], ignoreCase: true);
+        Assert.Equal("alias2.example", lookups[1], ignoreCase: true);
         Assert.Equal(3, result!.Records.Answers.Length);
         Assert.Equal(DomainRecordType.CNAME, result.Records.Answers[0].Type);
         Assert.Equal(DomainRecordType.CNAME, result.Records.Answers[1].Type);
         Assert.Equal(DomainRecordType.A, result.Records.Answers[2].Type);
+        Assert.Equal(address, ((IPAddressData)result.Records.Answers[2].Data).Address);
     }
 
     private static IInternalDomainClient CreateInternalClient(Func<DomainMessage, DomainMessage> handler)

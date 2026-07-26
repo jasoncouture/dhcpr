@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Server;
 
-public static class DoHEndpointExtensions
+public static class DnsOverHttpEndpointExtensions
 {
     public const string DnsQueryPath = "/dns-query";
     public const string DnsMessageMediaType = "application/dns-message";

@@ -5,7 +5,6 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
@@ -16,7 +15,7 @@ namespace Dhcpr.Dns.Core;
 
 public static class DnsServiceProviderExtensions
 {
-    public static IServiceCollection AddDns(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDns(this IServiceCollection services)
     {
         services.AddMemoryCache(o =>
         {
@@ -52,9 +51,9 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()
-            .Bind(configuration.GetSection("DNS"));
+            .BindConfiguration("DNS");
         services.AddOptionsWithValidateOnStart<RootServerConfiguration>()
-            .Bind(configuration.GetSection("DNS:RootServers"))
+            .BindConfiguration("DNS:RootServers")
             .Validate(static o => o.Validate(), "Invalid DNS root server configuration");
         return services;
     }

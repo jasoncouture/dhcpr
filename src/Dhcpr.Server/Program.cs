@@ -23,10 +23,6 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     ContentRootPath = AppContext.BaseDirectory,
 });
 
-Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
-Console.WriteLine($"Content root: {builder.Environment.ContentRootPath}");
-Console.WriteLine($"Base directory: {AppContext.BaseDirectory}");
-
 builder.Services.Configure<HostOptions>(options =>
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
 
@@ -50,8 +46,8 @@ builder.Services.AddOptions<KeyManagementOptions>()
     });
 
 builder.Services.AddCoreServices();
-builder.Services.AddDns(builder.Configuration);
-builder.Services.AddDhcp(builder.Configuration);
+builder.Services.AddDns();
+builder.Services.AddDhcp();
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>

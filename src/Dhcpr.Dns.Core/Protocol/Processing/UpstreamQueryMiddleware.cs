@@ -33,13 +33,40 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
             return null;
 
-        using var pooled = endPoints.ToPooledList();
-        var client = await _clientFactory.GetParallelDomainClient(
-            SelectQueryEndpoints(pooled),
-            cancellationToken);
+        // Preserve caller order (RecursiveRootResolver shuffles before directing).
+        using var remaining = endPoints.ToPooledList();
 
         var queryMessage = AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
-        return await client.SendAsync(queryMessage, cancellationToken);
+
+        while (remaining.Count > 0)
+        {
+            var batchCount = Math.Min(MaxParallelNameservers, remaining.Count);
+            using var batch = ListPool<IPEndPoint>.Default.Get();
+            for (var i = 0; i < batchCount; i++)
+            {
+                batch.Add(remaining[0]);
+                remaining.RemoveAt(0);
+            }
+
+            using var client = await _clientFactory.GetParallelDomainClient(
+                batch.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp }),
+                cancellationToken);
+
+            try
+            {
+                return await client.SendAsync(queryMessage, cancellationToken);
+            }
+            catch (Exception ex) when (NameserverSelection.IsTransportFailure(ex))
+            {
+                // ENETUNREACH / host unreachable / etc. — skip this batch, try remaining peers.
+            }
+        }
+
+        // Every nameserver endpoint failed at the transport layer.
+        return DomainMessage.CreateResponse(
+            context.DomainMessage,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.ServerFailure);
     }
 
     private static DomainMessage AddOptRecordWithDoBit(DomainMessage message, IEdnsProtocolService ednsProtocolService)
@@ -61,15 +88,5 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         {
             Records = message.Records with { Additional = newAdditional }
         };
-    }
-
-    private static IEnumerable<DomainClientOptions> SelectQueryEndpoints(PooledList<IPEndPoint> endPoints)
-    {
-        IEnumerable<IPEndPoint> selected = endPoints.Count <= MaxParallelNameservers
-            ? endPoints
-            : endPoints.OrderBy(_ => Random.Shared.Next()).Take(MaxParallelNameservers);
-
-        return selected.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp })
-            .ToArray();
     }
 }

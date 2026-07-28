@@ -45,6 +45,7 @@ public static class DnsServiceProviderExtensions
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
         services.AddSingleton<IDomainMessageMiddleware, RootZoneMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
+        services.AddSingleton<IDomainMessageMiddleware, DynamicDnsMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();

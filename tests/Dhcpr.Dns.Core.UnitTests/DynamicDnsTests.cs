@@ -6,11 +6,6 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
-using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
-using Dhcpr.Dns.Core.RootZone;
-
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -146,17 +141,16 @@ public class DynamicDnsTests
     }
 
     [Fact]
-    public async Task Resolver_ServesOverlayAa_DoNotCache()
+    public async Task Middleware_ServesOverlayAa_DoNotCache()
     {
         using var harness = CreateHarness();
         Update(harness, "dyn.foo.bar", "203.0.113.50");
 
-        var client = new NoUpstreamClient();
-        var resolver = CreateResolver(client, harness.Zones, harness.Store);
+        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
         var request = DomainMessage.CreateRequest("dyn.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
@@ -167,17 +161,16 @@ public class DynamicDnsTests
     }
 
     [Fact]
-    public async Task Resolver_OverlayWinsOverZoneFileRr()
+    public async Task Middleware_OverlayWinsOverZoneFileRr()
     {
         using var harness = CreateHarness();
         Update(harness, "www.foo.bar", "203.0.113.60");
 
-        var client = new NoUpstreamClient();
-        var resolver = CreateResolver(client, harness.Zones, harness.Store);
+        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains(result!.Records.Answers, r =>
@@ -196,12 +189,11 @@ public class DynamicDnsTests
 
         harness.Zones.Publish([BuildZone(FooBarZone, "foo.bar.bind")]);
 
-        var client = new NoUpstreamClient();
-        var resolver = CreateResolver(client, harness.Zones, harness.Store);
+        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
         var request = DomainMessage.CreateRequest("dyn.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains(result!.Records.Answers, r =>
@@ -243,21 +235,6 @@ public class DynamicDnsTests
         return AuthoritativeZoneBuilder.FromRecords(records, path);
     }
 
-    private static RecursiveRootResolver CreateResolver(
-        IInternalDomainClient client,
-        AuthoritativeZoneStore zones,
-        DynamicDnsStore dynamicDns)
-    {
-        var tips = new RootServerTips(new DynamicDnsTestHelpers.StaticOptionsMonitor<RootServerConfiguration>(
-            new RootServerConfiguration { Addresses = ["198.41.0.4:53"] }));
-        return new RecursiveRootResolver(
-            tips,
-            client,
-            zones,
-            dynamicDns,
-            NullLogger<RecursiveRootResolver>.Instance);
-    }
-
     private sealed class Harness : IDisposable
     {
         public Harness(string dataPath, DynamicDnsStore store, AuthoritativeZoneStore zones, DynamicDnsConfiguration config)
@@ -285,24 +262,5 @@ public class DynamicDnsTests
                 // best-effort cleanup
             }
         }
-    }
-
-    private sealed class NoUpstreamClient : IInternalDomainClient
-    {
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("no upstream");
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => throw new InvalidOperationException("no upstream");
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            System.Collections.Immutable.ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-            => throw new InvalidOperationException("no upstream");
     }
 }

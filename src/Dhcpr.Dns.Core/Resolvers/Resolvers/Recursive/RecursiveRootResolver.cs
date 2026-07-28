@@ -5,7 +5,6 @@ using System.Net;
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Authoritative;
-using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -22,20 +21,17 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly IRootServerTips _rootServerTips;
     private readonly AuthoritativeZoneStore _authoritativeZones;
-    private readonly DynamicDnsStore _dynamicDns;
 
     public RecursiveRootResolver(
         IRootServerTips rootServerTips,
         IInternalDomainClient internalClient,
         AuthoritativeZoneStore authoritativeZones,
-        DynamicDnsStore dynamicDns,
         ILogger<RecursiveRootResolver> logger
     )
     {
         _rootServerTips = rootServerTips;
         _internalClient = internalClient;
         _authoritativeZones = authoritativeZones;
-        _dynamicDns = dynamicDns;
         _logger = logger;
     }
 
@@ -47,13 +43,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             return null;
 
         var question = context.DomainMessage.Questions[0];
-
-        // DynDNS overlay wins for exact names (AA, not cached).
-        if (DynamicDnsAnswerer.TryAnswer(_dynamicDns, _authoritativeZones, context.DomainMessage) is { } dynamicAnswer)
-        {
-            context.DoNotCacheResponse = true;
-            return FinalizeRecursiveResponse(context.DomainMessage, dynamicAnswer);
-        }
 
         // Start at a loaded authoritative zone when QNAME falls under one (skip roots).
         if (_authoritativeZones.FindZone(question.Name.ToString()) is { } localZone)

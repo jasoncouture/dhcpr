@@ -373,7 +373,6 @@ public class AuthoritativeZoneTests
             tips,
             client,
             store,
-            DynamicDnsTestHelpers.CreateStore(),
             NullLogger<RecursiveRootResolver>.Instance);
     }
 

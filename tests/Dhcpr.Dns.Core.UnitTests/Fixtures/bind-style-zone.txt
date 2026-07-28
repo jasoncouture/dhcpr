@@ -1,0 +1,16 @@
+$ORIGIN example.com.
+$TTL 1h
+@ IN SOA ns.example.com. hostmaster.example.com. (
+    2026072801
+    1h
+    15m
+    2w
+    1h )
+@ IN NS ns.example.com.
+@ IN MX 10 mail.example.com.
+www IN CNAME example.com.
+ns IN A 192.0.2.1
+mail IN A 192.0.2.2
+txt IN TXT "hello world"
+_sip._tcp IN SRV 10 5 5060 sip.example.com.
+sip IN A 192.0.2.3

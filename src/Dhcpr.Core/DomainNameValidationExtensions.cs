@@ -8,7 +8,8 @@ public static partial class DomainNameValidationExtensions
     [GeneratedRegex(@"(?isn)^(?<name>(([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)\.)*([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?))\.?(:(?<port>[1-6]\d{4}|[0-9]{1,4}))?$")]
     public static partial Regex GetDnsRegularExpression();
 
-    [GeneratedRegex(@"(?isn)^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")]
+    // DNS labels: LDH + underscore (SRV/RFC 2782 service labels). 1–63 chars.
+    [GeneratedRegex(@"(?isn)^[a-z0-9_]([a-z0-9_\-]{0,61}[a-z0-9_])?$")]
     public static partial Regex GetLabelRegularExpression();
     public static bool IsValidDomainName(this string domainName) => GetDnsRegularExpression().IsMatch(domainName);
     public static bool IsValidDomainNameLabel(this string label) => GetLabelRegularExpression().IsMatch(label);

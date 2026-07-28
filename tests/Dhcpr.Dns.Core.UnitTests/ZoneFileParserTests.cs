@@ -72,6 +72,45 @@ public class ZoneFileParserTests
         Assert.Contains(IPAddress.Parse("2001:503:ba3e::2:30"), addresses);
     }
 
+    [Fact]
+    public void Parse_ReadsBindStyleMxTxtCnameSrvAndTtlUnits()
+    {
+        var text = File.ReadAllText(FixturePath("bind-style-zone.txt"));
+
+        var records = ZoneFileParser.Parse(text);
+
+        Assert.Contains(records, r => r.Type == DomainRecordType.MX && r.Name.ToString() == "example.com");
+        Assert.Contains(records, r =>
+            r.Type == DomainRecordType.TXT &&
+            r.Name.ToString() == "txt.example.com" &&
+            ((TextData)r.Data).Text == "hello world");
+        Assert.Contains(records, r =>
+            r.Type == DomainRecordType.CNAME &&
+            r.Name.ToString() == "www.example.com");
+        Assert.Contains(records, r =>
+            r.Type == DomainRecordType.SRV &&
+            r.Name.ToString() == "_sip._tcp.example.com" &&
+            ((ServiceData)r.Data).Port == 5060);
+        Assert.Equal(TimeSpan.FromHours(1), records.First(r => r.Type == DomainRecordType.SOA).TimeToLive);
+    }
+
+    [Fact]
+    public void ParseRootZone_SkipsDnssecAndGenerateLines()
+    {
+        var text = File.ReadAllText(FixturePath("root-zone-with-dnssec.txt"));
+
+        var snapshot = ZoneFileParser.ParseRootZone(text);
+
+        Assert.Equal(1800, (int)snapshot.Soa.RefreshInterval.TotalSeconds);
+        Assert.True(snapshot.TryGetRecords("com", out var com));
+        Assert.Contains(com, r => r.Type == DomainRecordType.NS);
+        Assert.Contains(com, r => r.Type == DomainRecordType.DS);
+        Assert.DoesNotContain(com, r => r.Type is DomainRecordType.RRSIG or DomainRecordType.DNSKEY or DomainRecordType.NSEC);
+        Assert.True(snapshot.TryGetRecords("a.gtld-servers.net", out var glue));
+        Assert.Contains(glue, r => r.Type == DomainRecordType.A);
+        Assert.False(snapshot.TryGetRecords("host1.example", out _));
+    }
+
     private static string FixturePath(string name)
         => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 }

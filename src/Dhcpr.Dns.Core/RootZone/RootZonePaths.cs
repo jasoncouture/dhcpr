@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Options;
 
+using Dhcpr.Core;
+
 namespace Dhcpr.Dns.Core.RootZone;
 
 public static class RootZonePaths
 {
     public const string RootZoneFileName = "root.zone";
+    public const string NamedRootFileName = "root-servers.txt";
     public const string RootZoneUrl = "https://www.internic.net/domain/root.zone";
 
     public static readonly string[] NamedRootUrls =
@@ -14,21 +17,20 @@ public static class RootZonePaths
         "http://192.0.46.9/domain/named.root"
     ];
 
-    public static string GetDirectory(IOptionsMonitor<RootServerConfiguration> options)
+    public static string GetDirectory(IOptionsMonitor<ApplicationConfiguration> options)
     {
-        var cacheFile = options.CurrentValue.CacheFilePath;
-        if (string.IsNullOrWhiteSpace(cacheFile))
-            return ".";
-        var dir = Path.GetDirectoryName(Path.GetFullPath(cacheFile));
-        return string.IsNullOrEmpty(dir) ? "." : dir;
+        var path = options.CurrentValue.DataPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return Path.GetFullPath(".");
+        return Path.GetFullPath(path);
     }
 
-    public static string GetRootZonePath(IOptionsMonitor<RootServerConfiguration> options)
+    public static string GetRootZonePath(IOptionsMonitor<ApplicationConfiguration> options)
         => Path.Combine(GetDirectory(options), RootZoneFileName);
 
-    public static string GetNamedRootCachePath(IOptionsMonitor<RootServerConfiguration> options)
-    {
-        var configured = options.CurrentValue.CacheFilePath;
-        return string.IsNullOrWhiteSpace(configured) ? "root-servers.txt" : configured;
-    }
+    public static string GetNamedRootCachePath(IOptionsMonitor<ApplicationConfiguration> options)
+        => Path.Combine(GetDirectory(options), NamedRootFileName);
+
+    public static string GetZoneFilePath(IOptionsMonitor<ApplicationConfiguration> options, string fileName)
+        => Path.Combine(GetDirectory(options), fileName);
 }

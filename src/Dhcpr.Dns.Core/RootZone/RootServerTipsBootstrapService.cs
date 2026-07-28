@@ -1,5 +1,6 @@
 using System.Net;
 
+using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol.Zone;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -17,17 +18,20 @@ public sealed class RootServerTipsBootstrapService : IHostedService
 {
     private readonly RootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
+    private readonly IOptionsMonitor<ApplicationConfiguration> _application;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootServerTipsBootstrapService> _logger;
 
     public RootServerTipsBootstrapService(
         RootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
+        IOptionsMonitor<ApplicationConfiguration> application,
         IServiceScopeFactory scopeFactory,
         ILogger<RootServerTipsBootstrapService> logger)
     {
         _tips = tips;
         _options = options;
+        _application = application;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -41,7 +45,7 @@ public sealed class RootServerTipsBootstrapService : IHostedService
             return;
         }
 
-        var cachePath = RootZonePaths.GetNamedRootCachePath(_options);
+        var cachePath = RootZonePaths.GetNamedRootCachePath(_application);
         if (File.Exists(cachePath))
         {
             try

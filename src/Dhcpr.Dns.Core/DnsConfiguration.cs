@@ -42,12 +42,14 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public bool TryValidate([NotNullWhen(false)] out string? error)
     {
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (RootServers is null || !RootServers.Validate())
         {
             error = "DNS:RootServers is invalid";
             return false;
         }
 
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
         Routes ??= new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         _parsedRoutes = new Dictionary<string, IPEndPoint[]>(StringComparer.OrdinalIgnoreCase);
 
@@ -74,6 +76,7 @@ public sealed class DnsConfiguration : IValidateSelf
             _parsedRoutes[route.Key] = endpoints;
         }
 
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (ListenAddresses is null || ListenAddresses.Length == 0)
         {
             error = "DNS:ListenAddresses is missing or empty (set per environment in appsettings)";
@@ -87,15 +90,18 @@ public sealed class DnsConfiguration : IValidateSelf
         }
 
 
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (TrustAnchors is not null)
         {
             foreach (var anchor in TrustAnchors)
             {
-                if (!anchor.TryValidate(out error))
+                if (anchor.TryValidate(out error))
                 {
-                    error = $"DNS:TrustAnchors contains an invalid entry: {error}";
-                    return false;
+                    continue;
                 }
+
+                error = $"DNS:TrustAnchors contains an invalid entry: {error}";
+                return false;
             }
         }
 

@@ -45,6 +45,10 @@ builder.Services.AddOptions<KeyManagementOptions>()
         options.XmlRepository = new FileSystemXmlRepository(target, loggerFactory);
     });
 
+builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
+    .Configure<IConfiguration>((options, configuration) => configuration.Bind(options))
+    .Validate(static o => o.Validate(), "DataPath must be set");
+
 builder.Services.AddCoreServices();
 builder.Services.AddDns();
 builder.Services.AddDhcp();

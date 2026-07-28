@@ -7,7 +7,6 @@ namespace Dhcpr.Dns.Core;
 public sealed class RootServerConfiguration : IValidateSelf
 {
     public bool Enabled { get; set; } = true;
-    public string CacheFilePath { get; set; } = "root-servers.txt";
     public bool Download { get; set; } = true;
     public bool LoadFromSystem { get; set; } = true;
     public string[] Addresses { get; set; } = Array.Empty<string>();
@@ -23,7 +22,6 @@ public sealed class RootServerConfiguration : IValidateSelf
         Justification = "Values are set by reflection")]
     public bool Validate()
     {
-        if (CacheFilePath is null) return false;
         if (Addresses is null) return false;
         if (DownloadUrls is null) return false;
         if (DownloadUrls.Any(i => i is null || !i.IsAbsoluteUri)) return false;

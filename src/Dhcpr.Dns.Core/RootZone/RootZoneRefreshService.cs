@@ -1,3 +1,4 @@
+using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol.Zone;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -11,20 +12,20 @@ public sealed class RootZoneRefreshService : BackgroundService
 {
     private readonly RootZoneStore _store;
     private readonly IRootServerTips _tips;
-    private readonly IOptionsMonitor<RootServerConfiguration> _options;
+    private readonly IOptionsMonitor<ApplicationConfiguration> _application;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootZoneRefreshService> _logger;
 
     public RootZoneRefreshService(
         RootZoneStore store,
         IRootServerTips tips,
-        IOptionsMonitor<RootServerConfiguration> options,
+        IOptionsMonitor<ApplicationConfiguration> application,
         IServiceScopeFactory scopeFactory,
         ILogger<RootZoneRefreshService> logger)
     {
         _store = store;
         _tips = tips;
-        _options = options;
+        _application = application;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -70,7 +71,7 @@ public sealed class RootZoneRefreshService : BackgroundService
             }
         }
 
-        var path = RootZonePaths.GetRootZonePath(_options);
+        var path = RootZonePaths.GetRootZonePath(_application);
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
@@ -125,7 +126,7 @@ public sealed class RootZoneRefreshService : BackgroundService
 
     private async Task LoadFromDiskAsync(CancellationToken cancellationToken)
     {
-        var path = RootZonePaths.GetRootZonePath(_options);
+        var path = RootZonePaths.GetRootZonePath(_application);
         if (!File.Exists(path))
             return;
 

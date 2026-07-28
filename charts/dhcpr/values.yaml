@@ -39,6 +39,7 @@ serviceMonitor:
 gateway:
   enabled: false
   className: traefik
+  # Traefik websecure entrypoint port (LB typically maps 443 → this).
   port: 8443
   # Listener port for dns-tcp / dns-udp when those routes are enabled.
   # Defaults to service.dnsPort when empty/omitted.

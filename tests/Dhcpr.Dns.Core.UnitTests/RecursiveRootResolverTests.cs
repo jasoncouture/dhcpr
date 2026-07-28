@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -352,6 +353,7 @@ public class RecursiveRootResolverTests
         return new RecursiveRootResolver(
             tips,
             internalClient,
+            new AuthoritativeZoneStore(),
             NullLogger<RecursiveRootResolver>.Instance);
     }
 

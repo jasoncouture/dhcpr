@@ -4,10 +4,11 @@ using System.Net;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
-
+using Dhcpr.Dns.Core.Protocol.Zone;
 using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Logging;
@@ -19,15 +20,18 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     private readonly IInternalDomainClient _internalClient;
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly IRootServerTips _rootServerTips;
+    private readonly AuthoritativeZoneStore _authoritativeZones;
 
     public RecursiveRootResolver(
         IRootServerTips rootServerTips,
         IInternalDomainClient internalClient,
+        AuthoritativeZoneStore authoritativeZones,
         ILogger<RecursiveRootResolver> logger
     )
     {
         _rootServerTips = rootServerTips;
         _internalClient = internalClient;
+        _authoritativeZones = authoritativeZones;
         _logger = logger;
     }
 
@@ -39,9 +43,41 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             return null;
 
         var question = context.DomainMessage.Questions[0];
+
+        // Start at a loaded authoritative zone when QNAME falls under one (skip roots).
+        if (_authoritativeZones.FindZone(question.Name.ToString()) is { } localZone)
+        {
+            var local = ZoneAnswerEngine.Answer(localZone, context.DomainMessage);
+            if (local.Message is not null &&
+                local.Kind is ZoneAnswerKind.Answer or ZoneAnswerKind.NoData or ZoneAnswerKind.NameError)
+            {
+                context.DoNotCacheResponse = true;
+                return FinalizeRecursiveResponse(context.DomainMessage, local.Message);
+            }
+
+            if (local.Kind is ZoneAnswerKind.Referral && local.Message is not null)
+            {
+                using var endPoints = ListPool<IPEndPoint>.Default.Get();
+                if (!await TrySeedEndpointsFromReferralAsync(
+                        context, local.Message, endPoints, cancellationToken).ConfigureAwait(false))
+                {
+                    return ServFail(context.DomainMessage);
+                }
+
+                var clonedRequest = context.DomainMessage with
+                {
+                    Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1)
+                };
+                var followed = await QueryFollowingReferralsAsync(
+                    context, clonedRequest, endPoints, local.ReferralCutApex, cancellationToken)
+                    .ConfigureAwait(false);
+                return FinalizeRecursiveResponse(context.DomainMessage, followed);
+            }
+        }
+
         var remainingLabels = question.Name.Labels;
-        using var endPoints = ListPool<IPEndPoint>.Default.Get();
-        endPoints.AddRange(_rootServerTips.GetEndpoints().OrderBy(_ => Random.Shared.Next()));
+        using var rootEndPoints = ListPool<IPEndPoint>.Default.Get();
+        rootEndPoints.AddRange(_rootServerTips.GetEndpoints().OrderBy(_ => Random.Shared.Next()));
         using var zoneLabels = ListPool<DomainLabel>.Default.Get();
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
@@ -65,7 +101,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var responseMessage = await QueryUpstreamAsync(context, message, endPoints, cancellationToken);
+                var responseMessage = await QueryUpstreamAsync(context, message, rootEndPoints, cancellationToken);
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
@@ -77,32 +113,34 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
                 if (addressRecords.Count == 0)
                     addressRecords.AddRange(
-                        await ResolveNameserverAddressesAsync(context, nsNames, endPoints, cancellationToken));
+                        await ResolveNameserverAddressesAsync(context, nsNames, rootEndPoints, cancellationToken));
 
                 // Could not resolve NS addresses — keep current endpoints.
                 if (addressRecords.Count == 0)
                     continue;
 
-                endPoints.Clear();
-                endPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
+                rootEndPoints.Clear();
+                rootEndPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
             }
 
-            var clonedRequest = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
-            var result = await QueryFollowingReferralsAsync(context, clonedRequest, endPoints, cancellationToken);
+            var cloned = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };
+            var result = await QueryFollowingReferralsAsync(
+                context, cloned, rootEndPoints, previousCutApex: null, cancellationToken);
 
             if (result.Records.Answers.Length != 0 ||
-                clonedRequest.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+                cloned.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
             {
                 return FinalizeRecursiveResponse(context.DomainMessage, result);
             }
 
-            clonedRequest = clonedRequest with
+            cloned = cloned with
             {
-                Questions = clonedRequest.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
+                Questions = cloned.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
                     .ToImmutableArray()
             };
             var cnameResponse =
-                await QueryFollowingReferralsAsync(context, clonedRequest, endPoints, cancellationToken);
+                await QueryFollowingReferralsAsync(
+                    context, cloned, rootEndPoints, previousCutApex: null, cancellationToken);
             if (cnameResponse.Records.Answers.Length > 0 &&
                 cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
             {
@@ -129,8 +167,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        // Pass the full nameserver set; UpstreamQueryMiddleware races small batches and
-        // only SERVFAILs after every endpoint has failed at the transport layer.
         var upstream = endPoints
             .OrderBy(_ => Random.Shared.Next())
             .ToImmutableArray();
@@ -141,13 +177,38 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         DomainMessageContext parentContext,
         DomainMessage request,
         PooledList<IPEndPoint> endPoints,
+        string? previousCutApex,
         CancellationToken cancellationToken)
     {
         const int maxReferralDepth = 8;
         DomainMessage? last = null;
+        var lastCut = previousCutApex;
 
         for (var depth = 0; depth < maxReferralDepth; depth++)
         {
+            // Child zone whose apex equals the cut we just followed — answer locally (no parent loop).
+            if (lastCut is not null &&
+                _authoritativeZones.FindZoneExactApex(lastCut) is { } childZone)
+            {
+                var local = ZoneAnswerEngine.Answer(childZone, request);
+                if (local.Message is not null &&
+                    local.Kind is ZoneAnswerKind.Answer or ZoneAnswerKind.NoData or ZoneAnswerKind.NameError)
+                {
+                    parentContext.DoNotCacheResponse = true;
+                    return local.Message;
+                }
+
+                if (local.Kind is ZoneAnswerKind.Referral && local.Message is not null)
+                {
+                    last = local.Message;
+                    lastCut = local.ReferralCutApex;
+                    if (!await TrySeedEndpointsFromReferralAsync(
+                            parentContext, local.Message, endPoints, cancellationToken).ConfigureAwait(false))
+                        return ServFail(request);
+                    continue;
+                }
+            }
+
             last = await QueryUpstreamAsync(parentContext, request, endPoints, cancellationToken);
 
             if (last.Records.Answers.Length > 0)
@@ -156,6 +217,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             using var nsNames = GetNameserverNames(last.Records).ToPooledList();
             if (nsNames.Count == 0)
                 return last;
+
+            lastCut = GetNsOwner(last.Records);
 
             var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
             using var referralAddresses = GetGlueAddresses(last.Records, nsNameSet).ToPooledList();
@@ -172,6 +235,44 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
 
         return IsUnresolvedReferral(last!) ? ServFail(request) : last!;
+    }
+
+    private async ValueTask<bool> TrySeedEndpointsFromReferralAsync(
+        DomainMessageContext parentContext,
+        DomainMessage referral,
+        PooledList<IPEndPoint> endPoints,
+        CancellationToken cancellationToken)
+    {
+        using var nsNames = GetNameserverNames(referral.Records).ToPooledList();
+        if (nsNames.Count == 0)
+            return false;
+
+        var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using var addresses = GetGlueAddresses(referral.Records, nsNameSet).ToPooledList();
+        if (addresses.Count == 0)
+        {
+            addresses.AddRange(
+                await ResolveNameserverAddressesAsync(parentContext, nsNames, endPoints, cancellationToken)
+                    .ConfigureAwait(false));
+        }
+
+        if (addresses.Count == 0)
+            return false;
+
+        endPoints.Clear();
+        endPoints.AddRange(addresses.Select(i => new IPEndPoint(i, 53)));
+        return true;
+    }
+
+    private static string? GetNsOwner(IEnumerable<DomainResourceRecord> records)
+    {
+        foreach (var record in records)
+        {
+            if (record.Type is DomainRecordType.NS)
+                return RootZoneSnapshot.NormalizeOwner(record.Name.ToString());
+        }
+
+        return null;
     }
 
     private static DomainMessage FinalizeRecursiveResponse(DomainMessage request, DomainMessage response)
@@ -191,11 +292,6 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        // We only want to query upstream if the nameserver is in-bailiwick.
-        // If it's out-of-bailiwick, we MUST do a full recursive lookup from the root.
-        // Otherwise, we end up querying the current nameservers for a domain they don't own,
-        // and they will return REFUSED or NXDOMAIN.
-
         using var nameserverQueries = nsNames
             .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
                 new[]

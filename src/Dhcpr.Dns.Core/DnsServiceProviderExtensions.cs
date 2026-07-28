@@ -1,4 +1,5 @@
 ﻿using Dhcpr.Core;
+using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers.Caching;
@@ -31,9 +32,11 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IRootServerTips>(static sp => sp.GetRequiredService<RootServerTips>());
         services.AddSingleton<RootZoneStore>();
         services.AddSingleton<IRootZoneStore>(static sp => sp.GetRequiredService<RootZoneStore>());
+        services.AddSingleton<AuthoritativeZoneStore>();
         // Tips bootstrap before root.zone refresh (registration order = start order).
         services.AddHostedService<RootServerTipsBootstrapService>();
         services.AddHostedService<RootZoneRefreshService>();
+        services.AddHostedService<AuthoritativeZoneLoader>();
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);

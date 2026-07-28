@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using DnsZone;
@@ -72,6 +73,21 @@ public static class ZoneFileParser
         catch (Exception ex) when (ex is not FormatException and not OperationCanceledException)
         {
             throw new FormatException($"Failed to parse BIND zone file: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>Parse a BIND zone file from disk with <c>$INCLUDE</c> support.</summary>
+    public static IReadOnlyList<DomainResourceRecord> ParseFile(string path)
+    {
+        var source = new BindFileDnsSource(path, BindZoneUnsupportedFilter.Filter);
+        try
+        {
+            var zone = DnsZoneFile.Parse(source);
+            return BindZoneMapper.MapAll(zone.Records);
+        }
+        catch (Exception ex) when (ex is not FormatException and not OperationCanceledException)
+        {
+            throw new FormatException($"Failed to parse BIND zone file '{path}': {ex.Message}", ex);
         }
     }
 

@@ -486,3 +486,4 @@ $RECYCLE.BIN/
 
 **/.idea
 *.DotSettings.user
+src/Dhcpr.Server/data

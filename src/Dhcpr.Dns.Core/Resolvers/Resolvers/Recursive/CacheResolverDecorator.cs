@@ -25,7 +25,7 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
         }
 
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
-        if (result is not null)
+        if (result is not null && !context.DoNotCacheResponse)
             _cache.Set(context.DomainMessage, result);
 
         return result;

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -12,10 +13,12 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 /// <summary>
 /// Conditional forwarder: longest-suffix match against <see cref="DnsConfiguration.Routes"/>.
 /// Unmatched names fall through to recursive resolution.
+/// Loaded authoritative zones win over forward routes.
 /// </summary>
 public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
 {
     private readonly IInternalDomainClient _internalClient;
+    private readonly AuthoritativeZoneStore _authoritativeZones;
     private readonly ILogger<ForwardResolver> _logger;
     private DnsConfiguration _configuration;
     private readonly IDisposable? _subscription;
@@ -23,9 +26,11 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
     public ForwardResolver(
         IOptionsMonitor<DnsConfiguration> options,
         IInternalDomainClient internalClient,
+        AuthoritativeZoneStore authoritativeZones,
         ILogger<ForwardResolver> logger)
     {
         _internalClient = internalClient;
+        _authoritativeZones = authoritativeZones;
         _logger = logger;
         _configuration = options.CurrentValue;
         _subscription = options.OnChange(c =>
@@ -39,14 +44,17 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        // Directed upstream hops are owned by UpstreamQueryMiddleware.
         if (context.UpstreamEndpoints is { Length: > 0 })
             return null;
 
         if (context.DomainMessage.Questions.Length == 0)
             return null;
 
-        var endpoints = MatchRoute(context.DomainMessage.Questions[0].Name);
+        var questionName = context.DomainMessage.Questions[0].Name;
+        if (_authoritativeZones.FindZone(questionName.ToString()) is not null)
+            return null;
+
+        var endpoints = MatchRoute(questionName);
         if (endpoints is null || endpoints.Length == 0)
             return null;
 

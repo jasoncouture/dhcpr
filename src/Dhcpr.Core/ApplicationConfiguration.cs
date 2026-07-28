@@ -6,6 +6,7 @@ public sealed class ApplicationConfiguration : IValidateSelf
 {
     public const string DataProtectionKeysDirectoryName = "dataprotection-keys";
     public const string CacheDirectoryName = "cache";
+    public const string ZonesDirectoryName = "zones";
     public const string NamedRootFileName = "root-servers.txt";
     public const string RootZoneFileName = "root.zone";
 
@@ -30,7 +31,10 @@ public sealed class ApplicationConfiguration : IValidateSelf
     public string GetRootZonePath()
         => Path.Combine(GetCacheDirectory(), RootZoneFileName);
 
-    /// <summary>Authoritative zone files live at the data root (not under cache/).</summary>
+    public string GetZonesDirectory()
+        => Path.Combine(GetDataDirectory(), ZonesDirectoryName);
+
+    /// <summary>Path under the data directory (used by root-zone helpers).</summary>
     public string GetZoneFilePath(string fileName)
         => Path.Combine(GetDataDirectory(), fileName);
 

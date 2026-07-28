@@ -47,6 +47,8 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return true;
     }
 
+    public void Clear() => (_memoryCache as MemoryCache)?.Clear();
+
     public void Set(DomainMessage request, DomainMessage response)
     {
         if (request.Questions.Length != 1)

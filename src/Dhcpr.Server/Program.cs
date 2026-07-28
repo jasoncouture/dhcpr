@@ -33,7 +33,7 @@ builder.Services.AddMemoryCache(o =>
 });
 
 builder.Services.AddOptionsWithValidateOnStart<DataProtectionKeyOptions>()
-    .Bind(builder.Configuration.GetSection("DataProtection:Keys"));
+    .BindConfiguration("DataProtection:Keys");
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
 

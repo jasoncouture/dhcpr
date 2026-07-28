@@ -354,6 +354,7 @@ public class RecursiveRootResolverTests
             tips,
             internalClient,
             new AuthoritativeZoneStore(),
+            DynamicDnsTestHelpers.CreateStore(),
             NullLogger<RecursiveRootResolver>.Instance);
     }
 

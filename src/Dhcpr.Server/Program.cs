@@ -60,6 +60,7 @@ var app = builder.Build();
 
 app.MapPrometheusScrapingEndpoint();
 app.MapDnsOverHttp();
+app.MapDynDnsUpdate();
 
 Console.WriteLine("Application configuration complete, starting services.");
 app.Run();

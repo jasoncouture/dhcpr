@@ -369,7 +369,12 @@ public class AuthoritativeZoneTests
     {
         var tips = new RootServerTips(new StaticOptionsMonitor<RootServerConfiguration>(
             new RootServerConfiguration { Addresses = ["198.41.0.4:53"] }));
-        return new RecursiveRootResolver(tips, client, store, NullLogger<RecursiveRootResolver>.Instance);
+        return new RecursiveRootResolver(
+            tips,
+            client,
+            store,
+            DynamicDnsTestHelpers.CreateStore(),
+            NullLogger<RecursiveRootResolver>.Instance);
     }
 
     private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>

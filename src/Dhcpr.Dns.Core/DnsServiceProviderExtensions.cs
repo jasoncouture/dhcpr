@@ -1,5 +1,6 @@
 ﻿using Dhcpr.Core;
 using Dhcpr.Dns.Core.Authoritative;
+using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Resolvers.Caching;
@@ -33,10 +34,12 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<RootZoneStore>();
         services.AddSingleton<IRootZoneStore>(static sp => sp.GetRequiredService<RootZoneStore>());
         services.AddSingleton<AuthoritativeZoneStore>();
+        services.AddSingleton<DynamicDnsStore>();
         // Tips bootstrap before root.zone refresh (registration order = start order).
         services.AddHostedService<RootServerTipsBootstrapService>();
         services.AddHostedService<RootZoneRefreshService>();
         services.AddHostedService<AuthoritativeZoneLoader>();
+        services.AddHostedService<DynamicDnsLoader>();
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
@@ -70,6 +73,9 @@ public static class DnsServiceProviderExtensions
         services.AddOptionsWithValidateOnStart<RootServerConfiguration>()
             .BindConfiguration("DNS:RootServers")
             .Validate(static o => o.Validate(), "Invalid DNS root server configuration");
+        services.AddOptionsWithValidateOnStart<DynamicDnsConfiguration>()
+            .BindConfiguration("DynamicDns")
+            .Validate(static o => o.Validate(out _), "Invalid DynamicDns configuration");
         return services;
     }
 

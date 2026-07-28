@@ -40,6 +40,9 @@ gateway:
   enabled: false
   className: traefik
   port: 8443
+  # Listener port for dns-tcp / dns-udp when those routes are enabled.
+  # Defaults to service.dnsPort when empty/omitted.
+  dnsPort: 53
   # Defaults to httpRoute.host when empty.
   hostname: ""
   # Defaults to "<fullname>-tls" when empty.
@@ -55,6 +58,24 @@ httpRoute:
   parentRefs:
     - name: dhcpr
       sectionName: websecure
+
+# Classic DNS over TCP (Gateway API TCPRoute). When gateway.enabled is true,
+# parentRefs point at this chart's Gateway (sectionName: dns-tcp).
+tcpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs:
+    - name: dhcpr
+      sectionName: dns-tcp
+
+# Classic DNS over UDP (Gateway API UDPRoute). When gateway.enabled is true,
+# parentRefs point at this chart's Gateway (sectionName: dns-udp).
+udpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs:
+    - name: dhcpr
+      sectionName: dns-udp
 
 # /data (DataPath) holds zones, dataprotection-keys/, and cache/ (root.zone, tips, …).
 # Use ReadWriteMany if running more than one replica.

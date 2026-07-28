@@ -29,4 +29,20 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: {{ .Values.gateway.certificateSecretName | default (printf "%s-tls" $fullName) }}
+    {{- if .Values.tcpRoute.enabled }}
+    - name: dns-tcp
+      port: {{ .Values.gateway.dnsPort | default .Values.service.dnsPort }}
+      protocol: TCP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- end }}
+    {{- if .Values.udpRoute.enabled }}
+    - name: dns-udp
+      port: {{ .Values.gateway.dnsPort | default .Values.service.dnsPort }}
+      protocol: UDP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- end }}
 {{- end }}

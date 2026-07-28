@@ -5,6 +5,7 @@ namespace Dhcpr.Core;
 public sealed class ApplicationConfiguration : IValidateSelf
 {
     public const string DataProtectionKeysDirectoryName = "dataprotection-keys";
+    public const string CacheDirectoryName = "cache";
     public const string NamedRootFileName = "root-servers.txt";
     public const string RootZoneFileName = "root.zone";
 
@@ -17,15 +18,19 @@ public sealed class ApplicationConfiguration : IValidateSelf
         return Path.GetFullPath(DataPath);
     }
 
+    public string GetCacheDirectory()
+        => Path.Combine(GetDataDirectory(), CacheDirectoryName);
+
     public string GetDataProtectionKeysPath()
         => Path.Combine(GetDataDirectory(), DataProtectionKeysDirectoryName);
 
     public string GetNamedRootCachePath()
-        => Path.Combine(GetDataDirectory(), NamedRootFileName);
+        => Path.Combine(GetCacheDirectory(), NamedRootFileName);
 
     public string GetRootZonePath()
-        => Path.Combine(GetDataDirectory(), RootZoneFileName);
+        => Path.Combine(GetCacheDirectory(), RootZoneFileName);
 
+    /// <summary>Authoritative zone files live at the data root (not under cache/).</summary>
     public string GetZoneFilePath(string fileName)
         => Path.Combine(GetDataDirectory(), fileName);
 

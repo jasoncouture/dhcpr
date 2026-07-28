@@ -20,6 +20,9 @@ public static class RootZonePaths
     public static string GetDirectory(IOptionsMonitor<ApplicationConfiguration> options)
         => options.CurrentValue.GetDataDirectory();
 
+    public static string GetCacheDirectory(IOptionsMonitor<ApplicationConfiguration> options)
+        => options.CurrentValue.GetCacheDirectory();
+
     public static string GetRootZonePath(IOptionsMonitor<ApplicationConfiguration> options)
         => options.CurrentValue.GetRootZonePath();
 

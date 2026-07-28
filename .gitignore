@@ -6,7 +6,9 @@
 **/dev.db-shm
 **/dev.db-wal
 
-# Downloaded DNS root zone cache
+# Generated/downloaded under DataPath/cache (and legacy loose root.zone)
+**/cache/root.zone
+**/cache/root-servers.txt
 root.zone
 
 # User-specific files

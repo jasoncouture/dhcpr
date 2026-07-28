@@ -19,7 +19,7 @@ ENV DOTNET_URLS=http://+:8080 \
 
 VOLUME ["/data"]
 
-RUN mkdir -p /data/dataprotection-keys
+RUN mkdir -p /data/dataprotection-keys /data/cache
 
 RUN apk add --no-cache \
     curl \

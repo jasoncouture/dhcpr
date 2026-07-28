@@ -9,7 +9,6 @@ using Dhcpr.Dns.Core.Protocol.Zone;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
-using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -170,17 +169,17 @@ public class AuthoritativeZoneTests
     }
 
     [Fact]
-    public async Task Recursive_StartsAtLocalZone_NoRootQuery()
+    public async Task Authoritative_StartsAtLocalZone_NoRootQuery()
     {
         var store = new AuthoritativeZoneStore();
         store.Publish([BuildZone(FooBarZone, "foo.bar.bind")]);
 
         var client = new CountingInternalClient(_ => throw new InvalidOperationException("should not query upstream"));
-        var resolver = CreateResolver(client, store);
+        var middleware = CreateAuthoritative(client, store);
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
@@ -189,7 +188,7 @@ public class AuthoritativeZoneTests
     }
 
     [Fact]
-    public async Task Recursive_ReferralFollowsChildNs()
+    public async Task Authoritative_ReferralFollowsChildNs()
     {
         var childNs = new IPEndPoint(IPAddress.Parse("192.0.2.50"), 53);
         var store = new AuthoritativeZoneStore();
@@ -218,11 +217,11 @@ public class AuthoritativeZoneTests
             return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
         });
 
-        var resolver = CreateResolver(client, store);
+        var middleware = CreateAuthoritative(client, store);
         var request = DomainMessage.CreateRequest("host.child.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Contains(result!.Records.Answers, r =>
@@ -233,7 +232,7 @@ public class AuthoritativeZoneTests
     }
 
     [Fact]
-    public async Task Recursive_ChildZoneAtCut_AnswersLocallyWithoutParentLoop()
+    public async Task Authoritative_ChildZoneAtCut_AnswersLocallyWithoutParentLoop()
     {
         var parent = BuildZone(FooBarZone, "foo.bar.bind");
         var child = BuildZone("""
@@ -249,11 +248,11 @@ public class AuthoritativeZoneTests
         store.Publish([parent, child]);
 
         var client = new CountingInternalClient(_ => throw new InvalidOperationException("no upstream"));
-        var resolver = CreateResolver(client, store);
+        var middleware = CreateAuthoritative(client, store);
         var request = DomainMessage.CreateRequest("host.child.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
-        var result = await resolver.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
@@ -363,18 +362,10 @@ public class AuthoritativeZoneTests
         return AuthoritativeZoneBuilder.FromRecords(records, path);
     }
 
-    private static RecursiveRootResolver CreateResolver(
+    private static AuthoritativeZoneMiddleware CreateAuthoritative(
         IInternalDomainClient client,
         AuthoritativeZoneStore store)
-    {
-        var tips = new RootServerTips(new StaticOptionsMonitor<RootServerConfiguration>(
-            new RootServerConfiguration { Addresses = ["198.41.0.4:53"] }));
-        return new RecursiveRootResolver(
-            tips,
-            client,
-            store,
-            NullLogger<RecursiveRootResolver>.Instance);
-    }
+        => new(store, client);
 
     private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
     {

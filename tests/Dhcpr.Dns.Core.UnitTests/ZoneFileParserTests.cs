@@ -111,6 +111,17 @@ public class ZoneFileParserTests
         Assert.False(snapshot.TryGetRecords("host1.example", out _));
     }
 
+    [Fact]
+    public void DomainRecordType_IncludesEveryDnsZoneResourceRecordType()
+    {
+        foreach (var name in Enum.GetNames<DnsZone.Records.ResourceRecordType>())
+        {
+            Assert.True(
+                Enum.TryParse<DomainRecordType>(name, ignoreCase: true, out _),
+                $"Missing DomainRecordType.{name}");
+        }
+    }
+
     private static string FixturePath(string name)
         => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 }

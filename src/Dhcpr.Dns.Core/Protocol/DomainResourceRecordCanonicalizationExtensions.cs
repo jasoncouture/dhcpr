@@ -143,7 +143,10 @@ public static class DomainResourceRecordCanonicalizationExtensions
 
     private static bool RequiresLowercaseRData(DomainRecordType type)
     {
-        return type is DomainRecordType.NS or DomainRecordType.CNAME or DomainRecordType.PTR or DomainRecordType.MX;
+        return type is DomainRecordType.NS or DomainRecordType.CNAME or DomainRecordType.PTR
+            or DomainRecordType.MX or DomainRecordType.DNAME or DomainRecordType.ALIAS
+            or DomainRecordType.MD or DomainRecordType.MF or DomainRecordType.MB
+            or DomainRecordType.MG or DomainRecordType.MR;
     }
 
     public static void EncodeCanonicalName(ref Span<byte> span, DomainLabels labels)

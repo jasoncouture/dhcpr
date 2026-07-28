@@ -30,22 +30,56 @@ public static class BindZoneMapper
         return record switch
         {
             AResourceRecord a when a.Address.AddressFamily == AddressFamily.InterNetwork
-                => new DomainResourceRecord(name, DomainRecordType.A, DomainRecordClass.IN, ttl, new IPAddressData(a.Address)),
+                => Rr(name, DomainRecordType.A, ttl, new IPAddressData(a.Address)),
             AaaaResourceRecord aaaa when aaaa.Address.AddressFamily == AddressFamily.InterNetworkV6
-                => new DomainResourceRecord(name, DomainRecordType.AAAA, DomainRecordClass.IN, ttl, new IPAddressData(aaaa.Address)),
+                => Rr(name, DomainRecordType.AAAA, ttl, new IPAddressData(aaaa.Address)),
             NsResourceRecord ns
-                => new DomainResourceRecord(name, DomainRecordType.NS, DomainRecordClass.IN, ttl, new NameData(ToLabels(ns.NameServer))),
+                => Rr(name, DomainRecordType.NS, ttl, new NameData(ToLabels(ns.NameServer))),
             CNameResourceRecord cname
-                => new DomainResourceRecord(name, DomainRecordType.CNAME, DomainRecordClass.IN, ttl, new NameData(ToLabels(cname.CanonicalName))),
+                => Rr(name, DomainRecordType.CNAME, ttl, new NameData(ToLabels(cname.CanonicalName))),
+            DNameResourceRecord dname
+                => Rr(name, DomainRecordType.DNAME, ttl, new NameData(ToLabels(dname.Target))),
+            AliasResourceRecord alias
+                => Rr(name, DomainRecordType.ALIAS, ttl, new NameData(ToLabels(alias.Target))),
             PtrResourceRecord ptr
-                => new DomainResourceRecord(name, DomainRecordType.PTR, DomainRecordClass.IN, ttl, new NameData(ToLabels(ptr.HostName))),
+                => Rr(name, DomainRecordType.PTR, ttl, new NameData(ToLabels(ptr.HostName))),
             MxResourceRecord mx
-                => new DomainResourceRecord(name, DomainRecordType.MX, DomainRecordClass.IN, ttl, new MailExchangerData(mx.Preference, ToLabels(mx.Exchange))),
+                => Rr(name, DomainRecordType.MX, ttl, new MailExchangerData(mx.Preference, ToLabels(mx.Exchange))),
             TxtResourceRecord txt
-                => new DomainResourceRecord(name, DomainRecordType.TXT, DomainRecordClass.IN, ttl, new TextData(txt.Content)),
+                => Rr(name, DomainRecordType.TXT, ttl, new TextData(txt.Content)),
+            HInfoResourceRecord hinfo
+                => Rr(name, DomainRecordType.HINFO, ttl, new HostInformationData(hinfo.Cpu, hinfo.Os)),
             SrvResourceRecord srv
-                => new DomainResourceRecord(name, DomainRecordType.SRV, DomainRecordClass.IN, ttl,
-                    new ServiceData(srv.Priority, srv.Weight, srv.Port, ToLabels(srv.Target))),
+                => Rr(name, DomainRecordType.SRV, ttl, new ServiceData(srv.Priority, srv.Weight, srv.Port, ToLabels(srv.Target))),
+            CAAResourceRecord caa
+                => Rr(name, DomainRecordType.CAA, ttl,
+                    new CertificationAuthorityAuthorizationData((byte)caa.Flag, caa.Tag, caa.Value)),
+            TLSAResourceRecord tlsa
+                => Rr(name, DomainRecordType.TLSA, ttl,
+                    new TlsAssociationData(
+                        (byte)tlsa.CertificateUsage,
+                        (byte)tlsa.Selector,
+                        (byte)tlsa.MatchingType,
+                        Convert.FromHexString(tlsa.CertificateAssociationData.Replace(" ", "", StringComparison.Ordinal))
+                            .ToImmutableArray())),
+            SSHFPResourceRecord sshfp
+                => Rr(name, DomainRecordType.SSHFP, ttl,
+                    new SshFingerprintData(
+                        (byte)sshfp.AlgorithmNumber,
+                        (byte)sshfp.FingerprintType,
+                        Convert.FromHexString(sshfp.Fingerprint.Replace(" ", "", StringComparison.Ordinal))
+                            .ToImmutableArray())),
+            NaptrResourceRecord naptr
+                => Rr(name, DomainRecordType.NAPTR, ttl,
+                    new NamingAuthorityPointerData(
+                        naptr.Order,
+                        naptr.Preference,
+                        naptr.Flags,
+                        naptr.Services,
+                        naptr.Regexp,
+                        ToLabels(naptr.Replacement))),
+            LuaResourceRecord lua
+                => Rr(name, DomainRecordType.LUA, ttl, new LuaRecordData(lua.TargetType, lua.Script)),
             SoaResourceRecord soa
                 => MapSoa(name, ttl, soa),
             DsResourceRecord ds
@@ -54,15 +88,21 @@ public static class BindZoneMapper
         };
     }
 
+    private static DomainResourceRecord Rr(
+        DomainLabels name,
+        DomainRecordType type,
+        TimeSpan ttl,
+        IDomainResourceRecordData data)
+        => new(name, type, DomainRecordClass.IN, ttl, data);
+
     private static DomainResourceRecord MapSoa(DomainLabels name, TimeSpan ttl, SoaResourceRecord soa)
     {
         if (!int.TryParse(soa.SerialNumber, NumberStyles.Integer, CultureInfo.InvariantCulture, out var serial))
             throw new FormatException($"Invalid SOA serial '{soa.SerialNumber}'");
 
-        return new DomainResourceRecord(
+        return Rr(
             name,
             DomainRecordType.SOA,
-            DomainRecordClass.IN,
             ttl,
             new StartOfAuthorityData(
                 ToLabels(soa.NameServer),
@@ -80,10 +120,9 @@ public static class BindZoneMapper
             throw new FormatException($"Invalid DS key tag '{ds.KeyTag}'");
 
         var hex = ds.Hash.Replace(" ", "", StringComparison.Ordinal);
-        return new DomainResourceRecord(
+        return Rr(
             name,
             DomainRecordType.DS,
-            DomainRecordClass.IN,
             ttl,
             new DelegationSignerData(
                 keyTag,

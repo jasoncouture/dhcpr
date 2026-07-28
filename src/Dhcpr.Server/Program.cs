@@ -32,22 +32,18 @@ builder.Services.AddMemoryCache(o =>
     o.ExpirationScanFrequency = TimeSpan.FromMinutes(5);
 });
 
-builder.Services.AddOptionsWithValidateOnStart<DataProtectionKeyOptions>()
-    .BindConfiguration("DataProtection:Keys");
+builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
+    .Configure<IConfiguration>((options, configuration) => configuration.Bind(options))
+    .Validate(static o => o.Validate(), "DataPath must be set");
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
 
 builder.Services.AddOptions<KeyManagementOptions>()
-    .Configure<ILoggerFactory, IOptions<DataProtectionKeyOptions>>((options, loggerFactory, keyOptions) =>
+    .Configure<ILoggerFactory, IOptions<ApplicationConfiguration>>((options, loggerFactory, application) =>
     {
-        if (string.IsNullOrWhiteSpace(keyOptions.Value.Path)) return;
-        var target = Directory.CreateDirectory(keyOptions.Value.Path);
+        var target = Directory.CreateDirectory(application.Value.GetDataProtectionKeysPath());
         options.XmlRepository = new FileSystemXmlRepository(target, loggerFactory);
     });
-
-builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
-    .Configure<IConfiguration>((options, configuration) => configuration.Bind(options))
-    .Validate(static o => o.Validate(), "DataPath must be set");
 
 builder.Services.AddCoreServices();
 builder.Services.AddDns();

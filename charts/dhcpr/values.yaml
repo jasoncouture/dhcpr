@@ -56,8 +56,8 @@ httpRoute:
     - name: dhcpr
       sectionName: websecure
 
-# /data holds Data Protection keys and root-server cache. Use ReadWriteMany if
-# running more than one replica.
+# /data (DataPath) holds Data Protection keys, root.zone, tip cache, and zones.
+# Use ReadWriteMany if running more than one replica.
 persistence:
   size: 1Gi
   storageClassName: ""

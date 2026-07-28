@@ -6,8 +6,8 @@ namespace Dhcpr.Dns.Core.RootZone;
 
 public static class RootZonePaths
 {
-    public const string RootZoneFileName = "root.zone";
-    public const string NamedRootFileName = "root-servers.txt";
+    public const string RootZoneFileName = ApplicationConfiguration.RootZoneFileName;
+    public const string NamedRootFileName = ApplicationConfiguration.NamedRootFileName;
     public const string RootZoneUrl = "https://www.internic.net/domain/root.zone";
 
     public static readonly string[] NamedRootUrls =
@@ -18,19 +18,14 @@ public static class RootZonePaths
     ];
 
     public static string GetDirectory(IOptionsMonitor<ApplicationConfiguration> options)
-    {
-        var path = options.CurrentValue.DataPath;
-        if (string.IsNullOrWhiteSpace(path))
-            return Path.GetFullPath(".");
-        return Path.GetFullPath(path);
-    }
+        => options.CurrentValue.GetDataDirectory();
 
     public static string GetRootZonePath(IOptionsMonitor<ApplicationConfiguration> options)
-        => Path.Combine(GetDirectory(options), RootZoneFileName);
+        => options.CurrentValue.GetRootZonePath();
 
     public static string GetNamedRootCachePath(IOptionsMonitor<ApplicationConfiguration> options)
-        => Path.Combine(GetDirectory(options), NamedRootFileName);
+        => options.CurrentValue.GetNamedRootCachePath();
 
     public static string GetZoneFilePath(IOptionsMonitor<ApplicationConfiguration> options, string fileName)
-        => Path.Combine(GetDirectory(options), fileName);
+        => options.CurrentValue.GetZoneFilePath(fileName);
 }

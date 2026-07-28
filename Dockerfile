@@ -13,10 +13,9 @@ FROM harbor.instigaterevolution.com/dockerhub/alpine:3.24 AS final
 WORKDIR /app
 EXPOSE 8080
 ENV DOTNET_URLS=http://+:8080 \
-    DataProtection__Keys__Path=/data/dataprotection-keys \
+    DataPath=/data \
     DHCP__ENABLED="false" \
-    DNS__ROOTSERVERS__DOWNLOAD="true" \
-    DNS__ROOTSERVERS__CACHEFILEPATH="/data/root-servers.txt"
+    DNS__ROOTSERVERS__DOWNLOAD="true"
 
 VOLUME ["/data"]
 

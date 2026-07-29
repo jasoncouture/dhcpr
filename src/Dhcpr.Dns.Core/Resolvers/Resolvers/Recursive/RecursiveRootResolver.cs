@@ -65,7 +65,21 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     new DomainLabels(zoneLabels.ToImmutableArray()),
                     DomainRecordType.NS);
 
-                var responseMessage = await QueryUpstreamAsync(context, message, rootEndPoints, cancellationToken);
+                // Zone-cut discovery shares the client DnssecScope. NODATA/NSEC from
+                // intermediate labels (e.g. cdn.cloudflare.net) must not Observe into
+                // Status — that sticky-Bogus’d deep CDN names like speedtest’s target.
+                context.DnssecScope?.PushIgnoreStatus();
+                DomainMessage responseMessage;
+                try
+                {
+                    responseMessage = await QueryUpstreamAsync(
+                        context, message, rootEndPoints, cancellationToken);
+                }
+                finally
+                {
+                    context.DnssecScope?.PopIgnoreStatus();
+                }
+
                 using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.

@@ -236,6 +236,9 @@ public sealed class DnssecMessageValidator
                 question.Name.ToString(),
                 question.Type,
                 response.Flags.ResponseCode);
+
+            await EnsureNegativeProofKeysAsync(context, allRecords, cancellationToken).ConfigureAwait(false);
+
             var nsecOutcome = ValidateNegativeProof(scope, question, response, allRecords, now);
             if (nsecOutcome is DnssecValidationStatus.Bogus)
             {
@@ -247,9 +250,33 @@ public sealed class DnssecMessageValidator
                 verifiedAny = true;
             else if (nsecOutcome is DnssecValidationStatus.Insecure)
                 return DnssecValidationStatus.Insecure;
+            else if (nsecOutcome is DnssecValidationStatus.Indeterminate)
+                return DnssecValidationStatus.Indeterminate;
         }
 
         return verifiedAny ? DnssecValidationStatus.Secure : DnssecValidationStatus.Indeterminate;
+    }
+
+    private async ValueTask EnsureNegativeProofKeysAsync(
+        DomainMessageContext context,
+        List<DomainResourceRecord> allRecords,
+        CancellationToken cancellationToken)
+    {
+        var signers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in allRecords)
+        {
+            if (record.Type is not (DomainRecordType.NSEC or DomainRecordType.NSEC3))
+                continue;
+            var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, record.Name, record.Type);
+            foreach (var sigRecord in rrsigs)
+            {
+                if (sigRecord.Data is ResourceRecordSignatureData rrsig)
+                    signers.Add(rrsig.SignersName.ToString());
+            }
+        }
+
+        foreach (var signer in signers)
+            await EnsureZoneKeysAvailableAsync(context, signer, cancellationToken).ConfigureAwait(false);
     }
 
     private DnssecValidationStatus ValidateNegativeProof(
@@ -277,6 +304,7 @@ public sealed class DnssecMessageValidator
         List<DomainResourceRecord> allRecords,
         DateTimeOffset now)
     {
+        var sawSignedNsecWithoutKeys = false;
         foreach (var nsecRecord in nsecs)
         {
             if (nsecRecord.Data is not NextSecureData nsec)
@@ -288,7 +316,16 @@ public sealed class DnssecMessageValidator
 
             var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
             if (!scope.TryGetKeys(signer, out var keys))
+            {
+                // Zone-walk NS probes often see NSEC before the signer’s DNSKEY is cached
+                // in this scope. Missing keys must not sticky-Bogus the client query.
+                sawSignedNsecWithoutKeys = true;
+                _logger.LogDebug(
+                    "DNSSEC NSEC signer keys missing for {Signer} (owner={Owner})",
+                    signer,
+                    nsecRecord.Name.ToString());
                 continue;
+            }
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, [nsecRecord], rrsigs, keys.Keys, now))
             {
@@ -321,6 +358,14 @@ public sealed class DnssecMessageValidator
                     nsec.NextDomainName.ToString());
                 return DnssecValidationStatus.Secure;
             }
+        }
+
+        if (sawSignedNsecWithoutKeys)
+        {
+            _logger.LogDebug(
+                "DNSSEC indeterminate: signed NSEC present but no keys for {Name}",
+                question.Name.ToString());
+            return DnssecValidationStatus.Indeterminate;
         }
 
         _logger.LogDebug("DNSSEC no covering NSEC for {Name}", question.Name.ToString());
@@ -356,8 +401,10 @@ public sealed class DnssecMessageValidator
             var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
             if (!scope.TryGetKeys(signer, out var keys))
             {
-                _logger.LogDebug("DNSSEC NSEC3 signer keys missing for {Signer}", signer);
-                return DnssecValidationStatus.Bogus;
+                _logger.LogDebug(
+                    "DNSSEC indeterminate: NSEC3 signer keys missing for {Signer}",
+                    signer);
+                return DnssecValidationStatus.Indeterminate;
             }
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, records, rrsigs, keys.Keys, now))

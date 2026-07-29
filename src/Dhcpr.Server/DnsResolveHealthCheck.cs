@@ -28,6 +28,31 @@ public sealed class DnsResolveHealthCheck : IHealthCheck
         _options = options;
     }
 
+    private static async Task<string?> ValidateRequestAsync(IDnsQueryExecutor executor, DomainMessage query,
+        CancellationToken cancellationToken)
+    {
+        var response = await executor.QueryAsync(query, cancellationToken);
+        
+        if (response is null)
+        {
+            return "no response";
+        }
+                
+
+        if (response.Flags.ResponseCode is not DomainResponseCode.NoError and not DomainResponseCode.NameError)
+        {
+            return $"rcode={response.Flags.ResponseCode}";
+        }
+
+        if (!response.Records.Answers.Any(static r =>
+                r.Type is DomainRecordType.A or DomainRecordType.AAAA or DomainRecordType.CNAME))
+        {
+            return "no address/CNAME answer";
+        }
+
+        return null;
+    }
+
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
@@ -51,23 +76,13 @@ public sealed class DnsResolveHealthCheck : IHealthCheck
             try
             {
                 var request = DomainMessage.CreateRequest(name, DomainRecordType.A);
-                var response = await _executor.QueryAsync(request, token).ConfigureAwait(false);
-                if (response is null)
+                var aErrorMessage = await ValidateRequestAsync(_executor, request, token);
+                request = DomainMessage.CreateRequest(name, DomainRecordType.AAAA);
+                var aaaaErrorMessage = await ValidateRequestAsync(_executor, request, token);
+                if (aErrorMessage is not null && aaaaErrorMessage is not null)
                 {
-                    failures.Add((name, "no response"));
-                    return;
-                }
-
-                if (response.Flags.ResponseCode is not DomainResponseCode.NoError)
-                {
-                    failures.Add((name, $"rcode={response.Flags.ResponseCode}"));
-                    return;
-                }
-
-                if (!response.Records.Answers.Any(static r =>
-                        r.Type is DomainRecordType.A or DomainRecordType.AAAA or DomainRecordType.CNAME))
-                {
-                    failures.Add((name, "no address/CNAME answer"));
+                    failures.Add((name, aErrorMessage));
+                    failures.Add((name, aaaaErrorMessage));
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

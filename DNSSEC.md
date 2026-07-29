@@ -4,7 +4,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working. Do not mark a phase done while core Done-when items remain stubs.
 
-**Phase 3 incomplete.** Next up: finish Phase 3 (wire validator + chain of trust). Do not start Phase 4 until Phase 3 is actually done.
+**Phase 3 complete.** Next up: Phase 4 (Cache / CNAME). Do not start Phase 4 until this doc still matches the code.
 
 ---
 
@@ -12,12 +12,13 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 | Present | Gap |
 |---------|-----|
-| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1 | No DS / DNSKEY fetches along the chain |
-| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | Trust anchors in config only — never loaded into validation |
-| `IDnssecValidator` crypto helpers (unit-tested) | `DnssecValidationMiddleware` injects validator and **never calls it** |
-| `DnssecScope` per client query, passed on re-entry | Scope is only a `Status` enum; `Secure` / `Bogus` never set |
-| Middleware strips upstream AD on every answer | AD / SERVFAIL / CD branches are dead code |
-| Forward vs recursive split; DynDNS / zone middleware separate | Cache / CNAME ignore validation state (Phase 4) |
+| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1 | Cache / CNAME ignore validation state (Phase 4) |
+| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | NSEC3 proofs deferred to Phase 5 |
+| `IDnssecValidator` crypto + `DnssecRrsetVerifier` / `DnssecMessageValidator` | Integration tests against live signed zones (Phase 5) |
+| Trust anchors loaded into `DnssecScope` and used for DNSKEY auth | Enable/disable + algorithm allow/deny (Phase 5) |
+| Middleware calls validator; fetches DS/DNSKEY; sets Secure/Bogus/Insecure | — |
+| Client AD=1 when Secure; SERVFAIL when Bogus and CD=0 | — |
+| NSEC proofs for NXDOMAIN/NODATA (when NSEC present) | — |
 
 `RecursiveRootResolver` is roots-only label descent. Local zones and DynDNS are their own middleware — DNSSEC validation stays in the decorator, not in the recursive resolver.
 

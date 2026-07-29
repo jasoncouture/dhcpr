@@ -64,6 +64,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
         services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
         services.AddSingleton<IDnssecValidator, DnssecValidator>();
+        services.AddSingleton<DnssecMessageValidator>();
 
         services.AddSingleton<ISocketFactory, SocketFactory>();
 

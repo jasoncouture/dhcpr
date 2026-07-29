@@ -4,7 +4,7 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 **Working rule:** implement **one phase at a time, then stop**. Do not start the next phase until the current one is merged and working. Do not mark a phase done while core Done-when items remain stubs.
 
-**Phase 3 complete.** Next up: Phase 4 (Cache / CNAME). Do not start Phase 4 until this doc still matches the code.
+**Phase 4 complete.** Next up: Phase 5 (Hardening). Do not start Phase 5 until this doc still matches the code.
 
 ---
 
@@ -12,13 +12,15 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 | Present | Gap |
 |---------|-----|
-| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1; `RootZoneMiddleware` skips directed hops | Cache / CNAME ignore validation state (Phase 4) |
-| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | Integration tests against live signed zones (Phase 5) |
-| `IDnssecValidator` crypto + `DnssecRrsetVerifier` / `DnssecMessageValidator` | Enable/disable + algorithm allow/deny (Phase 5) |
+| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1; `RootZoneMiddleware` skips directed hops | Integration tests against live signed zones (Phase 5) |
+| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | Enable/disable + algorithm allow/deny (Phase 5) |
+| `IDnssecValidator` crypto + `DnssecRrsetVerifier` / `DnssecMessageValidator` | Logging of validation failures without drowning in internal-hop noise (Phase 5) |
 | Trust anchors loaded into `DnssecScope` and used for DNSKEY auth | — |
 | Middleware calls validator; fetches DS/DNSKEY; sets Secure/Bogus/Insecure | — |
 | Client AD=1 when Secure; SERVFAIL when Bogus and CD=0 | — |
 | NSEC + NSEC3 proofs for NXDOMAIN/NODATA (Opt-Out → Insecure) | — |
+| Cache retains RRSIGs + security status; never serves AD from cached flags | — |
+| CNAME chase keeps covering RRSIGs; AD only if every hop is Secure | — |
 
 `RecursiveRootResolver` is roots-only label descent. Local zones and DynDNS are their own middleware — DNSSEC validation stays in the decorator, not in the recursive resolver.
 
@@ -89,6 +91,7 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 **Goal:** Wire-accurate types for EDNS and DNSSEC RRs (needed before validation).
 
 **Done when:**
+
 - [x] Typed EDNS(0) OPT RR with DO bit; encode/decode tests
 - [x] `UpstreamQueryMiddleware` attaches DO=1 on outbound queries
 - [x] UDP reply size uses client OPT payload size
@@ -129,13 +132,15 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ## Phase 4 — Cache / CNAME DNSSEC semantics
 
+**Status: done.**
+
 **Goal:** Cache and CNAME chase respect validation state.
 
 **Done when:**
 
-- Cache retains RRSIGs; stores security state; never serves unauthenticated data as AD
-- Rules for caching upstream hops (DNSKEY / DS / NS) are explicit and tested
-- CNAME decorator: AD only if every hop authenticates
+- [x] Cache retains RRSIGs; stores security state; never serves unauthenticated data as AD
+- [x] Rules for caching upstream hops (DNSKEY / DS / NS) are explicit and tested
+- [x] CNAME decorator: AD only if every hop authenticates (shared `DnssecScope`; covering RRSIGs kept)
 
 **Stop here.**
 

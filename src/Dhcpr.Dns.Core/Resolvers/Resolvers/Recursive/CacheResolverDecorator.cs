@@ -18,9 +18,10 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        if (_cache.TryGet(context.DomainMessage, out var cached) && cached is not null)
+        if (_cache.TryGet(context.DomainMessage, out var cached, out var securityStatus) && cached is not null)
         {
             context.CacheHit = true;
+            context.CachedDnssecStatus = securityStatus;
             return cached;
         }
 

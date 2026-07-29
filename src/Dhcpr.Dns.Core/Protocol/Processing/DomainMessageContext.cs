@@ -44,6 +44,11 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public bool CacheHit { get; set; }
 
     /// <summary>
+    /// DNSSEC status associated with a cache hit (Unchecked when miss or legacy entry).
+    /// </summary>
+    public DnssecValidationStatus CachedDnssecStatus { get; set; }
+
+    /// <summary>
     /// When true, the cache decorator must not store the response
     /// (e.g. answers from authoritative zone files).
     /// </summary>

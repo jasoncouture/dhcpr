@@ -1,5 +1,6 @@
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Validation;
 
 using Microsoft.Extensions.Logging;
@@ -10,15 +11,18 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _innerMiddleware;
     private readonly DnssecMessageValidator _validator;
+    private readonly IDnsResponseCache _cache;
     private readonly ILogger<DnssecValidationMiddleware> _logger;
 
     public DnssecValidationMiddleware(
         IDomainMessageMiddleware innerMiddleware,
         DnssecMessageValidator validator,
+        IDnsResponseCache cache,
         ILogger<DnssecValidationMiddleware> logger)
     {
         _innerMiddleware = innerMiddleware;
         _validator = validator;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -36,7 +40,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         if (result is null)
             return null;
 
-        // Never copy upstream AD.
+        // Never copy upstream / cache AD — AD is set only from local scope status below.
         result = result with { Flags = result.Flags with { Authentic = false } };
 
         if (context.DnssecScope is null)
@@ -47,18 +51,24 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
             : null;
         var before = context.DnssecScope.Status;
 
+        // Validate even on cache hits: RRSIGs are retained in cache, so crypto can
+        // re-verify and load DNSKEY/DS into scope without a network fetch for the answer.
         await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
+
+        if (!context.CacheHit && !context.DoNotCacheResponse)
+            _cache.UpdateSecurityStatus(context.DomainMessage, context.DnssecScope.Status);
 
         var after = context.DnssecScope.Status;
         _logger.LogDebug(
-            "DNSSEC {Hop} {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth})",
+            "DNSSEC {Hop} {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth}, cache={Cache})",
             context.IsInternal ? "hop" : "client",
-            question?.Name,
+            question?.Name.ToString(),
             question?.Type,
             result.Flags.ResponseCode,
             before,
             after,
-            context.InternalHopDepth);
+            context.InternalHopDepth,
+            context.CacheHit);
 
         if (context.IsInternal)
             return result;
@@ -69,7 +79,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
             {
                 _logger.LogDebug(
                     "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)",
-                    question?.Name,
+                    question?.Name.ToString(),
                     question?.Type);
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
@@ -79,11 +89,12 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
 
             _logger.LogDebug(
                 "DNSSEC returning bogus answer for {Name}/{Type} (CD=1)",
-                question?.Name,
+                question?.Name.ToString(),
                 question?.Type);
             return result;
         }
 
+        // Client AD only when the whole query (including CNAME chase hops) is Secure.
         if (context.DnssecScope.Status == DnssecValidationStatus.Secure)
         {
             _logger.LogDebug("DNSSEC setting AD for {Name}/{Type}", question?.Name.ToString(), question?.Type);

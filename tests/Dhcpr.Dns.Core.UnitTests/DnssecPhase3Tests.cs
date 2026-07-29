@@ -5,9 +5,11 @@ using System.Security.Cryptography;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 using Dhcpr.Dns.Core.Validation;
 
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -223,6 +225,7 @@ public class DnssecPhase3Tests
         return new DnssecValidationMiddleware(
             new FixedInner(response),
             messageValidator,
+            new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 })),
             NullLogger<DnssecValidationMiddleware>.Instance);
     }
 

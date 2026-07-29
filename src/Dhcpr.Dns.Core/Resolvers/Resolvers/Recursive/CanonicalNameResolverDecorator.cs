@@ -41,13 +41,14 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
             return result;
 
         // Never trust address RRs bundled with a CNAME — chase the target ourselves.
+        // Keep CNAME + covering RRSIGs so DNSSEC can authenticate each hop's alias.
         result = result with
         {
             Records = result.Records with
             {
-                Answers = result.Records.Answers
-                    .Where(i => i.Type is DomainRecordType.CNAME)
-                    .ToImmutableArray()
+                Answers = KeepTypesWithCoveringRrsigs(
+                    result.Records.Answers,
+                    DomainRecordType.CNAME)
             }
         };
 
@@ -60,7 +61,7 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         for (var depth = 0; depth < MaxCnameDepth; depth++)
         {
             if (result.Records.Answers.Any(i => i.Type == questionType))
-                return result;
+                return FinalizeChase(result);
 
             var nextTarget = GetTerminalCnameTarget(result.Records.Answers);
             if (nextTarget is null)
@@ -84,11 +85,11 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                 or DomainResponseCode.Refused)
                 return ServFail(context.DomainMessage);
 
-            var chasedCnames = nextResponse.Records.Answers
-                .Where(i => i.Type is DomainRecordType.CNAME)
-                .ToImmutableArray();
+            var chasedCnames = KeepTypesWithCoveringRrsigs(
+                nextResponse.Records.Answers,
+                DomainRecordType.CNAME);
 
-            if (chasedCnames.Length > 0)
+            if (chasedCnames.Any(i => i.Type is DomainRecordType.CNAME))
             {
                 result = result with
                 {
@@ -98,31 +99,31 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                     }
                 };
 
-                foreach (var cname in chasedCnames)
+                foreach (var cname in chasedCnames.Where(r => r.Type is DomainRecordType.CNAME))
                     seen.Add(cname.Name.ToString());
                 continue;
             }
 
-            var chasedAddresses = nextResponse.Records.Answers
-                .Where(i => i.Type == questionType)
-                .ToImmutableArray();
+            var chasedAddresses = KeepTypesWithCoveringRrsigs(
+                nextResponse.Records.Answers,
+                questionType);
 
-            if (chasedAddresses.Length > 0)
+            if (chasedAddresses.Any(i => i.Type == questionType))
             {
-                return result with
+                return FinalizeChase(result with
                 {
                     Flags = result.Flags with { ResponseCode = DomainResponseCode.NoError },
                     Records = result.Records with
                     {
                         Answers = result.Records.Answers.Concat(chasedAddresses).ToImmutableArray()
                     }
-                };
+                });
             }
 
             // Tip had no CNAME and no address of the requested type.
             if (nextResponse.Flags.ResponseCode is DomainResponseCode.NameError)
             {
-                return result with
+                return FinalizeChase(result with
                 {
                     Flags = result.Flags with { ResponseCode = DomainResponseCode.NameError },
                     Records = result.Records with
@@ -131,11 +132,11 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                         Authorities = nextResponse.Records.Authorities,
                         Additional = ImmutableArray<DomainResourceRecord>.Empty
                     }
-                };
+                });
             }
 
             // NODATA at tip: name exists, no QTYPE — keep CNAME chain, NOERROR.
-            return result with
+            return FinalizeChase(result with
             {
                 Flags = result.Flags with { ResponseCode = DomainResponseCode.NoError },
                 Records = result.Records with
@@ -144,16 +145,16 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                     Authorities = nextResponse.Records.Authorities,
                     Additional = ImmutableArray<DomainResourceRecord>.Empty
                 }
-            };
+            });
         }
 
         // Could not complete the chase (loop / depth / missing tip).
         if (result.Records.Answers.Any(i => i.Type == questionType))
-            return result;
+            return FinalizeChase(result);
 
         if (lastChase?.Flags.ResponseCode is DomainResponseCode.NameError)
         {
-            return result with
+            return FinalizeChase(result with
             {
                 Flags = result.Flags with { ResponseCode = DomainResponseCode.NameError },
                 Records = result.Records with
@@ -161,10 +162,42 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                     Authorities = lastChase.Records.Authorities,
                     Additional = ImmutableArray<DomainResourceRecord>.Empty
                 }
-            };
+            });
         }
 
         return ServFail(context.DomainMessage);
+    }
+
+    /// <summary>
+    /// AD is decided by <see cref="DnssecValidationMiddleware"/> from the shared
+    /// <see cref="DnssecScope"/> — only Secure when every chase hop authenticated.
+    /// Clear any AD that may have ridden on an inner hop response.
+    /// </summary>
+    private static DomainMessage FinalizeChase(DomainMessage result)
+        => result with { Flags = result.Flags with { Authentic = false } };
+
+    private static ImmutableArray<DomainResourceRecord> KeepTypesWithCoveringRrsigs(
+        ImmutableArray<DomainResourceRecord> answers,
+        DomainRecordType keepType)
+    {
+        var owners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in answers)
+        {
+            if (record.Type == keepType)
+                owners.Add(record.Name.ToString());
+        }
+
+        if (owners.Count == 0)
+            return ImmutableArray<DomainResourceRecord>.Empty;
+
+        return answers
+            .Where(r =>
+                r.Type == keepType ||
+                (r.Type is DomainRecordType.RRSIG &&
+                 r.Data is ResourceRecordSignatureData sig &&
+                 sig.TypeCovered == keepType &&
+                 owners.Contains(r.Name.ToString())))
+            .ToImmutableArray();
     }
 
     private static DomainMessage ServFail(DomainMessage request)

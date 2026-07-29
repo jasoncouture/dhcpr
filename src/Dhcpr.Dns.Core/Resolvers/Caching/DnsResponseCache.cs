@@ -1,12 +1,18 @@
 using System.Collections.Immutable;
 
 using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Dhcpr.Dns.Core.Resolvers.Caching;
 
+/// <summary>
+/// Response cache for recursive resolution. Retains full RRsets including RRSIGs.
+/// Stores <see cref="DnssecValidationStatus"/> separately from wire flags — never
+/// serves AD from a cached <see cref="DomainMessageFlags.Authentic"/> bit.
+/// </summary>
 public sealed class DnsResponseCache : IDnsResponseCache
 {
     private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(60);
@@ -20,8 +26,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
     }
 
     public bool TryGet(DomainMessage request, out DomainMessage? response)
+        => TryGet(request, out response, out _);
+
+    public bool TryGet(DomainMessage request, out DomainMessage? response, out DnssecValidationStatus securityStatus)
     {
         response = null;
+        securityStatus = DnssecValidationStatus.Unchecked;
         if (request.Questions.Length != 1)
             return false;
 
@@ -33,6 +43,8 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (age < TimeSpan.Zero)
             age = TimeSpan.Zero;
 
+        securityStatus = entry.SecurityStatus;
+        // Never resurrect AD from cache flags — Dnssec middleware applies AD from status.
         response = new DomainMessage(
             request.Id,
             entry.Flags with
@@ -40,7 +52,8 @@ public sealed class DnsResponseCache : IDnsResponseCache
                 Response = true,
                 RecursionDesired = request.Flags.RecursionDesired,
                 RecursionAvailable = true,
-                Truncated = false
+                Truncated = false,
+                Authentic = false
             },
             request.Questions,
             AgeRecords(entry.Records, age));
@@ -49,7 +62,35 @@ public sealed class DnsResponseCache : IDnsResponseCache
 
     public void Clear() => (_memoryCache as MemoryCache)?.Clear();
 
-    public void Set(DomainMessage request, DomainMessage response)
+    public void Remove(DomainMessage request)
+    {
+        if (request.Questions.Length != 1)
+            return;
+        _memoryCache.Remove(DnsCacheKey.FromQuestion(request.Questions[0]));
+    }
+
+    public void UpdateSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus)
+    {
+        if (request.Questions.Length != 1)
+            return;
+
+        var key = DnsCacheKey.FromQuestion(request.Questions[0]);
+        if (!_memoryCache.TryGetValue(key, out CacheEntry? entry) || entry is null)
+            return;
+
+        if (securityStatus is DnssecValidationStatus.Bogus)
+        {
+            _memoryCache.Remove(key);
+            return;
+        }
+
+        entry.SecurityStatus = securityStatus;
+    }
+
+    public void Set(
+        DomainMessage request,
+        DomainMessage response,
+        DnssecValidationStatus securityStatus = DnssecValidationStatus.Unchecked)
     {
         if (request.Questions.Length != 1)
             return;
@@ -57,8 +98,11 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return;
         if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure or DomainResponseCode.Refused)
             return;
+        if (securityStatus is DnssecValidationStatus.Bogus)
+            return;
 
         var questionType = request.Questions[0].Type;
+
         // Bare NS referrals must not be cached as answers for A/AAAA/etc.
         // NS questions may cache delegations — that is the layer answer.
         if (questionType is not DomainRecordType.NS &&
@@ -67,14 +111,19 @@ public sealed class DnsResponseCache : IDnsResponseCache
             response.Flags.ResponseCode is DomainResponseCode.NoError)
             return;
 
-        if (!TryStore(request, response))
+        // Upstream hop types (DNSKEY / DS / NS) cache like any other answer, including RRSIGs.
+        // Glue from NS responses is side-cached as A/AAAA with the parent's security status.
+        if (!TryStore(request, response, securityStatus))
             return;
 
         if (questionType is DomainRecordType.NS)
-            CacheGlueRecords(response);
+            CacheGlueRecords(response, securityStatus);
     }
 
-    private bool TryStore(DomainMessage request, DomainMessage response)
+    private bool TryStore(
+        DomainMessage request,
+        DomainMessage response,
+        DnssecValidationStatus securityStatus)
     {
         var lifetime = ComputeLifetime(response);
         if (lifetime <= TimeSpan.Zero)
@@ -84,7 +133,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
             lifetime = MaxCacheTtl;
 
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
-        var entry = new CacheEntry(response.Flags, response.Records, DateTimeOffset.UtcNow);
+        // Strip AD — security lives in SecurityStatus only.
+        var flags = response.Flags with { Authentic = false };
+        var entry = new CacheEntry(flags, response.Records, DateTimeOffset.UtcNow)
+        {
+            SecurityStatus = securityStatus
+        };
 
         _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
         {
@@ -95,7 +149,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return true;
     }
 
-    private void CacheGlueRecords(DomainMessage nsResponse)
+    private void CacheGlueRecords(DomainMessage nsResponse, DnssecValidationStatus securityStatus)
     {
         var nsNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in nsResponse.Records)
@@ -119,13 +173,18 @@ public sealed class DnsResponseCache : IDnsResponseCache
             var glueRecords = group.ToImmutableArray();
             var glueResponse = new DomainMessage(
                 glueRequest.Id,
-                nsResponse.Flags with { Response = true, ResponseCode = DomainResponseCode.NoError },
+                nsResponse.Flags with
+                {
+                    Response = true,
+                    ResponseCode = DomainResponseCode.NoError,
+                    Authentic = false
+                },
                 glueRequest.Questions,
                 new DomainResourceRecords(
                     glueRecords,
                     ImmutableArray<DomainResourceRecord>.Empty,
                     ImmutableArray<DomainResourceRecord>.Empty));
-            TryStore(glueRequest, glueResponse);
+            TryStore(glueRequest, glueResponse, securityStatus);
         }
     }
 
@@ -190,8 +249,14 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return builder.MoveToImmutable();
     }
 
-    private sealed record CacheEntry(
+    private sealed class CacheEntry(
         DomainMessageFlags Flags,
         DomainResourceRecords Records,
-        DateTimeOffset CachedAt);
+        DateTimeOffset CachedAt)
+    {
+        public DomainMessageFlags Flags { get; } = Flags;
+        public DomainResourceRecords Records { get; } = Records;
+        public DateTimeOffset CachedAt { get; } = CachedAt;
+        public DnssecValidationStatus SecurityStatus { get; set; }
+    }
 }

@@ -86,7 +86,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
 
         if (context.DnssecScope.Status == DnssecValidationStatus.Secure)
         {
-            _logger.LogDebug("DNSSEC setting AD for {Name}/{Type}", question?.Name, question?.Type);
+            _logger.LogDebug("DNSSEC setting AD for {Name}/{Type}", question?.Name.ToString(), question?.Type);
             result = result with { Flags = result.Flags with { Authentic = true } };
         }
 

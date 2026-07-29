@@ -71,7 +71,7 @@ public sealed class DnssecMessageValidator
         {
             _logger.LogDebug(
                 "DNSSEC insecure: no RRSIG in response for {Name}/{Type}",
-                question.Name,
+                question.Name.ToString(),
                 question.Type);
             scope.Observe(DnssecValidationStatus.Insecure);
             return;
@@ -87,14 +87,14 @@ public sealed class DnssecMessageValidator
             _logger.LogDebug(
                 "DNSSEC signed-message outcome {Outcome} for {Name}/{Type}",
                 outcome,
-                question.Name,
+                question.Name.ToString(),
                 question.Type);
             scope.Observe(outcome);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "DNSSEC validation failed unexpectedly for {Name}/{Type}",
-                question.Name, question.Type);
+                question.Name.ToString(), question.Type);
             scope.Observe(DnssecValidationStatus.Bogus);
         }
     }
@@ -150,7 +150,7 @@ public sealed class DnssecMessageValidator
             var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
             _logger.LogDebug(
                 "DNSSEC verifying {Name}/{Type} ({Count} RR(s), signer={Signer})",
-                group.Key.Name,
+                group.Key.Name.ToString(),
                 group.Key.Type,
                 rrset.Count,
                 signer);
@@ -169,60 +169,75 @@ public sealed class DnssecMessageValidator
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, rrset, rrsigs, keys.Keys, now))
             {
-                _logger.LogDebug("DNSSEC bogus: RRSIG verification failed for {Name}/{Type}", group.Key.Name, group.Key.Type);
+                _logger.LogDebug(
+                    "DNSSEC bogus: RRSIG verification failed for {Name}/{Type}",
+                    group.Key.Name.ToString(),
+                    group.Key.Type);
                 return DnssecValidationStatus.Bogus;
             }
 
-            _logger.LogDebug("DNSSEC verified {Name}/{Type}", group.Key.Name, group.Key.Type);
+            _logger.LogDebug("DNSSEC verified {Name}/{Type}", group.Key.Name.ToString(), group.Key.Type);
             verifiedAny = true;
         }
 
-        // NXDOMAIN / NODATA: require NSEC proof when signatures are present.
-        if (response.Flags.ResponseCode is DomainResponseCode.NameError ||
+        // NXDOMAIN / NODATA only — referrals (empty answers + NS in authority) are not denials.
+        var isReferral = response.Records.Answers.Length == 0 &&
+                         response.Records.Authorities.Any(static r => r.Type is DomainRecordType.NS);
+        var needsNegativeProof =
+            response.Flags.ResponseCode is DomainResponseCode.NameError ||
             (response.Flags.ResponseCode is DomainResponseCode.NoError &&
              response.Records.Answers.Length == 0 &&
-             question.Type is not DomainRecordType.DNSKEY and not DomainRecordType.DS))
+             !isReferral &&
+             question.Type is not DomainRecordType.DNSKEY and not DomainRecordType.DS);
+
+        if (needsNegativeProof)
         {
             _logger.LogDebug(
-                "DNSSEC checking NSEC proof for {Name}/{Type} rcode={Rcode}",
-                question.Name,
+                "DNSSEC checking negative proof for {Name}/{Type} rcode={Rcode}",
+                question.Name.ToString(),
                 question.Type,
                 response.Flags.ResponseCode);
-            var nsecOutcome = ValidateNsecProof(scope, question, allRecords, now);
+            var nsecOutcome = ValidateNegativeProof(scope, question, response, allRecords, now);
             if (nsecOutcome is DnssecValidationStatus.Bogus)
             {
-                _logger.LogDebug("DNSSEC bogus: NSEC proof failed for {Name}", question.Name);
+                _logger.LogDebug("DNSSEC bogus: negative proof failed for {Name}", question.Name.ToString());
                 return DnssecValidationStatus.Bogus;
             }
+
             if (nsecOutcome is DnssecValidationStatus.Secure)
                 verifiedAny = true;
-            else if (nsecOutcome is DnssecValidationStatus.Indeterminate)
-                _logger.LogDebug("DNSSEC NSEC3 present but not validated yet for {Name}", question.Name);
+            else if (nsecOutcome is DnssecValidationStatus.Insecure)
+                return DnssecValidationStatus.Insecure;
         }
 
         return verifiedAny ? DnssecValidationStatus.Secure : DnssecValidationStatus.Indeterminate;
     }
 
-    private DnssecValidationStatus ValidateNsecProof(
+    private DnssecValidationStatus ValidateNegativeProof(
         DnssecScope scope,
         DomainQuestion question,
+        DomainMessage response,
         List<DomainResourceRecord> allRecords,
         DateTimeOffset now)
     {
         var nsecs = allRecords.Where(static r => r.Type is DomainRecordType.NSEC).ToList();
-        if (nsecs.Count == 0)
-        {
-            // NSEC3 deferred to Phase 5 — signed response without NSEC is indeterminate for now.
-            if (allRecords.Any(static r => r.Type is DomainRecordType.NSEC3))
-            {
-                _logger.LogDebug("DNSSEC NSEC3 proofs not implemented; indeterminate for {Name}", question.Name);
-                return DnssecValidationStatus.Indeterminate;
-            }
+        if (nsecs.Count > 0)
+            return ValidateNsecProof(scope, question, nsecs, allRecords, now);
 
-            _logger.LogDebug("DNSSEC no NSEC records for negative proof of {Name}", question.Name);
-            return DnssecValidationStatus.Bogus;
-        }
+        if (allRecords.Any(static r => r.Type is DomainRecordType.NSEC3))
+            return ValidateNsec3Proof(scope, question, response, allRecords, now);
 
+        _logger.LogDebug("DNSSEC no NSEC/NSEC3 records for negative proof of {Name}", question.Name.ToString());
+        return DnssecValidationStatus.Bogus;
+    }
+
+    private DnssecValidationStatus ValidateNsecProof(
+        DnssecScope scope,
+        DomainQuestion question,
+        List<DomainResourceRecord> nsecs,
+        List<DomainResourceRecord> allRecords,
+        DateTimeOffset now)
+    {
         foreach (var nsecRecord in nsecs)
         {
             if (nsecRecord.Data is not NextSecureData nsec)
@@ -238,25 +253,179 @@ public sealed class DnssecMessageValidator
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, [nsecRecord], rrsigs, keys.Keys, now))
             {
-                _logger.LogDebug("DNSSEC NSEC RRSIG failed for {Owner}", nsecRecord.Name);
+                _logger.LogDebug("DNSSEC NSEC RRSIG failed for {Owner}", nsecRecord.Name.ToString());
                 return DnssecValidationStatus.Bogus;
             }
 
-            // NameError: NSEC must cover QNAME. NODATA: owner exists, type bit clear (simplified: cover QNAME or exact owner).
-            if (question.Name.Equals(nsecRecord.Name) ||
-                _crypto.CoversName(nsec, nsecRecord.Name, question.Name))
+            // Exact owner: NODATA when QTYPE (and CNAME) bits are clear.
+            if (question.Name.Equals(nsecRecord.Name))
+            {
+                if (DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, question.Type) ||
+                    DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, DomainRecordType.CNAME))
+                {
+                    _logger.LogDebug(
+                        "DNSSEC NSEC NODATA failed: type present on {Owner}",
+                        nsecRecord.Name.ToString());
+                    return DnssecValidationStatus.Bogus;
+                }
+
+                _logger.LogDebug("DNSSEC NSEC NODATA proof for {Name}/{Type}", question.Name.ToString(), question.Type);
+                return DnssecValidationStatus.Secure;
+            }
+
+            if (_crypto.CoversName(nsec, nsecRecord.Name, question.Name))
             {
                 _logger.LogDebug(
                     "DNSSEC NSEC {Owner} covers {Name} (next={Next})",
-                    nsecRecord.Name,
-                    question.Name,
-                    nsec.NextDomainName);
+                    nsecRecord.Name.ToString(),
+                    question.Name.ToString(),
+                    nsec.NextDomainName.ToString());
                 return DnssecValidationStatus.Secure;
             }
         }
 
-        _logger.LogDebug("DNSSEC no covering NSEC for {Name}", question.Name);
+        _logger.LogDebug("DNSSEC no covering NSEC for {Name}", question.Name.ToString());
         return DnssecValidationStatus.Bogus;
+    }
+
+    private DnssecValidationStatus ValidateNsec3Proof(
+        DnssecScope scope,
+        DomainQuestion question,
+        DomainMessage response,
+        List<DomainResourceRecord> allRecords,
+        DateTimeOffset now)
+    {
+        var nsec3s = DnssecNsec3Proof.Collect(allRecords);
+        if (nsec3s.Count == 0)
+        {
+            _logger.LogDebug("DNSSEC NSEC3 owners could not be decoded for {Name}", question.Name.ToString());
+            return DnssecValidationStatus.Bogus;
+        }
+
+        // Authenticate every NSEC3 RRset before trusting spans.
+        foreach (var group in nsec3s.GroupBy(static n => n.Record.Name.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            var records = group.Select(static g => g.Record).ToList();
+            var owner = records[0].Name;
+            var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, owner, DomainRecordType.NSEC3);
+            if (rrsigs.Count == 0)
+            {
+                _logger.LogDebug("DNSSEC NSEC3 {Owner} has no RRSIG", owner.ToString());
+                return DnssecValidationStatus.Bogus;
+            }
+
+            var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
+            if (!scope.TryGetKeys(signer, out var keys))
+            {
+                _logger.LogDebug("DNSSEC NSEC3 signer keys missing for {Signer}", signer);
+                return DnssecValidationStatus.Bogus;
+            }
+
+            if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, records, rrsigs, keys.Keys, now))
+            {
+                _logger.LogDebug("DNSSEC NSEC3 RRSIG failed for {Owner}", owner.ToString());
+                return DnssecValidationStatus.Bogus;
+            }
+        }
+
+        var parameters = nsec3s[0].Data;
+        var qnameHash = _crypto.CalculateNsec3Hash(question.Name, parameters);
+        if (qnameHash.Length == 0)
+            return DnssecValidationStatus.Bogus;
+
+        // NODATA: exact match on QNAME hash, QTYPE/CNAME bits clear.
+        var exact = DnssecNsec3Proof.FindExact(nsec3s, qnameHash);
+        if (exact is { } exactMatch &&
+            response.Flags.ResponseCode is DomainResponseCode.NoError)
+        {
+            if (DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, question.Type) ||
+                DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, DomainRecordType.CNAME))
+            {
+                _logger.LogDebug(
+                    "DNSSEC NSEC3 NODATA failed: type present for {Name}",
+                    question.Name.ToString());
+                return DnssecValidationStatus.Bogus;
+            }
+
+            _logger.LogDebug(
+                "DNSSEC NSEC3 NODATA proof for {Name}/{Type}",
+                question.Name.ToString(),
+                question.Type);
+            return DnssecValidationStatus.Secure;
+        }
+
+        // NXDOMAIN (and name-does-not-exist side of empty non-terminal): closest encloser + next closer (+ wildcard).
+        if (!DnssecNsec3Proof.TryFindClosestEncloser(
+                _crypto, nsec3s, question.Name, parameters,
+                out var closest, out _))
+        {
+            _logger.LogDebug("DNSSEC NSEC3 closest encloser not found for {Name}", question.Name.ToString());
+            return DnssecValidationStatus.Bogus;
+        }
+
+        // Exact closest == QNAME was handled above for NODATA; if we are here with NameError and exact match,
+        // that is inconsistent (name exists).
+        if (exact is not null && response.Flags.ResponseCode is DomainResponseCode.NameError)
+        {
+            _logger.LogDebug("DNSSEC NSEC3 NXDOMAIN but QNAME hash matches for {Name}", question.Name.ToString());
+            return DnssecValidationStatus.Bogus;
+        }
+
+        if (closest.Equals(question.Name))
+        {
+            // Empty non-terminal / NODATA without falling into exact above — treat as NODATA failure.
+            _logger.LogDebug("DNSSEC NSEC3 QNAME is closest encloser but NODATA bits failed for {Name}",
+                question.Name.ToString());
+            return DnssecValidationStatus.Bogus;
+        }
+
+        var nextCloser = DnssecNsec3Proof.NextCloser(question.Name, closest);
+        if (nextCloser is null)
+            return DnssecValidationStatus.Bogus;
+
+        var nextCloserHash = _crypto.CalculateNsec3Hash(nextCloser, parameters);
+        var nextCloserCover = DnssecNsec3Proof.FindCover(_crypto, nsec3s, nextCloserHash);
+        if (nextCloserCover is null)
+        {
+            _logger.LogDebug(
+                "DNSSEC NSEC3 no cover for next-closer {Next} of {Name}",
+                nextCloser.ToString(),
+                question.Name.ToString());
+            return DnssecValidationStatus.Bogus;
+        }
+
+        // Opt-Out: insecure delegations may exist in the span — cannot prove Secure NXDOMAIN.
+        if ((nextCloserCover.Value.Data.Flags & DnssecNsec3Proof.OptOutFlag) != 0)
+        {
+            _logger.LogDebug(
+                "DNSSEC NSEC3 Opt-Out cover for next-closer {Next}; insecure for {Name}",
+                nextCloser.ToString(),
+                question.Name.ToString());
+            return DnssecValidationStatus.Insecure;
+        }
+
+        if (response.Flags.ResponseCode is DomainResponseCode.NameError)
+        {
+            var wildcard = DnssecNsec3Proof.WildcardAt(closest);
+            var wildcardHash = _crypto.CalculateNsec3Hash(wildcard, parameters);
+            // Wildcard may match exactly (exists) or be covered (does not).
+            if (DnssecNsec3Proof.FindExact(nsec3s, wildcardHash) is null &&
+                DnssecNsec3Proof.FindCover(_crypto, nsec3s, wildcardHash) is null)
+            {
+                _logger.LogDebug(
+                    "DNSSEC NSEC3 no wildcard proof at *.{Closest} for {Name}",
+                    closest.ToString(),
+                    question.Name.ToString());
+                return DnssecValidationStatus.Bogus;
+            }
+        }
+
+        _logger.LogDebug(
+            "DNSSEC NSEC3 proof ok for {Name} (closest={Closest}, next={Next})",
+            question.Name.ToString(),
+            closest.ToString(),
+            nextCloser.ToString());
+        return DnssecValidationStatus.Secure;
     }
 
     private async ValueTask<bool> EnsureZoneKeysAvailableAsync(

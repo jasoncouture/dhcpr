@@ -12,13 +12,13 @@ Validating recursive DNSSEC, implemented as **middleware**. Authoritative zone s
 
 | Present | Gap |
 |---------|-----|
-| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1 | Cache / CNAME ignore validation state (Phase 4) |
-| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | NSEC3 proofs deferred to Phase 5 |
-| `IDnssecValidator` crypto + `DnssecRrsetVerifier` / `DnssecMessageValidator` | Integration tests against live signed zones (Phase 5) |
-| Trust anchors loaded into `DnssecScope` and used for DNSKEY auth | Enable/disable + algorithm allow/deny (Phase 5) |
+| Pipeline re-entry; `UpstreamQueryMiddleware` sends DO=1; `RootZoneMiddleware` skips directed hops | Cache / CNAME ignore validation state (Phase 4) |
+| Typed DNSKEY / DS / RRSIG / NSEC / NSEC3 parsers + canonicalization | Integration tests against live signed zones (Phase 5) |
+| `IDnssecValidator` crypto + `DnssecRrsetVerifier` / `DnssecMessageValidator` | Enable/disable + algorithm allow/deny (Phase 5) |
+| Trust anchors loaded into `DnssecScope` and used for DNSKEY auth | — |
 | Middleware calls validator; fetches DS/DNSKEY; sets Secure/Bogus/Insecure | — |
 | Client AD=1 when Secure; SERVFAIL when Bogus and CD=0 | — |
-| NSEC proofs for NXDOMAIN/NODATA (when NSEC present) | — |
+| NSEC + NSEC3 proofs for NXDOMAIN/NODATA (Opt-Out → Insecure) | — |
 
 `RecursiveRootResolver` is roots-only label descent. Local zones and DynDNS are their own middleware — DNSSEC validation stays in the decorator, not in the recursive resolver.
 
@@ -119,7 +119,8 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 - [x] Upstream hops: validate RRsets into scope (`Secure` / `Insecure` / `Bogus`)
 - [x] Fetch / authenticate DNSKEY and DS along zone cuts (chain of trust from trust anchors)
 - [x] Scope tracks authenticated keys / delegations (not only a status enum)
-- [x] NSEC proofs for NXDOMAIN / NODATA (NSEC3 deferred to Phase 5)
+- [x] NSEC proofs for NXDOMAIN / NODATA
+- [x] NSEC3 proofs (closest encloser, NODATA, Opt-Out → Insecure)
 - [x] Real Secure / Bogus / Insecure outcomes so AD / SERVFAIL branches fire
 
 **Stop here.**
@@ -148,7 +149,6 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 - Integration tests: multi-hop signed zone (fixtures or live); AD / SERVFAIL / CD
 - Config: enable/disable validation, trust-anchor list, algorithm allow/deny
-- NSEC3 support (if deferred from Phase 3)
 - Logging of validation failures without drowning in internal-hop noise
 
 **Stop here.** (Further work is follow-ups, not this plan.)

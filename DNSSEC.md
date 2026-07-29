@@ -102,27 +102,27 @@ Crypto lives in an `IDnssecValidator` **service** used by middleware — parsers
 
 ## Phase 3 — Validator + DnssecValidationMiddleware
 
-**Status: incomplete** (scaffolding only; marked “done” prematurely).
+**Status: done.**
 
 **Goal:** Local validation on middleware hops; set AD / honor CD / SERVFAIL.
 
 **Done when:**
 
-- [x] Trust anchors **exist** in DNS config (default root DS) — config validation only
-- [ ] Trust anchors **loaded and used** at runtime for chain-of-trust
+- [x] Trust anchors **exist** in DNS config (default root DS)
+- [x] Trust anchors **loaded and used** at runtime for chain-of-trust
 - [x] `IDnssecValidator` with BCL crypto: RSASHA256 (8), ECDSAP256SHA256 (13); NSEC/NSEC3 helpers
 - [x] Basic unit tests with known signature / keytag / DS / NSEC vectors
 - [x] `DnssecScope` created per client query, passed on every re-entry
 - [x] Middleware strips upstream AD (do not copy forwarder / recursive upstream AD)
-- [x] Client-facing skeleton: CD=0 + Bogus → SERVFAIL; Secure → AD=1
-- [ ] Middleware **calls** `IDnssecValidator` (today `_validator` is unused)
-- [ ] Upstream hops: validate RRsets into scope (`Secure` / `Insecure` / `Bogus`, not “RRSIG present → Indeterminate”)
-- [ ] Fetch / authenticate DNSKEY and DS along zone cuts (chain of trust from trust anchors)
-- [ ] Scope tracks authenticated keys / zone cuts (not only a status enum)
-- [ ] NSEC proofs for NXDOMAIN / NODATA (NSEC3 can wait for Phase 5 if needed)
-- [ ] Real Secure / Bogus outcomes so AD / SERVFAIL branches fire
+- [x] Client-facing: CD=0 + Bogus → SERVFAIL; Secure → AD=1
+- [x] Middleware **calls** `DnssecMessageValidator` / `IDnssecValidator`
+- [x] Upstream hops: validate RRsets into scope (`Secure` / `Insecure` / `Bogus`)
+- [x] Fetch / authenticate DNSKEY and DS along zone cuts (chain of trust from trust anchors)
+- [x] Scope tracks authenticated keys / delegations (not only a status enum)
+- [x] NSEC proofs for NXDOMAIN / NODATA (NSEC3 deferred to Phase 5)
+- [x] Real Secure / Bogus / Insecure outcomes so AD / SERVFAIL branches fire
 
-**Stop here.** Do not start Phase 4 until every unchecked item above is done.
+**Stop here.**
 
 ---
 

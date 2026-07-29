@@ -70,7 +70,13 @@ public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<
     {
         return new DomainMessage(
             request.Id,
-            request.Flags with { Response = true, ResponseCode = responseCode },
+            request.Flags with
+            {
+                Response = true,
+                ResponseCode = responseCode,
+                // Never echo query AD; DnssecValidationMiddleware sets Authentic from scope.
+                Authentic = false
+            },
             request.Questions,
             resourceRecords
         );

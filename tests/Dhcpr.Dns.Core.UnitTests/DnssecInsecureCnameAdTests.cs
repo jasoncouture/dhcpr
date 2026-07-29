@@ -12,86 +12,54 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
-public class DnssecNsecNodataTests
+public class DnssecInsecureCnameAdTests
 {
     [Fact]
-    public async Task NsecNodata_WithoutKeys_IsIndeterminateNotBogus()
+    public async Task UnsignedCnameWithSignedTarget_IsInsecureWithoutAd()
     {
+        // Mimics www.speedtest.net → CDN: insecure CNAME + signed A assembled client-facing.
         var (dnsKey, privateKey) = CreateEcdsaDnsKey("cloudflare.net");
-        var owner = new DomainLabels("cdn.cloudflare.net");
-        var nsec = new DomainResourceRecord(
-            owner,
-            DomainRecordType.NSEC,
+        var cname = new DomainResourceRecord(
+            new DomainLabels("www.speedtest.net"),
+            DomainRecordType.CNAME,
             DomainRecordClass.IN,
-            TimeSpan.FromSeconds(1800),
-            new NextSecureData(
-                new DomainLabels("cdn0.cloudflare.net"),
-                BuildTypeBitmap(DomainRecordType.A, DomainRecordType.RRSIG, DomainRecordType.NSEC)));
-        var nsecSig = SignRrset(privateKey, dnsKey, [nsec], DomainRecordType.NSEC);
+            TimeSpan.FromSeconds(3600),
+            new NameData(new DomainLabels("www.speedtest.net.cdn.cloudflare.net")));
+        var a1 = new DomainResourceRecord(
+            new DomainLabels("www.speedtest.net.cdn.cloudflare.net"),
+            DomainRecordType.A,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(300),
+            new IPAddressData(IPAddress.Parse("104.17.147.22")));
+        var a2 = new DomainResourceRecord(
+            new DomainLabels("www.speedtest.net.cdn.cloudflare.net"),
+            DomainRecordType.A,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(300),
+            new IPAddressData(IPAddress.Parse("104.17.148.22")));
+        var aSig = SignRrset(privateKey, dnsKey, [a1, a2], DomainRecordType.A);
 
-        var request = DomainMessage.CreateRequest("cdn.cloudflare.net", DomainRecordType.NS);
+        var request = DomainMessage.CreateRequest("www.speedtest.net");
         var response = DomainMessage.CreateResponse(
             request,
-            answers: [],
-            authorities: [nsec, nsecSig],
-            responseCode: DomainResponseCode.NoError);
-
-        // Scope has trust anchors only — no cloudflare.net DNSKEY loaded.
-        var scope = new DnssecScope();
-        scope.LoadTrustAnchors([new TrustAnchorConfiguration()]);
-
-        var validator = CreateValidator();
-        await validator.ValidateResponseAsync(
-            new DomainMessageContext(null, null, request) { DnssecScope = scope },
-            response,
-            CancellationToken.None);
-
-        Assert.NotEqual(DnssecValidationStatus.Bogus, scope.Status);
-    }
-
-    [Fact]
-    public async Task NsecNodata_WithKeys_IsSecure()
-    {
-        var (dnsKey, privateKey) = CreateEcdsaDnsKey("cloudflare.net");
-        var owner = new DomainLabels("cdn.cloudflare.net");
-        var nsec = new DomainResourceRecord(
-            owner,
-            DomainRecordType.NSEC,
-            DomainRecordClass.IN,
-            TimeSpan.FromSeconds(1800),
-            new NextSecureData(
-                new DomainLabels("cdn0.cloudflare.net"),
-                BuildTypeBitmap(DomainRecordType.A, DomainRecordType.RRSIG, DomainRecordType.NSEC)));
-        var nsecSig = SignRrset(privateKey, dnsKey, [nsec], DomainRecordType.NSEC);
-
-        var request = DomainMessage.CreateRequest("cdn.cloudflare.net", DomainRecordType.NS);
-        var response = DomainMessage.CreateResponse(
-            request,
-            answers: [],
-            authorities: [nsec, nsecSig],
+            answers: [cname, a1, a2, aSig],
             responseCode: DomainResponseCode.NoError);
 
         var scope = new DnssecScope();
         scope.SetKeys(new AuthenticatedDnsKeySet { Zone = "cloudflare.net", Keys = [dnsKey] });
 
-        var validator = CreateValidator();
+        var validator = new DnssecMessageValidator(
+            new DnssecValidator(NullLogger<DnssecValidator>.Instance),
+            new NoopInternalClient(),
+            new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration()),
+            NullLogger<DnssecMessageValidator>.Instance);
+
         await validator.ValidateResponseAsync(
             new DomainMessageContext(null, null, request) { DnssecScope = scope },
             response,
             CancellationToken.None);
 
-        Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
-    }
-
-    private static DnssecMessageValidator CreateValidator()
-    {
-        var options = Options.Create(new DnsConfiguration());
-        var monitor = new StaticOptionsMonitor<DnsConfiguration>(options.Value);
-        return new DnssecMessageValidator(
-            new DnssecValidator(NullLogger<DnssecValidator>.Instance, monitor),
-            new NoopInternalClient(),
-            monitor,
-            NullLogger<DnssecMessageValidator>.Instance);
+        Assert.Equal(DnssecValidationStatus.Insecure, scope.Status);
     }
 
     private static (DomainResourceRecord DnsKey, ECDsa PrivateKey) CreateEcdsaDnsKey(string zone)
@@ -125,14 +93,14 @@ public class DnssecNsecNodataTests
             typeCovered,
             DnssecAlgorithmType.EcdsaP256Sha256,
             (byte)rrset[0].Name.Count,
-            1800,
+            300,
             (uint)now.AddDays(1).ToUnixTimeSeconds(),
             (uint)now.AddDays(-1).ToUnixTimeSeconds(),
             keyTag,
             dnsKey.Name,
             ImmutableArray<byte>.Empty);
         var prefix = DnssecRrsetVerifier.EncodeRrsigWithoutSignature(rrsigTemplate);
-        var canonical = DnssecRrsetVerifier.BuildCanonicalRrset(rrset, 1800);
+        var canonical = DnssecRrsetVerifier.BuildCanonicalRrset(rrset, 300);
         var payload = new byte[prefix.Length + canonical.Length];
         prefix.CopyTo(payload, 0);
         canonical.CopyTo(payload, prefix.Length);
@@ -143,22 +111,8 @@ public class DnssecNsecNodataTests
             rrset[0].Name,
             DomainRecordType.RRSIG,
             DomainRecordClass.IN,
-            TimeSpan.FromSeconds(1800),
+            TimeSpan.FromSeconds(300),
             rrsig);
-    }
-
-    private static ImmutableArray<byte> BuildTypeBitmap(params DomainRecordType[] types)
-    {
-        // Minimal window-0 bitmap covering the listed types (sufficient for unit tests).
-        var max = types.Max(static t => (int)t);
-        var bytes = new byte[(max / 8) + 1];
-        foreach (var type in types)
-        {
-            var bit = (int)type;
-            bytes[bit / 8] |= (byte)(0x80 >> (bit % 8));
-        }
-
-        return new byte[] { 0, (byte)bytes.Length }.Concat(bytes).ToImmutableArray();
     }
 
     private sealed class NoopInternalClient : IInternalDomainClient

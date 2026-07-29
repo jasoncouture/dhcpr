@@ -221,6 +221,29 @@ public sealed class DnssecMessageValidator
             verifiedAny = true;
         }
 
+        // Unsigned answer RRsets (typical: CNAME from an insecure zone before a
+        // signed CDN target) must clear AD. Directed hops ignore unsigned glue, so
+        // the client-facing assembled answer is where this is enforced.
+        if (!isReferral)
+        {
+            foreach (var group in DnssecRrsetVerifier.GroupRrsets(response.Records.Answers))
+            {
+                if (group.Key.Type is DomainRecordType.DNSKEY or DomainRecordType.DS
+                    or DomainRecordType.NSEC or DomainRecordType.NSEC3 or DomainRecordType.NSEC3PARAM)
+                    continue;
+
+                var owner = new DomainLabels(group.Key.Name);
+                if (DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, owner, group.Key.Type).Count > 0)
+                    continue;
+
+                _logger.LogDebug(
+                    "DNSSEC insecure: unsigned answer RRset {Name}/{Type}",
+                    group.Key.Name,
+                    group.Key.Type);
+                return DnssecValidationStatus.Insecure;
+            }
+        }
+
         // NXDOMAIN / NODATA only — referrals are not denials.
         var needsNegativeProof =
             response.Flags.ResponseCode is DomainResponseCode.NameError ||

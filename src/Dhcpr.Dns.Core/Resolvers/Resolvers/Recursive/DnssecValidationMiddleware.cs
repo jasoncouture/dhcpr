@@ -50,7 +50,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
 
         var after = context.DnssecScope.Status;
-        _logger.LogInformation(
+        _logger.LogDebug(
             "DNSSEC {Hop} {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth})",
             context.IsInternal ? "hop" : "client",
             question?.Name,
@@ -67,7 +67,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         {
             if (!context.DomainMessage.Flags.CheckingDisabled)
             {
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)",
                     question?.Name,
                     question?.Type);
@@ -77,7 +77,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
                     DomainResponseCode.ServerFailure);
             }
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC returning bogus answer for {Name}/{Type} (CD=1)",
                 question?.Name,
                 question?.Type);
@@ -86,7 +86,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
 
         if (context.DnssecScope.Status == DnssecValidationStatus.Secure)
         {
-            _logger.LogInformation("DNSSEC setting AD for {Name}/{Type}", question?.Name, question?.Type);
+            _logger.LogDebug("DNSSEC setting AD for {Name}/{Type}", question?.Name, question?.Type);
             result = result with { Flags = result.Flags with { Authentic = true } };
         }
 

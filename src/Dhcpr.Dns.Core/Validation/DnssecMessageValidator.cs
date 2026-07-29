@@ -39,7 +39,7 @@ public sealed class DnssecMessageValidator
 
         var anchors = _options.CurrentValue.TrustAnchors ?? Array.Empty<TrustAnchorConfiguration>();
         scope.LoadTrustAnchors(anchors);
-        _logger.LogInformation("DNSSEC loaded {Count} trust anchor(s)", anchors.Length);
+        _logger.LogDebug("DNSSEC loaded {Count} trust anchor(s)", anchors.Length);
     }
 
     public async ValueTask ValidateResponseAsync(
@@ -55,7 +55,7 @@ public sealed class DnssecMessageValidator
 
         if (response.Questions.Length == 0)
         {
-            _logger.LogInformation("DNSSEC indeterminate: empty question section");
+            _logger.LogDebug("DNSSEC indeterminate: empty question section");
             scope.Observe(DnssecValidationStatus.Indeterminate);
             return;
         }
@@ -69,7 +69,7 @@ public sealed class DnssecMessageValidator
         var hasRrsig = allRecords.Any(static r => r.Type is DomainRecordType.RRSIG);
         if (!hasRrsig)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC insecure: no RRSIG in response for {Name}/{Type}",
                 question.Name,
                 question.Type);
@@ -84,7 +84,7 @@ public sealed class DnssecMessageValidator
 
             var outcome = await ValidateSignedMessageAsync(context, response, allRecords, cancellationToken)
                 .ConfigureAwait(false);
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC signed-message outcome {Outcome} for {Name}/{Type}",
                 outcome,
                 question.Name,
@@ -148,7 +148,7 @@ public sealed class DnssecMessageValidator
                 continue;
 
             var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC verifying {Name}/{Type} ({Count} RR(s), signer={Signer})",
                 group.Key.Name,
                 group.Key.Type,
@@ -157,23 +157,23 @@ public sealed class DnssecMessageValidator
 
             if (!await EnsureZoneKeysAvailableAsync(context, signer, cancellationToken).ConfigureAwait(false))
             {
-                _logger.LogInformation("DNSSEC bogus: no authenticated keys for signer {Signer}", signer);
+                _logger.LogDebug("DNSSEC bogus: no authenticated keys for signer {Signer}", signer);
                 return DnssecValidationStatus.Bogus;
             }
 
             if (!scope.TryGetKeys(signer, out var keys))
             {
-                _logger.LogInformation("DNSSEC bogus: keys missing after ensure for {Signer}", signer);
+                _logger.LogDebug("DNSSEC bogus: keys missing after ensure for {Signer}", signer);
                 return DnssecValidationStatus.Bogus;
             }
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, rrset, rrsigs, keys.Keys, now))
             {
-                _logger.LogInformation("DNSSEC bogus: RRSIG verification failed for {Name}/{Type}", group.Key.Name, group.Key.Type);
+                _logger.LogDebug("DNSSEC bogus: RRSIG verification failed for {Name}/{Type}", group.Key.Name, group.Key.Type);
                 return DnssecValidationStatus.Bogus;
             }
 
-            _logger.LogInformation("DNSSEC verified {Name}/{Type}", group.Key.Name, group.Key.Type);
+            _logger.LogDebug("DNSSEC verified {Name}/{Type}", group.Key.Name, group.Key.Type);
             verifiedAny = true;
         }
 
@@ -183,7 +183,7 @@ public sealed class DnssecMessageValidator
              response.Records.Answers.Length == 0 &&
              question.Type is not DomainRecordType.DNSKEY and not DomainRecordType.DS))
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC checking NSEC proof for {Name}/{Type} rcode={Rcode}",
                 question.Name,
                 question.Type,
@@ -191,13 +191,13 @@ public sealed class DnssecMessageValidator
             var nsecOutcome = ValidateNsecProof(scope, question, allRecords, now);
             if (nsecOutcome is DnssecValidationStatus.Bogus)
             {
-                _logger.LogInformation("DNSSEC bogus: NSEC proof failed for {Name}", question.Name);
+                _logger.LogDebug("DNSSEC bogus: NSEC proof failed for {Name}", question.Name);
                 return DnssecValidationStatus.Bogus;
             }
             if (nsecOutcome is DnssecValidationStatus.Secure)
                 verifiedAny = true;
             else if (nsecOutcome is DnssecValidationStatus.Indeterminate)
-                _logger.LogInformation("DNSSEC NSEC3 present but not validated yet for {Name}", question.Name);
+                _logger.LogDebug("DNSSEC NSEC3 present but not validated yet for {Name}", question.Name);
         }
 
         return verifiedAny ? DnssecValidationStatus.Secure : DnssecValidationStatus.Indeterminate;
@@ -215,11 +215,11 @@ public sealed class DnssecMessageValidator
             // NSEC3 deferred to Phase 5 — signed response without NSEC is indeterminate for now.
             if (allRecords.Any(static r => r.Type is DomainRecordType.NSEC3))
             {
-                _logger.LogInformation("DNSSEC NSEC3 proofs not implemented; indeterminate for {Name}", question.Name);
+                _logger.LogDebug("DNSSEC NSEC3 proofs not implemented; indeterminate for {Name}", question.Name);
                 return DnssecValidationStatus.Indeterminate;
             }
 
-            _logger.LogInformation("DNSSEC no NSEC records for negative proof of {Name}", question.Name);
+            _logger.LogDebug("DNSSEC no NSEC records for negative proof of {Name}", question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -238,7 +238,7 @@ public sealed class DnssecMessageValidator
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, [nsecRecord], rrsigs, keys.Keys, now))
             {
-                _logger.LogInformation("DNSSEC NSEC RRSIG failed for {Owner}", nsecRecord.Name);
+                _logger.LogDebug("DNSSEC NSEC RRSIG failed for {Owner}", nsecRecord.Name);
                 return DnssecValidationStatus.Bogus;
             }
 
@@ -246,7 +246,7 @@ public sealed class DnssecMessageValidator
             if (question.Name.Equals(nsecRecord.Name) ||
                 _crypto.CoversName(nsec, nsecRecord.Name, question.Name))
             {
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "DNSSEC NSEC {Owner} covers {Name} (next={Next})",
                     nsecRecord.Name,
                     question.Name,
@@ -255,7 +255,7 @@ public sealed class DnssecMessageValidator
             }
         }
 
-        _logger.LogInformation("DNSSEC no covering NSEC for {Name}", question.Name);
+        _logger.LogDebug("DNSSEC no covering NSEC for {Name}", question.Name);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -268,29 +268,29 @@ public sealed class DnssecMessageValidator
         zone = DnssecScope.NormalizeZone(zone);
         if (scope.TryGetKeys(zone, out _))
         {
-            _logger.LogInformation("DNSSEC keys already authenticated for {Zone}", zone);
+            _logger.LogDebug("DNSSEC keys already authenticated for {Zone}", zone);
             return true;
         }
 
         if (scope.SuppressKeyFetch)
         {
-            _logger.LogInformation("DNSSEC key fetch suppressed for {Zone}", zone);
+            _logger.LogDebug("DNSSEC key fetch suppressed for {Zone}", zone);
             return false;
         }
 
         // Ensure DS/TA for this zone exists (walk toward root).
         if (!scope.TryGetDelegation(zone, out _))
         {
-            _logger.LogInformation("DNSSEC ensuring delegation for {Zone}", zone);
+            _logger.LogDebug("DNSSEC ensuring delegation for {Zone}", zone);
             if (!await EnsureDelegationAvailableAsync(context, zone, cancellationToken).ConfigureAwait(false))
             {
-                _logger.LogInformation("DNSSEC no delegation available for {Zone}", zone);
+                _logger.LogDebug("DNSSEC no delegation available for {Zone}", zone);
                 return false;
             }
         }
 
         // Fetch DNSKEY from the same upstreams when directed; otherwise recurse.
-        _logger.LogInformation(
+        _logger.LogDebug(
             "DNSSEC fetching DNSKEY for {Zone} (directed={Directed})",
             zone,
             context.UpstreamEndpoints is { Length: > 0 });
@@ -316,7 +316,7 @@ public sealed class DnssecMessageValidator
             .ToList();
         if (keys.Count == 0)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC DNSKEY fetch for {Zone} returned no keys (rcode={Rcode})",
                 zone,
                 dnsKeyResponse.Flags.ResponseCode);
@@ -380,14 +380,14 @@ public sealed class DnssecMessageValidator
         if (dsRecords.Count == 0)
         {
             // No DS → insecure delegation (not bogus).
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC no DS for {Zone} (rcode={Rcode}); treating as unsigned cut",
                 zone,
                 dsResponse.Flags.ResponseCode);
             return false;
         }
 
-        _logger.LogInformation("DNSSEC authenticating {Count} DS RR(s) for {Zone}", dsRecords.Count, zone);
+        _logger.LogDebug("DNSSEC authenticating {Count} DS RR(s) for {Zone}", dsRecords.Count, zone);
         var all = dsResponse.Records.Answers
             .Concat(dsResponse.Records.Authorities)
             .Concat(dsResponse.Records.Additional)
@@ -441,7 +441,7 @@ public sealed class DnssecMessageValidator
 
         if (matchingKeys.Count == 0)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "DNSSEC no DNSKEY matched {Kind} for {Zone} ({KeyCount} key(s) tried)",
                 delegation.IsTrustAnchor ? "trust anchor" : "DS",
                 zone,
@@ -452,14 +452,14 @@ public sealed class DnssecMessageValidator
         var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, dnsKeyRecords[0].Name, DomainRecordType.DNSKEY);
         if (rrsigs.Count == 0)
         {
-            _logger.LogInformation("DNSSEC DNSKEY RRset for {Zone} has no RRSIG", zone);
+            _logger.LogDebug("DNSSEC DNSKEY RRset for {Zone} has no RRSIG", zone);
             return false;
         }
 
         if (!DnssecRrsetVerifier.TryVerifyRrset(
                 _crypto, dnsKeyRecords, rrsigs, matchingKeys, DateTimeOffset.UtcNow))
         {
-            _logger.LogInformation("DNSSEC DNSKEY RRSIG verification failed for {Zone}", zone);
+            _logger.LogDebug("DNSSEC DNSKEY RRSIG verification failed for {Zone}", zone);
             return false;
         }
 
@@ -468,7 +468,7 @@ public sealed class DnssecMessageValidator
             Zone = zone,
             Keys = dnsKeyRecords.ToImmutableArray()
         });
-        _logger.LogInformation(
+        _logger.LogDebug(
             "DNSSEC authenticated {KeyCount} DNSKEY(s) for {Zone} ({MatchCount} matched DS/TA)",
             dnsKeyRecords.Count,
             zone,
@@ -502,7 +502,7 @@ public sealed class DnssecMessageValidator
         if (!DnssecRrsetVerifier.TryVerifyRrset(
                 _crypto, dsRecords, rrsigs, parentKeys.Keys, DateTimeOffset.UtcNow))
         {
-            _logger.LogInformation("DNSSEC DS RRSIG verification failed for {Zone} (parent={Parent})", childZone, parent);
+            _logger.LogDebug("DNSSEC DS RRSIG verification failed for {Zone} (parent={Parent})", childZone, parent);
             return false;
         }
 
@@ -519,7 +519,7 @@ public sealed class DnssecMessageValidator
             Digests = digestsBuilder.ToImmutable(),
             IsTrustAnchor = false
         });
-        _logger.LogInformation(
+        _logger.LogDebug(
             "DNSSEC authenticated {Count} DS RR(s) for {Zone} via parent {Parent}",
             digestsBuilder.Count,
             childZone,

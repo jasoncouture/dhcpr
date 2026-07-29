@@ -7,22 +7,34 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Validation;
 
 public sealed class DnssecValidator : IDnssecValidator
 {
     private readonly ILogger<DnssecValidator> _logger;
+    private readonly IOptionsMonitor<DnsConfiguration>? _options;
 
-    public DnssecValidator(ILogger<DnssecValidator> logger)
+    public DnssecValidator(ILogger<DnssecValidator> logger, IOptionsMonitor<DnsConfiguration>? options = null)
     {
         _logger = logger;
+        _options = options;
     }
 
     public bool VerifySignature(ResourceRecordSignatureData rrsig, ReadOnlySpan<byte> rrsigWireDataExcludingSignature, ReadOnlySpan<byte> canonicalRrsetData, DomainNameSystemKeyData dnsKey)
     {
         if (rrsig.Algorithm != dnsKey.Algorithm)
             return false;
+
+        var policy = _options?.CurrentValue.Dnssec ?? new DnssecConfiguration();
+        if (!policy.IsAlgorithmAllowed((byte)rrsig.Algorithm))
+        {
+            _logger.LogDebug(
+                "DNSSEC skipping disallowed algorithm {Algorithm}",
+                rrsig.Algorithm);
+            return false;
+        }
 
         var payloadSize = rrsigWireDataExcludingSignature.Length + canonicalRrsetData.Length;
         var payload = ArrayPool<byte>.Shared.Rent(payloadSize);

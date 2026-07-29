@@ -201,7 +201,7 @@ public class DnssecPhase4Tests
         var validator = new DnssecMessageValidator(
             crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
-            inner, validator, cache, NullLogger<DnssecValidationMiddleware>.Instance);
+            inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
         var scope = new DnssecScope();
         var context = new DomainMessageContext(null, null, request) { DnssecScope = scope };
@@ -334,7 +334,7 @@ public class DnssecPhase4Tests
         var validator = new DnssecMessageValidator(
             crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
-            cnameDecorator, validator, cache, NullLogger<DnssecValidationMiddleware>.Instance);
+            cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
         var scope = new DnssecScope();
         scope.LoadTrustAnchors(options.CurrentValue.TrustAnchors!);
@@ -410,7 +410,7 @@ public class DnssecPhase4Tests
         var validator = new DnssecMessageValidator(
             crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
-            cnameDecorator, validator, cache, NullLogger<DnssecValidationMiddleware>.Instance);
+            cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
         var scope = new DnssecScope();
         scope.LoadTrustAnchors(options.CurrentValue.TrustAnchors!);

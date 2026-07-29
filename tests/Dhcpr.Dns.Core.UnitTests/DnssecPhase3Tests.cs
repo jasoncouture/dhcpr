@@ -226,6 +226,10 @@ public class DnssecPhase3Tests
             new FixedInner(response),
             messageValidator,
             new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 })),
+            new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+            {
+                TrustAnchors = [new TrustAnchorConfiguration()]
+            }),
             NullLogger<DnssecValidationMiddleware>.Instance);
     }
 

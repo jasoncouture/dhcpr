@@ -23,6 +23,9 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
+    /// <summary>DNSSEC validation enable/disable and algorithm policy.</summary>
+    public DnssecConfiguration Dnssec { get; set; } = new();
+
     [ConfigurationKeyName("DOH")]
     public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 
@@ -104,6 +107,10 @@ public sealed class DnsConfiguration : IValidateSelf
                 return false;
             }
         }
+
+        Dnssec ??= new DnssecConfiguration();
+        if (!Dnssec.TryValidate(out error))
+            return false;
 
         DnsOverHttp ??= new DnsOverHttpConfiguration();
         if (!DnsOverHttp.Validate())

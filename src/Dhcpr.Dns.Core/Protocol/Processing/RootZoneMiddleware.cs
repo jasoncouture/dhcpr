@@ -26,6 +26,11 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        // Directed upstream hops must hit live nameservers (with DO=1) so DNSSEC
+        // sees RRSIGs. Primed root.zone answers are unsigned NS/DS/glue only.
+        if (context.UpstreamEndpoints is { Length: > 0 })
+            return ValueTask.FromResult<DomainMessage?>(null);
+
         var snapshot = _store.Current;
         if (snapshot is null)
             return ValueTask.FromResult<DomainMessage?>(null);

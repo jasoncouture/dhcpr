@@ -64,6 +64,23 @@ public class RootZoneMiddlewareTests
     }
 
     [Fact]
+    public async Task DirectedUpstreamSkipsRootZone()
+    {
+        var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));
+        var store = new RootZoneStore();
+        store.Set(ZoneFileParser.ParseRootZone(text, DateTimeOffset.UtcNow));
+
+        var middleware = new RootZoneMiddleware(store);
+        var context = new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS))
+        {
+            UpstreamEndpoints = [new IPEndPoint(IPAddress.Parse("198.41.0.4"), 53)]
+        };
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task DsQueryReturnsDsRecords()
     {
         var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));

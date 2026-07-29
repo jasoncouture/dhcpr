@@ -222,7 +222,8 @@ public class DnssecPhase3Tests
 
         return new DnssecValidationMiddleware(
             new FixedInner(response),
-            messageValidator);
+            messageValidator,
+            NullLogger<DnssecValidationMiddleware>.Instance);
     }
 
     private static (DomainResourceRecord KeyRecord, ECDsa PrivateKey) CreateEcdsaDnsKey(string zone)

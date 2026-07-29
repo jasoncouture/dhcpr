@@ -4,6 +4,8 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
 using Dhcpr.Dns.Core.RootZone;
 
+using Microsoft.Extensions.Options;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
@@ -13,10 +15,12 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 public sealed class RootZoneMiddleware : IDomainMessageMiddleware
 {
     private readonly IRootZoneStore _store;
+    private readonly IOptionsMonitor<DnsConfiguration> _options;
 
-    public RootZoneMiddleware(IRootZoneStore store)
+    public RootZoneMiddleware(IRootZoneStore store, IOptionsMonitor<DnsConfiguration> options)
     {
         _store = store;
+        _options = options;
     }
 
     public string Name => "Root Zone";
@@ -44,13 +48,30 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         if (matching.Length == 0)
             return ValueTask.FromResult<DomainMessage?>(null);
 
+        var rrsigs = records
+            .Where(r =>
+                r.Type is DomainRecordType.RRSIG &&
+                r.Data is ResourceRecordSignatureData sig &&
+                sig.TypeCovered == question.Type)
+            .ToImmutableArray();
+
+        // When DNSSEC validation is on, unsigned primed answers poison the chain
+        // (e.g. root DNSKEY without RRSIG → Bogus SERVFAIL). Fall through to live DO=1.
+        var dnssecEnabled = _options.CurrentValue.Dnssec?.Enabled ?? true;
+        if (dnssecEnabled && rrsigs.Length == 0)
+            return ValueTask.FromResult<DomainMessage?>(null);
+
+        var answers = rrsigs.Length == 0
+            ? matching
+            : matching.Concat(rrsigs).ToImmutableArray();
+
         var additional = question.Type is DomainRecordType.NS
             ? CollectGlue(snapshot, matching)
             : ImmutableArray<DomainResourceRecord>.Empty;
 
         var response = DomainMessage.CreateResponse(
             context.DomainMessage,
-            answers: matching,
+            answers: answers,
             authorities: null,
             additional: additional,
             responseCode: DomainResponseCode.NoError);

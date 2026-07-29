@@ -458,11 +458,10 @@ public sealed class DnssecMessageValidator
             }
         }
 
-        // Fetch DNSKEY from the same upstreams when directed; otherwise recurse.
-        _logger.LogDebug(
-            "DNSSEC fetching DNSKEY for {Zone} (directed={Directed})",
-            zone,
-            context.UpstreamEndpoints is { Length: > 0 });
+        // Chain-of-trust material must recurse normally. Reusing this hop's
+        // UpstreamEndpoints sends parent/root DNSKEY/DS queries to the wrong NS
+        // (e.g. leaf auth servers), which fails validation → Bogus SERVFAIL.
+        _logger.LogDebug("DNSSEC fetching DNSKEY for {Zone}", zone);
         var request = DomainMessage.CreateRequest(
             zone is "." ? DomainLabels.Empty : new DomainLabels(zone),
             DomainRecordType.DNSKEY);
@@ -470,10 +469,9 @@ public sealed class DnssecMessageValidator
         try
         {
             scope.SuppressKeyFetch = true;
-            dnsKeyResponse = context.UpstreamEndpoints is { Length: > 0 } endpoints
-                ? await _internalClient.SendAsync(context, request, endpoints, cancellationToken)
-                    .ConfigureAwait(false)
-                : await _internalClient.SendAsync(context, request, cancellationToken).ConfigureAwait(false);
+            dnsKeyResponse = await _internalClient
+                .SendAsync(context, request, cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -532,10 +530,10 @@ public sealed class DnssecMessageValidator
         try
         {
             scope.SuppressKeyFetch = true;
-            dsResponse = context.UpstreamEndpoints is { Length: > 0 } endpoints
-                ? await _internalClient.SendAsync(context, request, endpoints, cancellationToken)
-                    .ConfigureAwait(false)
-                : await _internalClient.SendAsync(context, request, cancellationToken).ConfigureAwait(false);
+            // DS lives at the parent — never reuse the child hop's UpstreamEndpoints.
+            dsResponse = await _internalClient
+                .SendAsync(context, request, cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {

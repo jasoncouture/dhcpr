@@ -289,6 +289,72 @@ public class DnssecPhase5Tests
         Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.A);
     }
 
+    [Fact]
+    public async Task KeyFetch_DoesNotReuseHopUpstreamEndpoints()
+    {
+        var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");
+        var aRecord = A("www.example.com", "192.0.2.10");
+        var aSig = SignRrset(parentPrivate, parentKey, [aRecord], DomainRecordType.A);
+        var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
+
+        var leafNs = new IPEndPoint(IPAddress.Parse("203.0.113.50"), 53);
+        var sawDirectedKeyFetch = false;
+        var sawUndirectedKeyFetch = false;
+
+        var internalClient = new ScriptedInternalClient((parentContext, request) =>
+        {
+            var q = request.Questions[0];
+            if (q.Type is DomainRecordType.DNSKEY)
+            {
+                if (parentContext.UpstreamEndpoints is { Length: > 0 })
+                    sawDirectedKeyFetch = true;
+                else
+                    sawUndirectedKeyFetch = true;
+
+                return DomainMessage.CreateResponse(
+                    request, answers: [parentKey, parentDnsKeySig], responseCode: DomainResponseCode.NoError);
+            }
+
+            return DomainMessage.CreateResponse(
+                request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+        });
+
+        var request = DomainMessage.CreateRequest("www.example.com");
+        var response = DomainMessage.CreateResponse(
+            request, answers: [aRecord, aSig], responseCode: DomainResponseCode.NoError);
+
+        var options = Options(new DnsConfiguration
+        {
+            TrustAnchors =
+            [
+                new TrustAnchorConfiguration
+                {
+                    Name = "example.com",
+                    KeyTag = CalculateKeyTag(parentKey),
+                    Algorithm = (byte)DnssecAlgorithmType.EcdsaP256Sha256,
+                    DigestType = (byte)DelegationSignerDigestType.Sha256,
+                    DigestHex = ComputeDsDigestHex(parentKey)
+                }
+            ]
+        });
+
+        var middleware = CreateMiddleware(response, options, internalClient);
+        var scope = new DnssecScope();
+        var context = new DomainMessageContext(null, null, request)
+        {
+            DnssecScope = scope,
+            // Simulate validating a hop answered by a leaf nameserver.
+            UpstreamEndpoints = [leafNs]
+        };
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.False(sawDirectedKeyFetch);
+        Assert.True(sawUndirectedKeyFetch);
+        Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
+    }
+
     private static DnssecValidationMiddleware CreateMiddleware(
         DomainMessage response,
         IOptionsMonitor<DnsConfiguration> options,
@@ -427,23 +493,41 @@ public class DnssecPhase5Tests
             => ValueTask.FromResult<DomainMessage?>(response);
     }
 
-    private sealed class ScriptedInternalClient(Func<DomainMessage, DomainMessage> handler) : IInternalDomainClient
+    private sealed class ScriptedInternalClient : IInternalDomainClient
     {
+        private readonly Func<DomainMessageContext, DomainMessage, DomainMessage> _handler;
+
+        public ScriptedInternalClient(Func<DomainMessage, DomainMessage> handler)
+            : this((_, request) => handler(request))
+        {
+        }
+
+        public ScriptedInternalClient(Func<DomainMessageContext, DomainMessage, DomainMessage> handler)
+        {
+            _handler = handler;
+        }
+
         public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromResult(handler(message));
+            => ValueTask.FromResult(_handler(
+                new DomainMessageContext(null, null, message) { IsInternal = true },
+                message));
 
         public ValueTask<DomainMessage> SendAsync(
             DomainMessageContext parentContext,
             DomainMessage message,
             CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
+            => ValueTask.FromResult(_handler(
+                parentContext with { UpstreamEndpoints = null },
+                message));
 
         public ValueTask<DomainMessage> SendAsync(
             DomainMessageContext parentContext,
             DomainMessage message,
             ImmutableArray<IPEndPoint> upstreamEndpoints,
             CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
+            => ValueTask.FromResult(_handler(
+                parentContext with { UpstreamEndpoints = upstreamEndpoints },
+                message));
     }
 
     private sealed class StaticOptionsMonitor<T>(T current) : IOptionsMonitor<T>

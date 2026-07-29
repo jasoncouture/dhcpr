@@ -191,31 +191,42 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         PooledList<IPEndPoint> endPoints,
         CancellationToken cancellationToken)
     {
-        using var nameserverQueries = nsNames
-            .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
-                new[]
-                {
-                    _internalClient
-                        .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.A),
-                            cancellationToken).AsTask(),
-                    _internalClient
-                        .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
-                            cancellationToken).AsTask()
-                })
-            .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
-            .ToPooledList();
-
-        var responses = await Task.WhenAll(nameserverQueries);
-        var addresses = new List<IPAddress>();
-        foreach (var nextMessage in responses)
+        // Glue A/AAAA recursion shares DnssecScope with the client query. Its hop
+        // outcomes must not Observe into Status (Bogus is sticky and SERVFAILs
+        // unsigned final answers). Keys/DS learned along the way still apply.
+        parentContext.DnssecScope?.PushIgnoreStatus();
+        try
         {
-            if (nextMessage is null) continue;
-            addresses.AddRange(nextMessage.Records
-                .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                .Select(i => ((IPAddressData)i.Data).Address));
-        }
+            using var nameserverQueries = nsNames
+                .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
+                    new[]
+                    {
+                        _internalClient
+                            .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.A),
+                                cancellationToken).AsTask(),
+                        _internalClient
+                            .SendAsync(parentContext, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
+                                cancellationToken).AsTask()
+                    })
+                .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
+                .ToPooledList();
 
-        return addresses;
+            var responses = await Task.WhenAll(nameserverQueries);
+            var addresses = new List<IPAddress>();
+            foreach (var nextMessage in responses)
+            {
+                if (nextMessage is null) continue;
+                addresses.AddRange(nextMessage.Records
+                    .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
+                    .Select(i => ((IPAddressData)i.Data).Address));
+            }
+
+            return addresses;
+        }
+        finally
+        {
+            parentContext.DnssecScope?.PopIgnoreStatus();
+        }
     }
 
     private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

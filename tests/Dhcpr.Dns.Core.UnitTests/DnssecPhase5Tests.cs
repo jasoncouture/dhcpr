@@ -356,6 +356,21 @@ public class DnssecPhase5Tests
     }
 
     [Fact]
+    public void IgnoreStatus_BlocksObserveButKeepsKeys()
+    {
+        var scope = new DnssecScope();
+        scope.Observe(DnssecValidationStatus.Secure);
+        scope.PushIgnoreStatus();
+        scope.Observe(DnssecValidationStatus.Bogus);
+        scope.Observe(DnssecValidationStatus.Insecure);
+        scope.PopIgnoreStatus();
+        Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
+
+        scope.Observe(DnssecValidationStatus.Insecure);
+        Assert.Equal(DnssecValidationStatus.Insecure, scope.Status);
+    }
+
+    [Fact]
     public async Task SuppressKeyFetch_DoesNotPoisonScopeWithBogus()
     {
         var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");

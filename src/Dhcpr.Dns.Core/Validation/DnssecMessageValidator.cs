@@ -101,6 +101,15 @@ public sealed class DnssecMessageValidator
                 outcome,
                 question.Name.ToString(),
                 question.Type);
+            if (outcome is DnssecValidationStatus.Bogus)
+            {
+                _logger.LogDebug(
+                    "DNSSEC observing Bogus for {Name}/{Type} (prior status {Prior})",
+                    question.Name.ToString(),
+                    question.Type,
+                    scope.Status);
+            }
+
             scope.Observe(outcome);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

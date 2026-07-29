@@ -45,6 +45,20 @@ public sealed class DnssecScope
     /// <summary>True while fetching DS/DNSKEY so nested validation does not re-enter fetch loops.</summary>
     public bool SuppressKeyFetch { get; set; }
 
+    /// <summary>
+    /// Depth of status-isolation for side lookups (NS glue address recursion).
+    /// Keys/delegations still update; <see cref="Observe"/> is a no-op.
+    /// </summary>
+    private int _ignoreStatusDepth;
+
+    public void PushIgnoreStatus() => _ignoreStatusDepth++;
+
+    public void PopIgnoreStatus()
+    {
+        if (_ignoreStatusDepth > 0)
+            _ignoreStatusDepth--;
+    }
+
     public void LoadTrustAnchors(IEnumerable<TrustAnchorConfiguration> anchors)
     {
         foreach (var anchor in anchors)
@@ -95,6 +109,9 @@ public sealed class DnssecScope
 
     public void Observe(DnssecValidationStatus outcome)
     {
+        if (_ignoreStatusDepth > 0)
+            return;
+
         Status = Combine(Status, outcome);
     }
 

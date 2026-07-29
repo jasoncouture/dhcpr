@@ -50,7 +50,8 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Shuffle → Metrics → Logging → Dnssec → CanonicalName → Cache → resolver
+        // Outermost last: Shuffle → Metrics → Logging → Dnssec → CanonicalName → Cache → ServFailRetry → resolver
+        services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();

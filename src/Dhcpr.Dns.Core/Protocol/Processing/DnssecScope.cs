@@ -115,6 +115,11 @@ public sealed class DnssecScope
         Status = Combine(Status, outcome);
     }
 
+    /// <summary>
+    /// Clear validation outcome between SERVFAIL retries. Keys/delegations stay.
+    /// </summary>
+    public void ResetStatus() => Status = DnssecValidationStatus.Unchecked;
+
     public static DnssecValidationStatus Combine(DnssecValidationStatus current, DnssecValidationStatus next)
     {
         if (current is DnssecValidationStatus.Bogus || next is DnssecValidationStatus.Bogus)

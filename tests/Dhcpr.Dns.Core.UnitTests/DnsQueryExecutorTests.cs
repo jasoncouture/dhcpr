@@ -91,6 +91,30 @@ public class DnsQueryExecutorTests
         Assert.Equal(request.Id, decoded.Id);
     }
 
+    [Fact]
+    public async Task QueryAsync_QueuesRequestAndReturnsResponse()
+    {
+        var queue = new CountingQueue();
+        var executor = CreateExecutor(queue);
+        var request = DomainMessage.CreateRequest("health.example");
+
+        var queryTask = executor.QueryAsync(request, CancellationToken.None).AsTask();
+
+        Assert.Equal(1, queue.EnqueueCount);
+        Assert.NotNull(queue.LastMessage);
+        Assert.Equal("health.example", queue.LastMessage!.Context.DomainMessage.Questions[0].Name.ToString());
+
+        var response = DomainMessage.CreateResponse(
+            queue.LastMessage.Context.DomainMessage,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.NoError);
+        queue.LastMessage.TaskCompletionSource.TrySetResult(response);
+
+        var result = await queryTask;
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+    }
+
     private static IDnsQueryExecutor CreateExecutor(
         IMessageQueue<DnsPacketReceivedMessage> queue,
         int maxRequestBytes = 65535)

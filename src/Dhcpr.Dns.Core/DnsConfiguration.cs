@@ -26,6 +26,9 @@ public sealed class DnsConfiguration : IValidateSelf
     /// <summary>DNSSEC validation enable/disable and algorithm policy.</summary>
     public DnssecConfiguration Dnssec { get; set; } = new();
 
+    /// <summary>ASP.NET health check: resolve these domains through the DNS pipeline.</summary>
+    public DnsHealthCheckConfiguration HealthCheck { get; set; } = new();
+
     [ConfigurationKeyName("DOH")]
     public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 
@@ -110,6 +113,10 @@ public sealed class DnsConfiguration : IValidateSelf
 
         Dnssec ??= new DnssecConfiguration();
         if (!Dnssec.TryValidate(out error))
+            return false;
+
+        HealthCheck ??= new DnsHealthCheckConfiguration();
+        if (!HealthCheck.TryValidate(out error))
             return false;
 
         DnsOverHttp ??= new DnsOverHttpConfiguration();

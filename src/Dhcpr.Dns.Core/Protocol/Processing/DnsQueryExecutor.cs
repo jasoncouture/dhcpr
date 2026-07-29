@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Net;
 
 using Dhcpr.Core.Queue;
+using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Validation;
 
@@ -11,6 +12,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DnsQueryExecutor : IDnsQueryExecutor
 {
+    private static readonly IPEndPoint HealthCheckEndPoint = new(IPAddress.Loopback, 0);
+
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
     private readonly DnsOverHttpConfiguration _dnsOverHttp;
 
@@ -44,6 +47,35 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             return DnsQueryExecutionResult.Fail(DnsQueryExecutionStatus.InvalidWireFormat);
         }
 
+        var response = await QueryAsync(request, clientEndPoint, serverEndPoint, cancellationToken)
+            .ConfigureAwait(false);
+        if (response is null)
+            return DnsQueryExecutionResult.Fail(
+                cancellationToken.IsCancellationRequested
+                    ? DnsQueryExecutionStatus.Cancelled
+                    : DnsQueryExecutionStatus.NoResponse);
+
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(512, response.EstimatedSize));
+        try
+        {
+            var length = DomainMessageEncoder.Encode(buffer, response);
+            return DnsQueryExecutionResult.Ok(buffer.AsSpan(0, length).ToArray());
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    public ValueTask<DomainMessage?> QueryAsync(DomainMessage request, CancellationToken cancellationToken)
+        => QueryAsync(request, HealthCheckEndPoint, HealthCheckEndPoint, cancellationToken);
+
+    private async ValueTask<DomainMessage?> QueryAsync(
+        DomainMessage request,
+        IPEndPoint clientEndPoint,
+        IPEndPoint serverEndPoint,
+        CancellationToken cancellationToken)
+    {
         var context = new DomainMessageContext(clientEndPoint, serverEndPoint, request)
         {
             IsInternal = false,
@@ -62,28 +94,13 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
 
         _messageQueue.Enqueue(queued, cancellationToken);
 
-        DomainMessage? response;
         try
         {
-            response = await queued.TaskCompletionSource.Task.ConfigureAwait(false);
+            return await queued.TaskCompletionSource.Task.ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return DnsQueryExecutionResult.Fail(DnsQueryExecutionStatus.Cancelled);
-        }
-
-        if (response is null)
-            return DnsQueryExecutionResult.Fail(DnsQueryExecutionStatus.NoResponse);
-
-        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(512, response.EstimatedSize));
-        try
-        {
-            var length = DomainMessageEncoder.Encode(buffer, response);
-            return DnsQueryExecutionResult.Ok(buffer.AsSpan(0, length).ToArray());
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
+            return null;
         }
     }
 }

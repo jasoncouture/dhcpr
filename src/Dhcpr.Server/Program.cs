@@ -48,6 +48,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
 builder.Services.AddCoreServices();
 builder.Services.AddDns();
 builder.Services.AddDhcp();
+builder.Services.AddDhcprHealthChecks();
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
@@ -59,6 +60,7 @@ builder.Services.AddOpenTelemetry()
 var app = builder.Build();
 
 app.MapPrometheusScrapingEndpoint();
+app.MapDhcprHealthChecks();
 app.MapDnsOverHttp();
 app.MapDynDnsUpdate();
 

@@ -100,4 +100,23 @@ env:
 # Optional bulk env from ConfigMaps/Secrets (Kubernetes EnvFromSource shape).
 envFrom: []
 
+# ASP.NET /health — resolves DNS:HealthCheck:Domains through the DNS pipeline.
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
 resources: {}

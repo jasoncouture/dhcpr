@@ -1,5 +1,7 @@
 using System.Net;
 
+using Dhcpr.Dns.Core.Protocol;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public interface IDnsQueryExecutor
@@ -11,6 +13,13 @@ public interface IDnsQueryExecutor
         ReadOnlyMemory<byte> requestWire,
         IPEndPoint clientEndPoint,
         IPEndPoint serverEndPoint,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Run a typed request through the shared resolver pipeline (used by health checks).
+    /// </summary>
+    ValueTask<DomainMessage?> QueryAsync(
+        DomainMessage request,
         CancellationToken cancellationToken);
 }
 

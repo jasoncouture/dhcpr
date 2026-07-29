@@ -355,6 +355,110 @@ public class DnssecPhase5Tests
         Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
     }
 
+    [Fact]
+    public async Task SuppressKeyFetch_DoesNotPoisonScopeWithBogus()
+    {
+        var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");
+        var aRecord = A("www.example.com", "192.0.2.10");
+        var aSig = SignRrset(parentPrivate, parentKey, [aRecord], DomainRecordType.A);
+        var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
+
+        // While SuppressKeyFetch is set, nested validation of a signed referral would
+        // previously Observe(Bogus) because EnsureZoneKeysAvailable returns false.
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ctx = ci.ArgAt<DomainMessageContext>(0);
+                Assert.True(ctx.DnssecScope!.SuppressKeyFetch);
+                // Signed NS referral (DS RRSIG present) — must not Bogus the scope.
+                var ns = new DomainResourceRecord(
+                    new DomainLabels("example.com"),
+                    DomainRecordType.NS,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(300),
+                    new NameData(new DomainLabels("ns.example.com")));
+                var ds = CreateDsRecord("child.example.com", parentKey);
+                var dsSig = SignRrset(parentPrivate, parentKey, [ds], DomainRecordType.DS);
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    ctx.DomainMessage,
+                    answers: [],
+                    authorities: [ns, ds, dsSig],
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 }));
+        var options = Options(new DnsConfiguration
+        {
+            TrustAnchors =
+            [
+                new TrustAnchorConfiguration
+                {
+                    Name = "example.com",
+                    KeyTag = CalculateKeyTag(parentKey),
+                    Algorithm = (byte)DnssecAlgorithmType.EcdsaP256Sha256,
+                    DigestType = (byte)DelegationSignerDigestType.Sha256,
+                    DigestHex = ComputeDsDigestHex(parentKey)
+                }
+            ]
+        });
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, options);
+        var validator = new DnssecMessageValidator(
+            crypto, new ScriptedInternalClient(_ =>
+                DomainMessage.CreateResponse(
+                    DomainMessage.CreateRequest("."), DomainResourceRecords.Empty, DomainResponseCode.ServerFailure)),
+            options, NullLogger<DnssecMessageValidator>.Instance);
+        var dnssec = new DnssecValidationMiddleware(
+            inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
+
+        var scope = new DnssecScope();
+        scope.LoadTrustAnchors(options.CurrentValue.TrustAnchors!);
+        scope.SetKeys(new AuthenticatedDnsKeySet { Zone = "example.com", Keys = [parentKey] });
+        scope.SuppressKeyFetch = true;
+
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.NS);
+        var result = await dnssec.ProcessAsync(
+            new DomainMessageContext(null, null, request)
+            {
+                DnssecScope = scope,
+                IsInternal = true,
+                UpstreamEndpoints = [new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53)]
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.NotEqual(DnssecValidationStatus.Bogus, scope.Status);
+        _ = aRecord;
+        _ = aSig;
+        _ = parentDnsKeySig;
+    }
+
+    [Fact]
+    public async Task UnsignedDirectedGlue_DoesNotMarkScopeInsecure()
+    {
+        var request = DomainMessage.CreateRequest("ns.example.com", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(
+            request,
+            answers: [A("ns.example.com", "192.0.2.53")],
+            responseCode: DomainResponseCode.NoError);
+
+        var options = Options(new DnsConfiguration());
+        var middleware = CreateMiddleware(response, options);
+        var scope = new DnssecScope();
+        scope.Observe(DnssecValidationStatus.Secure);
+
+        await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request)
+            {
+                DnssecScope = scope,
+                IsInternal = true,
+                UpstreamEndpoints = [new IPEndPoint(IPAddress.Parse("192.0.2.1"), 53)]
+            },
+            CancellationToken.None);
+
+        Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
+    }
+
     private static DnssecValidationMiddleware CreateMiddleware(
         DomainMessage response,
         IOptionsMonitor<DnsConfiguration> options,

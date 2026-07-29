@@ -56,6 +56,20 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
             ? context.DomainMessage.Questions[0]
             : null;
         var name = question?.Name.ToString();
+
+        // DNSKEY/DS fetches set SuppressKeyFetch and share this scope. Nested hop
+        // validation would call EnsureZoneKeysAvailable → false → Bogus and poison
+        // the client query permanently (Combine never clears Bogus). Auth of the
+        // fetched material is done by DnssecMessageValidator after the fetch returns.
+        if (context.DnssecScope.SuppressKeyFetch)
+        {
+            _logger.LogDebug(
+                "DNSSEC skip hop validation during key/DS fetch for {Name}/{Type}",
+                name,
+                question?.Type);
+            return result;
+        }
+
         var before = context.DnssecScope.Status;
 
         // Validate even on cache hits: RRSIGs are retained in cache, so crypto can

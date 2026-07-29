@@ -69,6 +69,18 @@ public sealed class DnssecMessageValidator
         var hasRrsig = allRecords.Any(static r => r.Type is DomainRecordType.RRSIG);
         if (!hasRrsig)
         {
+            // Directed internal hops (glue, NS probes, upstream answers) share the client
+            // scope. Unsigned glue must not Observe(Insecure) or it clears AD on Secure
+            // answers. Client-facing and undirected re-entry (CNAME chase) still count.
+            if (context.IsInternal && context.UpstreamEndpoints is { Length: > 0 })
+            {
+                _logger.LogDebug(
+                    "DNSSEC unsigned directed hop ignored for status ({Name}/{Type})",
+                    question.Name.ToString(),
+                    question.Type);
+                return;
+            }
+
             _logger.LogDebug(
                 "DNSSEC insecure: no RRSIG in response for {Name}/{Type}",
                 question.Name.ToString(),
@@ -157,6 +169,15 @@ public sealed class DnssecMessageValidator
 
             if (!await EnsureZoneKeysAvailableAsync(context, signer, cancellationToken).ConfigureAwait(false))
             {
+                // During key/DS fetch, nested validation cannot pull keys — not Bogus.
+                if (scope.SuppressKeyFetch)
+                {
+                    _logger.LogDebug(
+                        "DNSSEC indeterminate: key fetch suppressed for signer {Signer}",
+                        signer);
+                    return DnssecValidationStatus.Indeterminate;
+                }
+
                 _logger.LogDebug("DNSSEC bogus: no authenticated keys for signer {Signer}", signer);
                 return DnssecValidationStatus.Bogus;
             }

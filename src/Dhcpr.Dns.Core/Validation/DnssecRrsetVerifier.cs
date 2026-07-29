@@ -105,11 +105,25 @@ public static class DnssecRrsetVerifier
         return buffer[..(buffer.Length - span.Length)];
     }
 
-    public static IEnumerable<IGrouping<(DomainLabels Name, DomainRecordType Type), DomainResourceRecord>>
+    public static IEnumerable<IGrouping<(string Name, DomainRecordType Type), DomainResourceRecord>>
         GroupRrsets(IEnumerable<DomainResourceRecord> records)
         => records
             .Where(static r => r.Type is not DomainRecordType.RRSIG and not DomainRecordType.OPT)
-            .GroupBy(static r => (r.Name, r.Type));
+            .GroupBy(
+                static r => (Name: r.Name.ToString(), r.Type),
+                GroupKeyComparer.Instance);
+
+    private sealed class GroupKeyComparer : IEqualityComparer<(string Name, DomainRecordType Type)>
+    {
+        public static readonly GroupKeyComparer Instance = new();
+
+        public bool Equals((string Name, DomainRecordType Type) x, (string Name, DomainRecordType Type) y)
+            => x.Type == y.Type &&
+               string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string Name, DomainRecordType Type) obj)
+            => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name), obj.Type);
+    }
 
     public static IReadOnlyList<DomainResourceRecord> FindCoveringRrsigs(
         IEnumerable<DomainResourceRecord> records,

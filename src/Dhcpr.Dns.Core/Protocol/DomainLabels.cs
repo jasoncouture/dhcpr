@@ -5,8 +5,11 @@ using Dhcpr.Core;
 
 namespace Dhcpr.Dns.Core.Protocol;
 
-public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfComputeEstimatedSize, IReadOnlyList<string>
+public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels)
+    : ISelfComputeEstimatedSize, IReadOnlyList<string>, IEquatable<DomainLabels>
 {
+    // ImmutableArray.Equals is reference equality on the backing array — useless for DNS names
+    // built from separate parses. Compare the rendered name instead.
     private static IEnumerable<DomainLabel> ValidateAndCreateLabelsFromStrings(IEnumerable<string> strings)
     {
         foreach (var str in strings.Select(i => i.Trim()))
@@ -41,6 +44,18 @@ public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels) : ISelfCom
 
     public override string ToString()
         => DomainName;
+
+    public bool Equals(DomainLabels? other)
+    {
+        if (other is null)
+            return false;
+        if (ReferenceEquals(this, other))
+            return true;
+        return string.Equals(DomainName, other.DomainName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override int GetHashCode()
+        => StringComparer.OrdinalIgnoreCase.GetHashCode(DomainName);
 
     IEnumerator IEnumerable.GetEnumerator()
     {

@@ -131,7 +131,7 @@ public sealed class DnssecMessageValidator
         foreach (var group in DnssecRrsetVerifier.GroupRrsets(allRecords)
                      .Where(static g => g.Key.Type is DomainRecordType.DNSKEY))
         {
-            var zone = DnssecScope.NormalizeZone(group.Key.Name.ToString());
+            var zone = DnssecScope.NormalizeZone(group.Key.Name);
             await EnsureDnsKeysAuthenticatedAsync(context, zone, group.ToList(), allRecords, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -139,7 +139,7 @@ public sealed class DnssecMessageValidator
         foreach (var group in DnssecRrsetVerifier.GroupRrsets(allRecords)
                      .Where(static g => g.Key.Type is DomainRecordType.DS))
         {
-            var childZone = DnssecScope.NormalizeZone(group.Key.Name.ToString());
+            var childZone = DnssecScope.NormalizeZone(group.Key.Name);
             await EnsureDelegationAuthenticatedAsync(context, childZone, group.ToList(), allRecords, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -155,23 +155,34 @@ public sealed class DnssecMessageValidator
         var question = response.Questions[0];
         var now = DateTimeOffset.UtcNow;
 
-        // Verify each non-DNSSEC RRset that has covering RRSIGs.
+        // Positive answers: verify answer-section RRsets only. Authority/additional on
+        // those responses often carry parent NS + glue (or one-RR fragments) whose RRSIGs
+        // cover the full set — validating them as Bogus false-SERVFAILs DS/apex queries
+        // (cloudflare.net, www.speedtest.net → CDN). Referrals (empty answers + NS) still
+        // authenticate the authority NS RRset.
+        var isReferral = response.Records.Answers.Length == 0 &&
+                         response.Records.Authorities.Any(static r => r.Type is DomainRecordType.NS);
+        var rrsetsToVerify = isReferral
+            ? response.Records.Authorities
+            : response.Records.Answers;
+
         var verifiedAny = false;
-        foreach (var group in DnssecRrsetVerifier.GroupRrsets(allRecords))
+        foreach (var group in DnssecRrsetVerifier.GroupRrsets(rrsetsToVerify))
         {
             if (group.Key.Type is DomainRecordType.DNSKEY or DomainRecordType.DS or DomainRecordType.NSEC
                 or DomainRecordType.NSEC3 or DomainRecordType.NSEC3PARAM)
                 continue;
 
             var rrset = group.ToList();
-            var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, group.Key.Name, group.Key.Type);
+            var owner = new DomainLabels(group.Key.Name);
+            var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, owner, group.Key.Type);
             if (rrsigs.Count == 0)
                 continue;
 
             var signer = ((ResourceRecordSignatureData)rrsigs[0].Data).SignersName.ToString();
             _logger.LogDebug(
                 "DNSSEC verifying {Name}/{Type} ({Count} RR(s), signer={Signer})",
-                group.Key.Name.ToString(),
+                group.Key.Name,
                 group.Key.Type,
                 rrset.Count,
                 signer);
@@ -201,18 +212,16 @@ public sealed class DnssecMessageValidator
             {
                 _logger.LogDebug(
                     "DNSSEC bogus: RRSIG verification failed for {Name}/{Type}",
-                    group.Key.Name.ToString(),
+                    group.Key.Name,
                     group.Key.Type);
                 return DnssecValidationStatus.Bogus;
             }
 
-            _logger.LogDebug("DNSSEC verified {Name}/{Type}", group.Key.Name.ToString(), group.Key.Type);
+            _logger.LogDebug("DNSSEC verified {Name}/{Type}", group.Key.Name, group.Key.Type);
             verifiedAny = true;
         }
 
-        // NXDOMAIN / NODATA only — referrals (empty answers + NS in authority) are not denials.
-        var isReferral = response.Records.Answers.Length == 0 &&
-                         response.Records.Authorities.Any(static r => r.Type is DomainRecordType.NS);
+        // NXDOMAIN / NODATA only — referrals are not denials.
         var needsNegativeProof =
             response.Flags.ResponseCode is DomainResponseCode.NameError ||
             (response.Flags.ResponseCode is DomainResponseCode.NoError &&

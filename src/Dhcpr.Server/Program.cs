@@ -3,6 +3,8 @@ using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
+using Dhcpr.Server.Components;
+using Dhcpr.Server.LiveQueries;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -50,6 +52,11 @@ builder.Services.AddDns();
 builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 
+builder.Services.AddSingleton<LiveQueryStore>();
+builder.Services.AddHostedService(static sp => sp.GetRequiredService<LiveQueryStore>());
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
     {
@@ -59,6 +66,11 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
+app.UseAntiforgery();
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
 app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 app.MapDnsOverHttp();
@@ -66,3 +78,5 @@ app.MapDynDnsUpdate();
 
 Console.WriteLine("Application configuration complete, starting services.");
 app.Run();
+
+public partial class Program;

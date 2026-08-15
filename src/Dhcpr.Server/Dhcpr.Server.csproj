@@ -18,8 +18,4 @@
       <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="wwwroot\" />
-    </ItemGroup>
-
 </Project>

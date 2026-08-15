@@ -55,12 +55,13 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Shuffle → Metrics → Logging → Dnssec → CanonicalName → Cache → ServFailRetry → resolver
+        // Outermost last: Shuffle → Metrics → LiveQuery → Logging → Dnssec → … → resolver
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, LiveQueryEventMiddleware>();
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();

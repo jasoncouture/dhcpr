@@ -13,5 +13,6 @@
     <Project Path="tests/Dhcpr.Dhcp.Core.UnitTests/Dhcpr.Dhcp.Core.UnitTests.csproj" />
     <Project Path="tests/Dhcpr.Dns.Core.UnitTests/Dhcpr.Dns.Core.UnitTests.csproj" />
     <Project Path="tests/Dhcpr.Peering.Discovery.UnitTests/Dhcpr.Peering.Discovery.UnitTests.csproj" />
+    <Project Path="tests/Dhcpr.Server.UnitTests/Dhcpr.Server.UnitTests.csproj" />
   </Folder>
 </Solution>

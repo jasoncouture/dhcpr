@@ -1,0 +1,101 @@
+:root {
+    --bg: #0f1419;
+    --surface: #1a222c;
+    --border: #2a3542;
+    --text: #d6dde6;
+    --muted: #8b98a8;
+    --accent: #5ec4c8;
+    --error: #e06c75;
+    --hit: #98c379;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    font-size: 13px;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
+}
+
+.subtitle {
+    color: var(--muted);
+}
+
+main {
+    flex: 1;
+    padding: 0.75rem 1rem 1.5rem;
+}
+
+.toolbar {
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    color: var(--muted);
+}
+
+.query-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.query-table th,
+.query-table td {
+    text-align: left;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.query-table th {
+    color: var(--muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+}
+
+.query-table td:nth-child(5),
+.query-table td:nth-child(7) {
+    white-space: normal;
+    word-break: break-all;
+}
+
+.query-table tr.error td {
+    color: var(--error);
+}
+
+.query-table tbody tr:hover {
+    background: var(--surface);
+}

@@ -4,9 +4,11 @@ ARG TARGETARCH
 WORKDIR /src
 
 COPY --link --parents *.slnx **/*.csproj **/*.props **/*.targets ./
-RUN dotnet restore src/Dhcpr.Server/Dhcpr.Server.csproj -a "${TARGETARCH}" --os linux-musl -p:Configuration=Release --p:PublishSingleFile=true
+# PublishSingleFile breaks MapStaticAssets: Assembly.Location is empty so the
+# staticwebassets endpoints manifest is never found → /_framework/blazor.web.js 404.
+RUN dotnet restore src/Dhcpr.Server/Dhcpr.Server.csproj -a "${TARGETARCH}" --os linux-musl -p:Configuration=Release
 COPY . .
-RUN dotnet publish src/Dhcpr.Server/Dhcpr.Server.csproj -c Release -o /app/publish -a "${TARGETARCH}" --os linux-musl --no-restore --self-contained --p:PublishSingleFile=true
+RUN dotnet publish src/Dhcpr.Server/Dhcpr.Server.csproj -c Release -o /app/publish -a "${TARGETARCH}" --os linux-musl --no-restore --self-contained
 RUN chmod +x /app/publish/Dhcpr.Server
 
 FROM harbor.instigaterevolution.com/dockerhub/alpine:3.24 AS final

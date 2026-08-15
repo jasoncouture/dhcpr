@@ -67,6 +67,9 @@ builder.Services.AddOpenTelemetry()
 var app = builder.Build();
 
 app.UseAntiforgery();
+// wwwroot fallback (MapStaticAssets uses the build manifest; disk files still needed
+// when the manifest cannot be resolved, e.g. historical single-file publishes).
+app.UseStaticFiles();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

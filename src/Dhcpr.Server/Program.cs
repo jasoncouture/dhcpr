@@ -67,17 +67,8 @@ builder.Services.AddOpenTelemetry()
 var app = builder.Build();
 
 app.UseAntiforgery();
-// PublishSingleFile leaves Assembly.Location empty, so the parameterless
-// MapStaticAssets() cannot resolve the endpoints manifest. Pass an explicit
-// path under AppContext.BaseDirectory (where publish places the JSON + wwwroot).
 app.UseStaticFiles();
-var staticAssetsManifest = Path.Combine(
-    AppContext.BaseDirectory,
-    "Dhcpr.Server.staticwebassets.endpoints.json");
-if (File.Exists(staticAssetsManifest))
-    app.MapStaticAssets(staticAssetsManifest);
-else
-    app.MapStaticAssets();
+app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

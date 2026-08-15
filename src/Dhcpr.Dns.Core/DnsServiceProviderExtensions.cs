@@ -9,6 +9,8 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 using Dhcpr.Dns.Core.RootZone;
 using Dhcpr.Dns.Core.Validation;
 
+using MessagePipe;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
@@ -27,6 +29,7 @@ public static class DnsServiceProviderExtensions
             o.CompactionPercentage = 0.25;
             o.ExpirationScanFrequency = TimeSpan.FromMinutes(1);
         });
+        services.AddMessagePipe();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
         services.AddHttpClient<NamedRootHttpClient>(ConfigureInternicHttpClient);

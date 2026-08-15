@@ -55,11 +55,15 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
                 sig.TypeCovered == question.Type)
             .ToImmutableArray();
 
-        // When DNSSEC validation is on, unsigned primed answers poison the chain
-        // (e.g. root DNSKEY without RRSIG → Bogus SERVFAIL). Fall through to live DO=1.
+        // When DNSSEC validation is on, primed answers must carry currently-valid RRSIGs.
+        // Stale root.zone between Internic refreshes (SOA refresh 1800s, RRSIG calendar
+        // windows) otherwise verifies Bogus → systemic SERVFAIL → probe restarts.
         var dnssecEnabled = _options.CurrentValue.Dnssec?.Enabled ?? true;
-        if (dnssecEnabled && rrsigs.Length == 0)
-            return ValueTask.FromResult<DomainMessage?>(null);
+        if (dnssecEnabled)
+        {
+            if (rrsigs.Length == 0 || !HasCurrentlyValidRrsig(rrsigs, DateTimeOffset.UtcNow))
+                return ValueTask.FromResult<DomainMessage?>(null);
+        }
 
         var answers = rrsigs.Length == 0
             ? matching
@@ -86,6 +90,22 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         };
 
         return ValueTask.FromResult<DomainMessage?>(response);
+    }
+
+    private static bool HasCurrentlyValidRrsig(
+        ImmutableArray<DomainResourceRecord> rrsigs,
+        DateTimeOffset utcNow)
+    {
+        var nowUnix = (uint)utcNow.ToUnixTimeSeconds();
+        foreach (var record in rrsigs)
+        {
+            if (record.Data is not ResourceRecordSignatureData sig)
+                continue;
+            if (nowUnix >= sig.SignatureInception && nowUnix <= sig.SignatureExpiration)
+                return true;
+        }
+
+        return false;
     }
 
     private static ImmutableArray<DomainResourceRecord> CollectGlue(

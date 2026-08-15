@@ -116,6 +116,59 @@ public class RootZoneMiddlewareTests
     }
 
     [Fact]
+    public async Task ExpiredCoveringRrsigMissesWhenDnssecEnabled()
+    {
+        var owner = new DomainLabels("com");
+        var ns = new DomainResourceRecord(
+            owner,
+            DomainRecordType.NS,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(172800),
+            new NameData(new DomainLabels("a.gtld-servers.net")));
+        var rrsig = new DomainResourceRecord(
+            owner,
+            DomainRecordType.RRSIG,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(172800),
+            new ResourceRecordSignatureData(
+                DomainRecordType.NS,
+                DnssecAlgorithmType.EcdsaP256Sha256,
+                1,
+                172800,
+                (uint)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(),
+                (uint)DateTimeOffset.UtcNow.AddDays(-7).ToUnixTimeSeconds(),
+                1234,
+                DomainLabels.Empty,
+                ImmutableArray.Create<byte>(1, 2, 3, 4)));
+
+        var soa = new StartOfAuthorityData(
+            new DomainLabels("a.root-servers.net"),
+            new DomainLabels("nstld.verisign-grs.com"),
+            1,
+            TimeSpan.FromSeconds(1800),
+            TimeSpan.FromSeconds(900),
+            TimeSpan.FromDays(7),
+            TimeSpan.FromDays(1));
+        var snapshot = new RootZoneSnapshot(
+            soa,
+            TimeSpan.FromDays(1),
+            DateTimeOffset.UtcNow,
+            new Dictionary<string, ImmutableArray<DomainResourceRecord>>
+            {
+                ["com"] = [ns, rrsig]
+            });
+        var store = new RootZoneStore();
+        store.Set(snapshot);
+
+        var middleware = CreateMiddleware(store, dnssecEnabled: true);
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS)),
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task ExpiredSnapshotIsMiss()
     {
         var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));

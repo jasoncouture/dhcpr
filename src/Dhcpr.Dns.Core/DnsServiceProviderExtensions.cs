@@ -21,7 +21,9 @@ public static class DnsServiceProviderExtensions
     {
         services.AddMemoryCache(o =>
         {
-            o.SizeLimit = 100_000_000;
+            // Size is per DnsResponseCache entry (Size = 1). 100M was effectively unbounded
+            // and could grow until the pod OOMs after sustained query load.
+            o.SizeLimit = 100_000;
             o.CompactionPercentage = 0.25;
             o.ExpirationScanFrequency = TimeSpan.FromMinutes(1);
         });

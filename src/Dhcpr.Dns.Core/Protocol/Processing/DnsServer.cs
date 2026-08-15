@@ -152,17 +152,31 @@ public sealed class DnsServer : BackgroundService
                 : new IPEndPoint(IPAddress.Any, 0);
             while (!cancellationToken.IsCancellationRequested)
             {
-                var result =
-                    await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), remoteEndPoint, cancellationToken);
+                try
+                {
+                    var result =
+                        await udpClient.Client.ReceiveMessageFromAsync(
+                            buffer.AsMemory(), remoteEndPoint, cancellationToken);
 
-                CreateContextAndQueueForProcessing(
-                    result.RemoteEndPoint,
-                    networkInterface: result.PacketInformation.Interface,
-                    udpClient,
-                    listenEndPoint,
-                    buffer.AsSpan(0, result.ReceivedBytes),
-                    cancellationToken
-                );
+                    CreateContextAndQueueForProcessing(
+                        result.RemoteEndPoint,
+                        networkInterface: result.PacketInformation.Interface,
+                        udpClient,
+                        listenEndPoint,
+                        buffer.AsSpan(0, result.ReceivedBytes),
+                        cancellationToken
+                    );
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Transient socket errors must not end the listener — DnsServer treats
+                    // any listener exit as fatal (StopHost).
+                    _logger.LogWarning(ex, "UDP receive error on {EndPoint}; continuing", listenEndPoint);
+                }
             }
         }
         finally

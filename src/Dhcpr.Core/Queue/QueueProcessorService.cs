@@ -57,6 +57,15 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
             var messageProcessors = scope.ServiceProvider.GetServices<IQueueMessageProcessor<T>>();
             await RunMessageProcessorsAsync(message, messageProcessors, token);
         }
+        catch (OperationCanceledException) when (
+            cancellationToken.IsCancellationRequested || stoppingToken.IsCancellationRequested)
+        {
+            // Expected on cancel / shutdown.
+        }
+        catch
+        {
+            // Isolate per-message failures from the processor loop (StopHost).
+        }
         finally
         {
             await ReturnCancellationTokenSource(rentedCancellationTokenSource);
@@ -128,7 +137,14 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         {
             any = true;
             tasks.RemoveAt(item.Index);
-            await item.Task;
+            try
+            {
+                await item.Task.ConfigureAwait(false);
+            }
+            catch
+            {
+                // A single faulted message must not tear down the processor (StopHost).
+            }
         }
 
         return any;

@@ -29,7 +29,7 @@ public class UnsupportedQueryTypeMiddlewareTests
     }
 
     [Fact]
-    public async Task UnknownTypeReturnsServFailWithoutCallingInner()
+    public async Task UnknownTypeReturnsNotImplementedWithoutCallingInner()
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
@@ -42,7 +42,7 @@ public class UnsupportedQueryTypeMiddlewareTests
         var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
+        Assert.Equal(DomainResponseCode.NotImplemented, result!.Flags.ResponseCode);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

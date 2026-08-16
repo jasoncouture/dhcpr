@@ -1,8 +1,8 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Rejects QTYPE ANY (255) with NOTIMP and other unknown QTYPEs with SERVFAIL
-/// before cache or upstream work. Attack traffic must not poison the cache.
+/// Rejects QTYPE ANY (255) and other unknown QTYPEs with NOTIMP before cache or
+/// upstream work. Attack traffic must not poison the cache.
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {
@@ -25,21 +25,12 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     {
         foreach (var question in context.DomainMessage.Questions)
         {
-            if (question.Type == AnyQueryType)
+            if (question.Type == AnyQueryType || !Enum.IsDefined(question.Type))
             {
                 return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,
                     DomainResponseCode.NotImplemented));
-            }
-
-            if (!Enum.IsDefined(question.Type))
-            {
-                context.ServFailReason = $"unsupported query type {(ushort)question.Type}";
-                return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
-                    context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.ServerFailure));
             }
         }
 

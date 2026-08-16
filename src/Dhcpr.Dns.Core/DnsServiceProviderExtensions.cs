@@ -65,6 +65,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
+        // Outermost: unknown QTYPE (e.g. ANY/255) → SERVFAIL before cache/upstream.
+        services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();

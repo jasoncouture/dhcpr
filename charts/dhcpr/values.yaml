@@ -21,6 +21,7 @@ service:
   type: ClusterIP
   httpPort: 8080
   dnsPort: 53
+  annotations: {}
 
 # Prometheus Operator ServiceMonitor for /metrics on the http port.
 # `release` must match kube-prometheus-stack's serviceMonitorSelector.

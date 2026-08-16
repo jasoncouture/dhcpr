@@ -8,6 +8,7 @@ public interface ILiveQueryHubGrain : IGrainWithGuidKey
 
     Task Unsubscribe(ILiveQueryObserver observer, CancellationToken cancellationToken = default);
 
+    // No CancellationToken on OneWay — see ILiveQueryPublishWorker.
     [OneWay]
-    Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken = default);
+    Task Publish(DnsQueryEventMessage evt);
 }

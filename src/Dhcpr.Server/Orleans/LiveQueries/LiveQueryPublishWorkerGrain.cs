@@ -9,11 +9,9 @@ namespace Dhcpr.Server.Orleans.LiveQueries;
 [StatelessWorker]
 public sealed class LiveQueryPublishWorkerGrain : Grain, ILiveQueryPublishWorker
 {
-    public Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken = default)
+    public Task Publish(DnsQueryEventMessage evt)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         var hub = GrainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
-        // OneWay on the hub: await only waits until the message is queued.
-        return hub.Publish(evt, cancellationToken);
+        return hub.Publish(evt);
     }
 }

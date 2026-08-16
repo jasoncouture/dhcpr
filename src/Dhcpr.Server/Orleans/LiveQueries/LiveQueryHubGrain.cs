@@ -41,10 +41,8 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         return Task.CompletedTask;
     }
 
-    public async Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken = default)
+    public async Task Publish(DnsQueryEventMessage evt)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         lock (_ring)
         {
             _ring.AddFirst(evt);
@@ -55,14 +53,10 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         List<ILiveQueryObserver>? dead = null;
         foreach (var observer in _observers)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await observer.OnEvent(evt, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                // Fan-out is not tied to the originating DNS request lifetime.
+                await observer.OnEvent(evt, CancellationToken.None);
             }
             catch
             {

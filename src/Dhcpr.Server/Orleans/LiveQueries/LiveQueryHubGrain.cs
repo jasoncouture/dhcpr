@@ -34,10 +34,10 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         return Task.CompletedTask;
     }
 
-    public Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+    public async Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Await Notify on this grain's turn (observers are OneWay — enqueue only).
-        return _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
+        // Observers are OneWay — Notify awaits enqueue only, on this grain's turn.
+        await _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
     }
 }

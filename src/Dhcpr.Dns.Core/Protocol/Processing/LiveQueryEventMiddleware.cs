@@ -4,11 +4,6 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-/// <summary>
-/// Publishes completed client-facing queries for the live UI.
-/// Awaits <see cref="ILiveQueryEventPublisher.PublishAsync"/> which must complete quickly
-/// (Orleans OneWay local enqueue) so cluster fan-out never blocks DNS.
-/// </summary>
 public sealed class LiveQueryEventMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;

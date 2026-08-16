@@ -5,9 +5,6 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
-/// <summary>
-/// Orleans-serializable live-query event. Endpoints are strings because <see cref="IPEndPoint"/> is not Orleans-friendly.
-/// </summary>
 [GenerateSerializer]
 public sealed class DnsQueryEventMessage
 {

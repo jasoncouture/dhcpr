@@ -1,10 +1,10 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-/// <summary>
-/// Publishes live query UI events. Implementations must complete quickly (e.g. Orleans OneWay
-/// local enqueue) so DNS middleware is not blocked on cluster fan-out.
-/// </summary>
 public interface ILiveQueryEventPublisher
 {
+    /// <summary>
+    /// Enqueues a live-query event for UI fan-out. Must complete quickly (local OneWay enqueue);
+    /// must not await cluster observer delivery.
+    /// </summary>
     ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken);
 }

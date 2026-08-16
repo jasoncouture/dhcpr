@@ -13,7 +13,6 @@ namespace Dhcpr.Server.LiveQueries;
 /// <summary>
 /// Retains a ring of recent <see cref="DnsQueryEvent"/>s and fans them out per Blazor circuit
 /// via DropOldest channels so slow UI never back-pressures DNS.
-/// Receives events via MessagePipe (fed by the Orleans hub bridge on each silo).
 /// </summary>
 public sealed class LiveQueryStore : IHostedService, IAsyncMessageHandler<DnsQueryEvent>, IAsyncDisposable
 {

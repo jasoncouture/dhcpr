@@ -10,9 +10,9 @@ public static class OrleansServiceCollectionExtensions
 {
     public static WebApplicationBuilder AddDhcprOrleans(this WebApplicationBuilder builder)
     {
-        builder.UseOrleans(silo =>
+        builder.UseOrleans(static silo =>
         {
-            silo.Configure<ClusterOptions>(options =>
+            silo.Configure<ClusterOptions>(static options =>
             {
                 options.ClusterId = "dhcpr";
                 options.ServiceId = "dhcpr";

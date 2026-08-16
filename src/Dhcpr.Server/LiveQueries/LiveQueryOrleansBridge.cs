@@ -7,16 +7,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Dhcpr.Server.LiveQueries;
 
-/// <summary>
-/// Subscribes to the cluster-wide Orleans live-query hub and republishes into MessagePipe
-/// so <see cref="LiveQueryStore"/> (and any other in-process subscribers) receive events.
-/// </summary>
-public sealed class LiveQueryOrleansBridge : IHostedService
+public sealed partial class LiveQueryOrleansBridge : IHostedService
 {
-    /// <summary>
-    /// Must be shorter than hub <c>ObserverManager</c> expiration so this silo's
-    /// subscription is not dropped.
-    /// </summary>
+    // Shorter than hub ObserverManager expiration so this silo's subscription is not dropped.
     private static readonly TimeSpan ResubscribeInterval = TimeSpan.FromMinutes(2);
 
     private readonly IGrainFactory _grainFactory;
@@ -27,7 +20,7 @@ public sealed class LiveQueryOrleansBridge : IHostedService
     private HubObserver? _observerInstance;
     private ILiveQueryObserver? _observer;
     private ILiveQueryHubGrain? _hub;
-    private CancellationTokenSource? _resubscribeCts;
+    private CancellationTokenSource? _resubscribeCancellation;
     private Task? _resubscribeLoop;
 
     public LiveQueryOrleansBridge(
@@ -47,17 +40,17 @@ public sealed class LiveQueryOrleansBridge : IHostedService
         _hub = _grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
         await _hub.Subscribe(_observer, cancellationToken);
 
-        _resubscribeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _resubscribeLoop = ResubscribeLoopAsync(_resubscribeCts.Token);
+        _resubscribeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _resubscribeLoop = ResubscribeLoopAsync(_resubscribeCancellation.Token);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_resubscribeCts is not null)
+        if (_resubscribeCancellation is not null)
         {
-            await _resubscribeCts.CancelAsync();
-            _resubscribeCts.Dispose();
-            _resubscribeCts = null;
+            await _resubscribeCancellation.CancelAsync();
+            _resubscribeCancellation.Dispose();
+            _resubscribeCancellation = null;
         }
 
         if (_resubscribeLoop is not null)
@@ -68,6 +61,7 @@ public sealed class LiveQueryOrleansBridge : IHostedService
             }
             catch (OperationCanceledException)
             {
+                // Ignored — expected when shutdown cancels the refresh loop.
             }
 
             _resubscribeLoop = null;
@@ -79,9 +73,14 @@ public sealed class LiveQueryOrleansBridge : IHostedService
             {
                 await _hub.Unsubscribe(_observer, cancellationToken);
             }
+            catch (OperationCanceledException)
+            {
+                // Ignored — expected when shutdown cancels an in-flight unsubscribe.
+            }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Failed to unsubscribe live query Orleans bridge during shutdown");
+                // Best-effort cleanup: failing unsubscribe must not block host stop.
+                LogUnsubscribeFailed(_logger, ex);
             }
 
             try
@@ -90,7 +89,8 @@ public sealed class LiveQueryOrleansBridge : IHostedService
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Failed to delete live query observer reference during shutdown");
+                // Best-effort cleanup: failing DeleteObjectReference must not block host stop.
+                LogDeleteObserverFailed(_logger, ex);
             }
         }
 
@@ -108,19 +108,40 @@ public sealed class LiveQueryOrleansBridge : IHostedService
             {
                 await _hub!.Subscribe(_observer!, cancellationToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Failed to refresh live query hub subscription");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Boundary: one failed refresh must not kill the loop / host.
+                LogRefreshSubscriptionFailed(_logger, ex);
             }
         }
     }
 
-    private sealed class HubObserver(IAsyncPublisher<DnsQueryEvent> publisher) : ILiveQueryObserver
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Failed to unsubscribe live query Orleans bridge during shutdown")]
+    private static partial void LogUnsubscribeFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Failed to delete live query observer reference during shutdown")]
+    private static partial void LogDeleteObserverFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to refresh live query hub subscription")]
+    private static partial void LogRefreshSubscriptionFailed(ILogger logger, Exception exception);
+
+    private sealed class HubObserver : ILiveQueryObserver
     {
+        private readonly IAsyncPublisher<DnsQueryEvent> _publisher;
+
+        public HubObserver(IAsyncPublisher<DnsQueryEvent> publisher)
+        {
+            _publisher = publisher;
+        }
+
         public Task OnEvent(DnsQueryEventMessage evt, CancellationToken cancellationToken)
         {
             // Sync Publish: OneWay observer must not block the Orleans callback path.
-            publisher.Publish(evt.ToDnsQueryEvent(), cancellationToken);
+            _publisher.Publish(evt.ToDnsQueryEvent(), cancellationToken);
             return Task.CompletedTask;
         }
     }

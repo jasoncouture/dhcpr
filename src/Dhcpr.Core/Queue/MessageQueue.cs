@@ -15,7 +15,7 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
 
     private readonly ConcurrentQueue<QueueItem<T>> _queue = new();
 
-    public void Enqueue(T item, CancellationToken cancellationToken = default)
+    public void Enqueue(T item, CancellationToken cancellationToken)
     {
         _queue.Enqueue(new QueueItem<T>(item, cancellationToken));
         UpdateSignalState();
@@ -87,7 +87,7 @@ public sealed class MessageQueue<T> : IMessageQueue<T> where T : class
         }
     }
 
-    public async ValueTask<QueueItem<T>> DequeueAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<QueueItem<T>> DequeueAsync(CancellationToken cancellationToken)
     {
         while (true)
         {

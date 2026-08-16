@@ -62,7 +62,7 @@ public class SimpleMessenger : ISimpleMessenger
         return true;
     }
 
-    public async ValueTask SendTo(object receiver, object sender, object data, CancellationToken cancellationToken)
+    public async ValueTask SendToAsync(object receiver, object sender, object data, CancellationToken cancellationToken)
     {
         if (receiver is not ISubscriber subscriber) return;
         using var allSubscribers = GetSubscribers();

@@ -23,7 +23,7 @@ public class UpstreamQueryMiddlewareTests
         var unreachable = new HashSet<IPEndPoint> { unreachable1, unreachable2, unreachable3 };
 
         var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetParallelDomainClient(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 var options = callInfo.ArgAt<IEnumerable<DomainClientOptions>>(0).ToArray();
@@ -55,7 +55,7 @@ public class UpstreamQueryMiddlewareTests
         var answer = IPAddress.Parse("9.9.9.9");
 
         var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetParallelDomainClient(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 var options = callInfo.ArgAt<IEnumerable<DomainClientOptions>>(0).ToArray();
@@ -81,7 +81,7 @@ public class UpstreamQueryMiddlewareTests
     public async Task ServFailOnlyAfterAllEndpointsExhausted()
     {
         var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetParallelDomainClient(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 var client = Substitute.For<IDomainClient>();
@@ -118,7 +118,7 @@ public class UpstreamQueryMiddlewareTests
         var liars = new HashSet<IPEndPoint> { lying, lying2, lying3 };
 
         var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetParallelDomainClient(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 var options = callInfo.ArgAt<IEnumerable<DomainClientOptions>>(0).ToArray();
@@ -145,7 +145,7 @@ public class UpstreamQueryMiddlewareTests
     public async Task NameErrorAfterAllEndpointsReturnsNameError()
     {
         var factory = Substitute.For<IDomainClientFactory>();
-        factory.GetParallelDomainClient(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 var client = Substitute.For<IDomainClient>();

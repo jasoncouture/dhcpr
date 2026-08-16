@@ -18,7 +18,7 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher
         // OneWay: await only waits until the message is queued locally.
         // Pass None into the grain — Orleans cancels a OneWay call's CT when enqueue completes,
         // which would abort hub/observer fan-out if the request token were used.
-        await worker.Publish(DnsQueryEventMessage.From(evt), CancellationToken.None)
+        await worker.PublishAsync(DnsQueryEventMessage.From(evt), CancellationToken.None)
             .WaitAsync(cancellationToken);
     }
 }

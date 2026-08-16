@@ -49,7 +49,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
                 remaining.RemoveAt(0);
             }
 
-            using var client = await _clientFactory.GetParallelDomainClient(
+            using var client = await _clientFactory.GetParallelDomainClientAsync(
                 batch.Select(i => new DomainClientOptions { EndPoint = i, Type = DomainClientType.Udp }),
                 cancellationToken);
 

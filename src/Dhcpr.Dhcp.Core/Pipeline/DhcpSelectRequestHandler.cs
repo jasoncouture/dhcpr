@@ -17,7 +17,7 @@ public sealed class DhcpSelectRequestHandler : IDhcpRequestHandler
         _logger = logger;
         _leasePool = leasePool;
     }
-    public ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken)
+    public ValueTask HandleDhcpRequestAsync(DhcpRequestContext context, CancellationToken cancellationToken)
     {
         if (context.Cancel) return ValueTask.CompletedTask;
         if (context.Response is not null) return ValueTask.CompletedTask;

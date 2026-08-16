@@ -16,16 +16,17 @@ public sealed class DomainClientFactory : IDomainClientFactory
         _internalDomainClient = internalDomainClient;
     }
 
-    public async ValueTask<IDomainClient> GetParallelDomainClient(IEnumerable<DomainClientOptions> options,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<IDomainClient> GetParallelDomainClientAsync(IEnumerable<DomainClientOptions> options,
+        CancellationToken cancellationToken)
     {
-        var clients = await Task.WhenAll(options.Select(i => GetDomainClient(i, cancellationToken).AsTask()));
+        var clients = await Task.WhenAll(options.Select(i => GetDomainClientAsync(i, cancellationToken).AsTask()));
         return new DomainClientParallelWrapper(clients);
     }
 
-    public ValueTask<IDomainClient> GetDomainClient(DomainClientOptions options,
-        CancellationToken cancellationToken = default)
+    public ValueTask<IDomainClient> GetDomainClientAsync(DomainClientOptions options,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (options.Type != DomainClientType.Internal &&
             ReferenceEquals(options.EndPoint, DomainClientOptions.DefaultEndPoint))
         {

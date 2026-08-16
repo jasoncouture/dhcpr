@@ -2,7 +2,7 @@
 
 public interface IMessageQueue<T> where T : class
 {
-    void Enqueue(T item, CancellationToken cancellationToken = default);
+    void Enqueue(T item, CancellationToken cancellationToken);
 
-    ValueTask<QueueItem<T>> DequeueAsync(CancellationToken cancellationToken = default);
+    ValueTask<QueueItem<T>> DequeueAsync(CancellationToken cancellationToken);
 }

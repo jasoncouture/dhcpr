@@ -115,13 +115,13 @@ public class InternalDomainClientTests
         public int EnqueueCount { get; private set; }
         public InternalDnsRequestReceivedMessage? LastMessage { get; private set; }
 
-        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken = default)
+        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken)
         {
             EnqueueCount++;
             LastMessage = (InternalDnsRequestReceivedMessage)item;
         }
 
-        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken = default)
+        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException();
     }
 }

@@ -15,24 +15,24 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         _observers = new ObserverManager<ILiveQueryObserver>(ObserverExpiration, logger);
     }
 
-    public Task Subscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
+    public Task SubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Subscribe(observer, observer);
         return Task.CompletedTask;
     }
 
-    public Task Unsubscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
+    public Task UnsubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Unsubscribe(observer);
         return Task.CompletedTask;
     }
 
-    public async Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+    public async Task PublishAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Observers are OneWay — Notify awaits enqueue only, on this grain's turn.
-        await _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
+        await _observers.Notify(observer => observer.OnEventAsync(evt, cancellationToken));
     }
 }

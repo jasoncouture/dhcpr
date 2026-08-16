@@ -1,9 +1,16 @@
 namespace Dhcpr.Dns.Core.RootZone;
 
-public sealed class RootZoneHttpClient(HttpClient httpClient)
+public sealed class RootZoneHttpClient
 {
-    public Task<HttpResponseMessage> GetRootZoneAsync(CancellationToken cancellationToken)
-        => httpClient.GetAsync(
+    private readonly HttpClient _httpClient;
+
+    public RootZoneHttpClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
+    public async Task<HttpResponseMessage> GetRootZoneAsync(CancellationToken cancellationToken)
+        => await _httpClient.GetAsync(
             RootZonePaths.RootZoneUrl,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);

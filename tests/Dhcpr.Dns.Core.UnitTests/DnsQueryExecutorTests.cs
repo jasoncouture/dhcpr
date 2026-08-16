@@ -143,13 +143,13 @@ public class DnsQueryExecutorTests
         public int EnqueueCount { get; private set; }
         public HttpDnsPacketReceivedMessage? LastMessage { get; private set; }
 
-        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken = default)
+        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken)
         {
             EnqueueCount++;
             LastMessage = (HttpDnsPacketReceivedMessage)item;
         }
 
-        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken = default)
+        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken)
             => throw new NotSupportedException();
     }
 }

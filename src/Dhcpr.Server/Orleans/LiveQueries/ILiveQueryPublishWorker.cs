@@ -5,5 +5,5 @@ namespace Dhcpr.Server.Orleans.LiveQueries;
 public interface ILiveQueryPublishWorker : IGrainWithIntegerKey
 {
     [OneWay]
-    Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken);
+    Task PublishAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken);
 }

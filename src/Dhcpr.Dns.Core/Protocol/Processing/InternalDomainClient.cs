@@ -45,10 +45,10 @@ public class InternalDomainClient : IInternalDomainClient
         if (!directed)
         {
             if (depth > MaxInternalHops)
-                return ServFail(message);
+                return ServFailAsync(message);
 
             if (parentContext.WorkBudget is { } budget && !budget.TryConsume())
-                return ServFail(message);
+                return ServFailAsync(message);
         }
 
         ImmutableArray<IPEndPoint>? endpoints = directed ? upstreamEndpoints : null;
@@ -68,7 +68,7 @@ public class InternalDomainClient : IInternalDomainClient
         return EnqueueAsync(context, cancellationToken);
     }
 
-    private static ValueTask<DomainMessage> ServFail(DomainMessage message)
+    private static ValueTask<DomainMessage> ServFailAsync(DomainMessage message)
         => ValueTask.FromResult(
             DomainMessage.CreateResponse(
                 message,

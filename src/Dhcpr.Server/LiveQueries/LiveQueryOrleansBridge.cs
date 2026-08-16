@@ -38,7 +38,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         _observerInstance = new HubObserver(_publisher);
         _observer = _grainFactory.CreateObjectReference<ILiveQueryObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
-        await _hub.Subscribe(_observer, cancellationToken);
+        await _hub.SubscribeAsync(_observer, cancellationToken);
 
         _resubscribeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _resubscribeLoop = ResubscribeLoopAsync(_resubscribeCancellation.Token);
@@ -71,7 +71,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         {
             try
             {
-                await _hub.Unsubscribe(_observer, cancellationToken);
+                await _hub.UnsubscribeAsync(_observer, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -106,7 +106,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         {
             try
             {
-                await _hub!.Subscribe(_observer!, cancellationToken);
+                await _hub!.SubscribeAsync(_observer!, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -138,7 +138,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
             _publisher = publisher;
         }
 
-        public Task OnEvent(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+        public Task OnEventAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
         {
             // Sync Publish: OneWay observer must not block the Orleans callback path.
             _publisher.Publish(evt.ToDnsQueryEvent(), cancellationToken);

@@ -4,5 +4,5 @@ public interface IDhcpRequestHandler
 {
     int Priority => 0;
     string Name => GetType().Name;
-    ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken);
+    ValueTask HandleDhcpRequestAsync(DhcpRequestContext context, CancellationToken cancellationToken);
 }

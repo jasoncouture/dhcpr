@@ -102,15 +102,25 @@ public sealed class LiveQueryStore : IHostedService, IAsyncMessageHandler<DnsQue
             writer.TryComplete();
     }
 
-    private sealed class Subscription(LiveQueryStore store, Guid id, ChannelWriter<DnsQueryEvent> writer) : IDisposable
+    private sealed class Subscription : IDisposable
     {
+        private readonly LiveQueryStore _store;
+        private readonly Guid _id;
+        private readonly ChannelWriter<DnsQueryEvent> _writer;
         private int _disposed;
+
+        public Subscription(LiveQueryStore store, Guid id, ChannelWriter<DnsQueryEvent> writer)
+        {
+            _store = store;
+            _id = id;
+            _writer = writer;
+        }
 
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)
                 return;
-            store.Unsubscribe(id, writer);
+            _store.Unsubscribe(_id, _writer);
         }
     }
 }

@@ -16,7 +16,7 @@ public sealed class DhcpMessageTypeValidatorRequestHandler : IDhcpRequestHandler
 
     public int Priority => -100;
 
-    public ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken)
+    public ValueTask HandleDhcpRequestAsync(DhcpRequestContext context, CancellationToken cancellationToken)
     {
         var dhcpMessageTypeOption = context.Message.Options.GetOptionForCode(DhcpOptionCode.DhcpMessageType);
         if (dhcpMessageTypeOption?.Payload.Length != 1)

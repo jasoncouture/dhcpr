@@ -72,7 +72,7 @@ public static class DynDnsUpdateProcessor
     }
 
     public static string BasicAuthorization(string username, string password)
-        => "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
+        => $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"))}";
 
     private static string UpdateOne(
         DynamicDnsStore store,

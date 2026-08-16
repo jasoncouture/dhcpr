@@ -83,7 +83,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
     {
         foreach (var task in tasks)
         {
-            task.IgnoreExceptionsAsync().Orphan();
+            task.IgnoreExceptionsAsync().OrphanAsync();
         }
 
         source.Cancel();

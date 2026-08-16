@@ -55,5 +55,5 @@ public static class DynDnsEndpointExtensions
     }
 
     private static IResult TextResult(string body)
-        => Results.Text(body.EndsWith('\n') ? body : body + "\n", "text/plain; charset=utf-8");
+        => Results.Text(body.EndsWith('\n') ? body : $"{body}\n", "text/plain; charset=utf-8");
 }

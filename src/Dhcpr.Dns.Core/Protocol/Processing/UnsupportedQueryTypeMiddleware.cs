@@ -16,7 +16,7 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
@@ -25,13 +25,13 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
             if (!Enum.IsDefined(question.Type))
             {
                 context.ServFailReason = $"unsupported query type {(ushort)question.Type}";
-                return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
+                return DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,
-                    DomainResponseCode.ServerFailure));
+                    DomainResponseCode.ServerFailure);
             }
         }
 
-        return _inner.ProcessAsync(context, cancellationToken);
+        return await _inner.ProcessAsync(context, cancellationToken);
     }
 }

@@ -4,18 +4,21 @@ namespace Dhcpr.Core;
 
 public static class TaskExtensions
 {
-    public static async void Orphan(this Task task)
+    public static async void OrphanAsync(this Task task)
     {
         await task.IgnoreExceptionsAsync().ConfigureAwait(false);
     }
-    public static async Task IgnoreExceptionsAsync(this Task task, CancellationToken? cancellationToken = default)
+    public static Task IgnoreExceptionsAsync(this Task task)
+        => IgnoreExceptionsAsync(task, CancellationToken.None);
+
+    public static async Task IgnoreExceptionsAsync(this Task task, CancellationToken cancellationToken)
     {
         try
         {
-            task = task.WaitAsync(cancellationToken ?? CancellationToken.None);
-            if (cancellationToken is not null)
-                task = task.ContinueWith(async t => await t.IgnoreExceptionsAsync());
-            await task.WaitAsync(cancellationToken ?? CancellationToken.None);
+            task = task.WaitAsync(cancellationToken);
+            // Keep swallowing failures if the linked wait itself is cancelled mid-flight.
+            task = task.ContinueWith(static async t => await t.IgnoreExceptionsAsync(CancellationToken.None));
+            await task.WaitAsync(cancellationToken);
         }
         catch (Exception)
         {
@@ -23,7 +26,7 @@ public static class TaskExtensions
         }
     }
 
-    public static async Task<bool> OperationCancelledToBoolean(this Task task)
+    public static async Task<bool> OperationCancelledToBooleanAsync(this Task task)
     {
         try
         {

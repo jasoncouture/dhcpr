@@ -80,7 +80,7 @@ public sealed class RootServerTipsBootstrapService : IHostedService
 
                 _tips.SetDownloadedTips(addresses);
                 var tipLines = string.Join('\n', addresses.Select(static a => a.ToString()));
-                await AtomicFileReplace.WriteAsync(cachePath, tipLines + "\n", cancellationToken)
+                await AtomicFileReplace.WriteAsync(cachePath, $"{tipLines}\n", cancellationToken)
                     .ConfigureAwait(false);
                 _logger.LogInformation("Downloaded {Count} root tips from {Url}", addresses.Length, url);
                 return;

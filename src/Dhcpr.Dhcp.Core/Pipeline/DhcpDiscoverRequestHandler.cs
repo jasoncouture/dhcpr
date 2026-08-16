@@ -18,7 +18,7 @@ public sealed class DhcpDiscoverRequestHandler : IDhcpRequestHandler
         _logger = logger;
     }
 
-    public ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken)
+    public ValueTask HandleDhcpRequestAsync(DhcpRequestContext context, CancellationToken cancellationToken)
     {
         if (context.Response is not null) return ValueTask.CompletedTask;
         var dhcpMessageTypeOption = context.Message.Options.GetOptionForCode(DhcpOptionCode.DhcpMessageType);

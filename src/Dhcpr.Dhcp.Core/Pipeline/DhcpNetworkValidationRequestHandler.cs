@@ -24,7 +24,7 @@ public sealed class DhcpNetworkValidationRequestHandler : IDhcpRequestHandler
         };
     }
 
-    public ValueTask HandleDhcpRequest(DhcpRequestContext context, CancellationToken cancellationToken)
+    public ValueTask HandleDhcpRequestAsync(DhcpRequestContext context, CancellationToken cancellationToken)
     {
         var isValidNetwork =
             _networks.Any(

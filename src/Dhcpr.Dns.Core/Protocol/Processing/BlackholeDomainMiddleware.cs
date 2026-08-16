@@ -22,7 +22,7 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
@@ -34,14 +34,14 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
                 if (!IsBlackholed(question.Name, blackholes))
                     continue;
 
-                return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
+                return DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,
-                    DomainResponseCode.NameError));
+                    DomainResponseCode.NameError);
             }
         }
 
-        return _inner.ProcessAsync(context, cancellationToken);
+        return await _inner.ProcessAsync(context, cancellationToken);
     }
 
     internal static bool IsBlackholed(DomainLabels name, string[] blackholes)
@@ -52,7 +52,7 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
             if (qname.Equals(suffix, StringComparison.OrdinalIgnoreCase))
                 return true;
             if (qname.Length > suffix.Length + 1 &&
-                qname.EndsWith('.' + suffix, StringComparison.OrdinalIgnoreCase))
+                qname.EndsWith($".{suffix}", StringComparison.OrdinalIgnoreCase))
                 return true;
         }
 

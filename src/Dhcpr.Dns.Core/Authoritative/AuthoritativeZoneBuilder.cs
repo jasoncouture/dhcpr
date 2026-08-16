@@ -75,7 +75,7 @@ public static class AuthoritativeZoneBuilder
             return true;
         if (apex.Length == 0)
             return true;
-        return owner.EndsWith("." + apex, StringComparison.OrdinalIgnoreCase);
+        return owner.EndsWith($".{apex}", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string[] GetRelativeLabels(string owner, string[] apexLabels)

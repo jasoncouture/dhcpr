@@ -37,7 +37,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         return (cancellationTokenSource, subscription);
     }
 
-    private async ValueTask ReturnCancellationTokenSource(
+    private async ValueTask ReturnCancellationTokenSourceAsync(
         (CancellationTokenSource cancellationTokenSource, CancellationTokenRegistration subscription) tokenSourceTuple)
     {
         var (cancellationTokenSource, subscription) = tokenSourceTuple;
@@ -59,7 +59,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         }
         finally
         {
-            await ReturnCancellationTokenSource(rentedCancellationTokenSource);
+            await ReturnCancellationTokenSourceAsync(rentedCancellationTokenSource);
         }
     }
 
@@ -83,7 +83,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
                 {
                     while (tasks.Count >= _options.MaximumConcurrency && tasks.Count > 0)
                     {
-                        if (await RemoveCompletedTasks(tasks))
+                        if (await RemoveCompletedTasksAsync(tasks))
                             continue;
                         await Task.WhenAny(tasks);
                     }
@@ -116,7 +116,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         }
     }
 
-    private static async Task<bool> RemoveCompletedTasks(IList<Task> tasks)
+    private static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
     {
         using var completedTasks = tasks.Where(i => i.IsCompleted)
             .Select((i, index) => new { Task = i, Index = index })

@@ -171,7 +171,7 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
-    private async Task HandleTcpClient(TcpClient client, CancellationToken cancellationToken)
+    private async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -350,7 +350,7 @@ public sealed class DnsServer : BackgroundService
                 {
                     var client = await acceptTask;
                     if (client is not null)
-                        activeTasks.Add(HandleTcpClient(client, stoppingToken));
+                        activeTasks.Add(HandleTcpClientAsync(client, stoppingToken));
                     if (stoppingToken.IsCancellationRequested)
                         return;
                     acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);

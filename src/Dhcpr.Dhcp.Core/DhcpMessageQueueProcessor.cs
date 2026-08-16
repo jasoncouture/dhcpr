@@ -38,7 +38,7 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
                 {
                     try
                     {
-                        await handler.HandleDhcpRequest(requestContext, cancellationToken);
+                        await handler.HandleDhcpRequestAsync(requestContext, cancellationToken);
                         if (!requestContext.Cancel)
                             continue;
 

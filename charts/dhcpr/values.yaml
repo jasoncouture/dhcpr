@@ -53,6 +53,7 @@ gateway:
 
 # When gateway.enabled is true, parentRefs point at this chart's Gateway
 # (sectionName: websecure). Otherwise parentRefs below are used as-is.
+# sticky uses a TraefikService (traefik.io) for Blazor circuit affinity.
 httpRoute:
   enabled: false
   host: dns.instigaterevolution.com
@@ -60,6 +61,13 @@ httpRoute:
   parentRefs:
     - name: dhcpr
       sectionName: websecure
+  sticky:
+    enabled: true
+    cookie:
+      # Defaults to chart fullname when empty.
+      name: ""
+      httpOnly: true
+      secure: true
 
 # Classic DNS over TCP (Gateway API TCPRoute). When gateway.enabled is true,
 # parentRefs point at this chart's Gateway (sectionName: dns-tcp).

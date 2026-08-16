@@ -1,11 +1,14 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Rejects QTYPEs outside the known <see cref="DomainRecordType"/> set (e.g. ANY/255)
-/// with SERVFAIL before cache or upstream work. Attack traffic must not poison the cache.
+/// Rejects QTYPE ANY (255) with NOTIMP and other unknown QTYPEs with SERVFAIL
+/// before cache or upstream work. Attack traffic must not poison the cache.
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {
+    // RFC 1035 / 8482: * / ANY
+    private const DomainRecordType AnyQueryType = (DomainRecordType)255;
+
     private readonly IDomainMessageMiddleware _inner;
 
     public UnsupportedQueryTypeMiddleware(IDomainMessageMiddleware inner)
@@ -22,6 +25,14 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     {
         foreach (var question in context.DomainMessage.Questions)
         {
+            if (question.Type == AnyQueryType)
+            {
+                return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
+                    context.DomainMessage,
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.NotImplemented));
+            }
+
             if (!Enum.IsDefined(question.Type))
             {
                 context.ServFailReason = $"unsupported query type {(ushort)question.Type}";

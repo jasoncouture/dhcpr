@@ -5,8 +5,6 @@ using MessagePipe;
 
 using Microsoft.Extensions.Hosting;
 
-using Orleans.Concurrency;
-
 namespace Dhcpr.Server.LiveQueries;
 
 /// <summary>
@@ -15,6 +13,12 @@ namespace Dhcpr.Server.LiveQueries;
 /// </summary>
 public sealed class LiveQueryOrleansBridge : IHostedService
 {
+    /// <summary>
+    /// Must be shorter than hub <c>ObserverManager</c> expiration so this silo's
+    /// subscription is not dropped.
+    /// </summary>
+    private static readonly TimeSpan ResubscribeInterval = TimeSpan.FromMinutes(2);
+
     private readonly IGrainFactory _grainFactory;
     private readonly IAsyncPublisher<DnsQueryEvent> _publisher;
     private readonly ILogger<LiveQueryOrleansBridge> _logger;
@@ -23,6 +27,8 @@ public sealed class LiveQueryOrleansBridge : IHostedService
     private HubObserver? _observerInstance;
     private ILiveQueryObserver? _observer;
     private ILiveQueryHubGrain? _hub;
+    private CancellationTokenSource? _resubscribeCts;
+    private Task? _resubscribeLoop;
 
     public LiveQueryOrleansBridge(
         IGrainFactory grainFactory,
@@ -40,10 +46,33 @@ public sealed class LiveQueryOrleansBridge : IHostedService
         _observer = _grainFactory.CreateObjectReference<ILiveQueryObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
         await _hub.Subscribe(_observer, cancellationToken);
+
+        _resubscribeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _resubscribeLoop = ResubscribeLoopAsync(_resubscribeCts.Token);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        if (_resubscribeCts is not null)
+        {
+            await _resubscribeCts.CancelAsync();
+            _resubscribeCts.Dispose();
+            _resubscribeCts = null;
+        }
+
+        if (_resubscribeLoop is not null)
+        {
+            try
+            {
+                await _resubscribeLoop;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            _resubscribeLoop = null;
+        }
+
         if (_hub is not null && _observer is not null)
         {
             try
@@ -68,6 +97,22 @@ public sealed class LiveQueryOrleansBridge : IHostedService
         _observer = null;
         _observerInstance = null;
         _hub = null;
+    }
+
+    private async Task ResubscribeLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(ResubscribeInterval);
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            try
+            {
+                await _hub!.RefreshSubscription(_observer!, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to refresh live query hub subscription");
+            }
+        }
     }
 
     private sealed class HubObserver(IAsyncPublisher<DnsQueryEvent> publisher) : ILiveQueryObserver

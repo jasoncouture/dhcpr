@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 
 using Orleans.Concurrency;
+using Orleans.Utilities;
 
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
@@ -9,13 +10,20 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
 {
     public const int RingCapacity = 250;
 
-    private readonly HashSet<ILiveQueryObserver> _observers = new();
+    private static readonly TimeSpan ObserverExpiration = TimeSpan.FromMinutes(5);
+
+    private readonly ObserverManager<ILiveQueryObserver> _observers;
     private readonly LinkedList<DnsQueryEventMessage> _ring = new();
+
+    public LiveQueryHubGrain(ILogger<LiveQueryHubGrain> logger)
+    {
+        _observers = new ObserverManager<ILiveQueryObserver>(ObserverExpiration, logger);
+    }
 
     public async Task Subscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _observers.Add(observer);
+        _observers.Subscribe(observer, observer);
 
         // Replay newest-first so a silo joining mid-flight gets a snapshot.
         ImmutableArray<DnsQueryEventMessage> snapshot;
@@ -25,26 +33,25 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         foreach (var evt in snapshot)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                await observer.OnEvent(evt, cancellationToken);
-            }
-            catch
-            {
-                _observers.Remove(observer);
-                throw;
-            }
+            await observer.OnEvent(evt, cancellationToken);
         }
+    }
+
+    public Task RefreshSubscription(ILiveQueryObserver observer, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _observers.Subscribe(observer, observer);
+        return Task.CompletedTask;
     }
 
     public Task Unsubscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _observers.Remove(observer);
+        _observers.Unsubscribe(observer);
         return Task.CompletedTask;
     }
 
-    public async Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+    public Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -55,29 +62,7 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
                 _ring.RemoveLast();
         }
 
-        List<ILiveQueryObserver>? dead = null;
-        foreach (var observer in _observers)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                await observer.OnEvent(evt, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                dead ??= new List<ILiveQueryObserver>();
-                dead.Add(observer);
-            }
-        }
-
-        if (dead is null)
-            return;
-
-        foreach (var observer in dead)
-            _observers.Remove(observer);
+        _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
+        return Task.CompletedTask;
     }
 }

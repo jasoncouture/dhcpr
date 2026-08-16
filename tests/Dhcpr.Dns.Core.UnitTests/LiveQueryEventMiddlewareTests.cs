@@ -102,6 +102,34 @@ public class LiveQueryEventMiddlewareTests
         Assert.Empty(publisher.Published);
     }
 
+    [Fact]
+    public async Task PublishesBlackholeNxDomain()
+    {
+        var leaf = Substitute.For<IDomainMessageMiddleware>();
+        leaf.Name.Returns("Leaf");
+        var monitor = Substitute.For<Microsoft.Extensions.Options.IOptionsMonitor<DnsConfiguration>>();
+        monitor.CurrentValue.Returns(new DnsConfiguration { BlackholeDomains = ["dhitc.com"] });
+        var blackhole = new BlackholeDomainMiddleware(leaf, monitor);
+        var publisher = new RecordingPublisher();
+        var middleware = new LiveQueryEventMiddleware(blackhole, publisher);
+        var request = DomainMessage.CreateRequest("www.dhitc.com", DomainRecordType.A);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Single(publisher.Published);
+        Assert.Equal("www.dhitc.com", publisher.Published[0].Name);
+        Assert.Equal(DomainResponseCode.NameError, publisher.Published[0].ResponseCode);
+        Assert.Equal("Blackhole", publisher.Published[0].Middleware);
+        await leaf.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
     private sealed class RecordingPublisher : ILiveQueryEventPublisher
     {
         public List<DnsQueryEvent> Published { get; } = new();

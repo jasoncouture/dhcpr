@@ -43,7 +43,7 @@ public sealed class LiveQueryEventMiddleware : IDomainMessageMiddleware
                 result.Flags.ResponseCode,
                 context.CacheHit,
                 FormatAnswerAddresses(result, question.Type),
-                _inner.Name);
+                context.AnsweredBy ?? _inner.Name);
 
             await _publisher.PublishAsync(evt, cancellationToken);
         }

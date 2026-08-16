@@ -21,6 +21,7 @@
             <th>Type</th>
             <th>Name</th>
             <th>RCODE</th>
+            <th>Via</th>
             <th>Answers</th>
         </tr>
         </thead>
@@ -34,6 +35,7 @@
                 <td>@row.Type</td>
                 <td>@row.Name</td>
                 <td>@row.ResponseCode</td>
+                <td>@row.Middleware</td>
                 <td>@(string.IsNullOrEmpty(row.Answers) ? "—" : row.Answers)</td>
             </tr>
         }

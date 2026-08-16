@@ -34,6 +34,7 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
                 if (!IsBlackholed(question.Name, blackholes))
                     continue;
 
+                context.AnsweredBy = "Blackhole";
                 return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,

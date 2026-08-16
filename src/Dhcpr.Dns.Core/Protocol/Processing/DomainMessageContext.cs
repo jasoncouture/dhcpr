@@ -64,4 +64,10 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// Surfaced by query logging at Error level.
     /// </summary>
     public string? ServFailReason { get; set; }
+
+    /// <summary>
+    /// When a short-circuit middleware answers (blackhole, unsupported QTYPE), the
+    /// live-query UI uses this label instead of the inner CoR leaf name.
+    /// </summary>
+    public string? AnsweredBy { get; set; }
 }

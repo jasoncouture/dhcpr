@@ -7,7 +7,7 @@
     <div class="toolbar">
         <span class="count">@(_rows.Count) shown</span>
         <label>
-            <input type="checkbox" @bind="_paused" />
+            <input type="checkbox" @bind="_paused" @bind:after="OnPauseChanged" />
             Pause
         </label>
     </div>
@@ -67,21 +67,26 @@
         {
             await foreach (var evt in reader.ReadAllAsync(cancellationToken))
             {
-                if (_paused)
-                    continue;
-
+                // Always retain events; pause only freezes the render so unpausing shows everything.
                 await InvokeAsync(() =>
                 {
                     _rows.Insert(0, evt);
                     while (_rows.Count > LiveQueryStore.SnapshotCapacity)
                         _rows.RemoveAt(_rows.Count - 1);
-                    StateHasChanged();
+                    if (!_paused)
+                        StateHasChanged();
                 });
             }
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private void OnPauseChanged()
+    {
+        if (!_paused)
+            StateHasChanged();
     }
 
     public async ValueTask DisposeAsync()

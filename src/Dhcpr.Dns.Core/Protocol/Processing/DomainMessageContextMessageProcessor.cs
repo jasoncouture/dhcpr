@@ -18,14 +18,17 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
     private readonly IEdnsProtocolService _ednsProtocolService;
+    private readonly ILiveQueryEventPublisher _liveQueryPublisher;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
         IEdnsProtocolService ednsProtocolService,
+        ILiveQueryEventPublisher liveQueryPublisher,
         ILogger<DomainMessageContextMessageProcessor> logger)
     {
         _logger = logger;
         _ednsProtocolService = ednsProtocolService;
+        _liveQueryPublisher = liveQueryPublisher;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
     }
 
@@ -35,13 +38,17 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         try
         {
             DomainMessage? response = null;
+            IDomainMessageMiddleware? answeredBy = null;
             foreach (var middleware in _middlewareChain)
             {
                 response = await middleware.ProcessAsync(message.Context, cancellationToken);
                 if (message.Context.Cancel) // This is intended for things that want to ignore the request.
                     break;
                 if (response is not null) // This is intended for things to say "I don't handle this, try next"
+                {
+                    answeredBy = middleware;
                     break;
+                }
             }
 
             // This is a directive to ignore the message.
@@ -57,6 +64,14 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
             {
                 response = response with { Id = message.Context.DomainMessage.Id };
             }
+
+            // Publish once per external client answer (UDP/TCP/DoH), independent of decorate order.
+            await DnsQueryEventFactory.PublishAnswersAsync(
+                _liveQueryPublisher,
+                message.Context,
+                response,
+                message.Context.AnsweredBy ?? answeredBy?.Name ?? "unknown",
+                cancellationToken);
 
             if (awaitable is not null)
             {

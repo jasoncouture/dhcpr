@@ -12,6 +12,7 @@ using Dhcpr.Dns.Core.Validation;
 using MessagePipe;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 
@@ -55,7 +56,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → LiveQuery → Blackhole → Unsupported → Shuffle → Metrics → Dnssec → …
+        // Outermost last: Logging → Blackhole → Unsupported → Shuffle → Metrics → Dnssec → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
@@ -67,10 +68,11 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
-        // Outside Blackhole/Unsupported so those answers still fan out to the live UI.
-        services.Decorate<IDomainMessageMiddleware, LiveQueryEventMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
+
+        // Live UI publishes from DomainMessageContextMessageProcessor (once per external answer).
+        services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();

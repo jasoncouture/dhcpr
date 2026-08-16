@@ -8,7 +8,7 @@ using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
-public class LiveQueryEventMiddlewareTests
+public class DnsQueryEventFactoryTests
 {
     [Fact]
     public async Task PublishesForExternalAnswer()
@@ -27,13 +27,7 @@ public class LiveQueryEventMiddlewareTests
             },
             responseCode: DomainResponseCode.NoError);
 
-        var inner = Substitute.For<IDomainMessageMiddleware>();
-        inner.Name.Returns("TestResolver");
-        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
-
         var publisher = new RecordingPublisher();
-        var middleware = new LiveQueryEventMiddleware(inner, publisher);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -42,9 +36,9 @@ public class LiveQueryEventMiddlewareTests
             CacheHit = true
         };
 
-        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+        await DnsQueryEventFactory.PublishAnswersAsync(
+            publisher, context, response, "TestResolver", CancellationToken.None);
 
-        Assert.Same(response, result);
         Assert.Single(publisher.Published);
         var evt = publisher.Published[0];
         Assert.Equal("example.com", evt.Name);
@@ -58,37 +52,11 @@ public class LiveQueryEventMiddlewareTests
     }
 
     [Fact]
-    public async Task SkipsNullPassThrough()
-    {
-        var inner = Substitute.For<IDomainMessageMiddleware>();
-        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>((DomainMessage?)null));
-
-        var publisher = new RecordingPublisher();
-        var middleware = new LiveQueryEventMiddleware(inner, publisher);
-        var context = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Loopback, 53000),
-            new IPEndPoint(IPAddress.Loopback, 53),
-            DomainMessage.CreateRequest("example.com"));
-
-        var result = await middleware.ProcessAsync(context, CancellationToken.None);
-
-        Assert.Null(result);
-        Assert.Empty(publisher.Published);
-    }
-
-    [Fact]
     public async Task SkipsInternalRequests()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
-
-        var inner = Substitute.For<IDomainMessageMiddleware>();
-        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
-
         var publisher = new RecordingPublisher();
-        var middleware = new LiveQueryEventMiddleware(inner, publisher);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -97,13 +65,14 @@ public class LiveQueryEventMiddlewareTests
             IsInternal = true
         };
 
-        await middleware.ProcessAsync(context, CancellationToken.None);
+        await DnsQueryEventFactory.PublishAnswersAsync(
+            publisher, context, response, "TestResolver", CancellationToken.None);
 
         Assert.Empty(publisher.Published);
     }
 
     [Fact]
-    public async Task PublishesBlackholeNxDomain()
+    public async Task PublishesBlackholeAnsweredByLabel()
     {
         var leaf = Substitute.For<IDomainMessageMiddleware>();
         leaf.Name.Returns("Leaf");
@@ -111,17 +80,21 @@ public class LiveQueryEventMiddlewareTests
         monitor.CurrentValue.Returns(new DnsConfiguration { BlackholeDomains = ["dhitc.com"] });
         var blackhole = new BlackholeDomainMiddleware(leaf, monitor);
         var publisher = new RecordingPublisher();
-        var middleware = new LiveQueryEventMiddleware(blackhole, publisher);
         var request = DomainMessage.CreateRequest("www.dhitc.com", DomainRecordType.A);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
             request);
 
-        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+        var result = await blackhole.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Equal("Blackhole", context.AnsweredBy);
+
+        await DnsQueryEventFactory.PublishAnswersAsync(
+            publisher, context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
+
         Assert.Single(publisher.Published);
         Assert.Equal("www.dhitc.com", publisher.Published[0].Name);
         Assert.Equal(DomainResponseCode.NameError, publisher.Published[0].ResponseCode);

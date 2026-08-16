@@ -21,6 +21,12 @@ public sealed class DnsConfiguration : IValidateSelf
 
     public IReadOnlyDictionary<string, IPEndPoint[]> GetParsedRoutes() => _parsedRoutes;
 
+    /// <summary>
+    /// Domain suffixes that always receive NXDOMAIN (no cache / upstream).
+    /// Matches the name itself and any subdomain (e.g. <c>dhitc.com</c> → <c>*.dhitc.com</c>).
+    /// </summary>
+    public string[] BlackholeDomains { get; set; } = Array.Empty<string>();
+
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
     /// <summary>DNSSEC validation enable/disable and algorithm policy.</summary>
@@ -124,6 +130,19 @@ public sealed class DnsConfiguration : IValidateSelf
         {
             error = "DNS:DOH:MaxRequestBytes must be between 1 and 65535";
             return false;
+        }
+
+        BlackholeDomains ??= Array.Empty<string>();
+        for (var i = 0; i < BlackholeDomains.Length; i++)
+        {
+            var domain = BlackholeDomains[i]?.Trim().TrimEnd('.');
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                error = $"DNS:BlackholeDomains[{i}] is empty";
+                return false;
+            }
+
+            BlackholeDomains[i] = domain;
         }
 
         error = null;

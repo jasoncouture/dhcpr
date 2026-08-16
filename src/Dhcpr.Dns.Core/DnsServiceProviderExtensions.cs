@@ -67,6 +67,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
         // Outermost: unknown QTYPE (e.g. ANY/255) → SERVFAIL before cache/upstream.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
+        // Then blackhole suffixes → NXDOMAIN (still outside cache/upstream).
+        services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
 
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();

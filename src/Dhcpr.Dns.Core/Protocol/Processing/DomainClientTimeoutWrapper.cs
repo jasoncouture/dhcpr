@@ -11,6 +11,8 @@ public sealed class DomainClientTimeoutWrapper : IDomainClient
         _timeout = timeout;
     }
 
+    public void Dispose() => _implementation.Dispose();
+
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
     {
         using var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

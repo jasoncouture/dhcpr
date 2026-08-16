@@ -13,6 +13,12 @@ public sealed class DomainClientWrapper : IDomainClient
         _right = right;
     }
 
+    public void Dispose()
+    {
+        _left.Dispose();
+        _right.Dispose();
+    }
+
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
     {
         var exceptions = ListPool<Exception>.Default.Get();

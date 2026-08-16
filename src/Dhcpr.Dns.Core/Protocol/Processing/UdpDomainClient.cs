@@ -21,6 +21,8 @@ public sealed class UdpDomainClient : IDomainClient
         _target = target;
     }
 
+    public void Dispose() => _udpClient.Dispose();
+
 
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message,
         CancellationToken cancellationToken)

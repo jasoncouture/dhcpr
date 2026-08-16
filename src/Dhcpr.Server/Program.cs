@@ -54,7 +54,10 @@ builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 builder.AddDhcprOrleans();
 
-builder.Services.AddSingleton<ILiveQueryEventPublisher, OrleansLiveQueryEventPublisher>();
+builder.Services.AddSingleton<OrleansLiveQueryEventPublisher>();
+builder.Services.AddSingleton<ILiveQueryEventPublisher>(static sp =>
+    sp.GetRequiredService<OrleansLiveQueryEventPublisher>());
+builder.Services.AddHostedService(static sp => sp.GetRequiredService<OrleansLiveQueryEventPublisher>());
 builder.Services.AddHostedService<LiveQueryOrleansBridge>();
 builder.Services.AddSingleton<LiveQueryStore>();
 builder.Services.AddHostedService(static sp => sp.GetRequiredService<LiveQueryStore>());

@@ -29,10 +29,15 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         return Task.CompletedTask;
     }
 
-    public async Task PublishAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+    public Task PublishAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Observers are OneWay — Notify awaits enqueue only, on this grain's turn.
-        await _observers.Notify(observer => observer.OnEventAsync(evt, cancellationToken));
+        // Action Notify (statement body required so this does not bind Func<Task> overload).
+        // Awaiting observer Tasks serializes fan-out on this grain and wedges the silo under load.
+        _observers.Notify(observer =>
+        {
+            _ = observer.OnEventAsync(evt, CancellationToken.None);
+        });
+        return Task.CompletedTask;
     }
 }

@@ -1,5 +1,3 @@
-using System.Text;
-
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
@@ -40,19 +38,10 @@ public static class DnsQueryEventFactory
         }
     }
 
-    private static string FormatAnswerAddresses(DomainMessage response, DomainRecordType type)
-    {
-        var builder = new StringBuilder();
-        foreach (var record in response.Records.Answers)
-        {
-            if (record.Type != type || record.Data is not IPAddressData addressData)
-                continue;
-
-            if (builder.Length > 0)
-                builder.Append(", ");
-            builder.Append(addressData.Address);
-        }
-
-        return builder.ToString();
-    }
+    private static string FormatAnswerAddresses(DomainMessage response, DomainRecordType type) =>
+        string.Join(
+            ", ",
+            response.Records.Answers
+                .Where(r => r.Type == type && r.Data is IPAddressData)
+                .Select(r => ((IPAddressData)r.Data).Address));
 }

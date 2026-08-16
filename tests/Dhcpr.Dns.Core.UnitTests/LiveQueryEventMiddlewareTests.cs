@@ -4,8 +4,6 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-using MessagePipe;
-
 using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
@@ -104,20 +102,14 @@ public class LiveQueryEventMiddlewareTests
         Assert.Empty(publisher.Published);
     }
 
-    private sealed class RecordingPublisher : IAsyncPublisher<DnsQueryEvent>
+    private sealed class RecordingPublisher : ILiveQueryEventPublisher
     {
         public List<DnsQueryEvent> Published { get; } = new();
 
-        public void Publish(DnsQueryEvent message, CancellationToken cancellationToken = default)
-            => Published.Add(message);
-
-        public ValueTask PublishAsync(DnsQueryEvent message, CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("PublishAsync must not be used for live query events.");
-
-        public ValueTask PublishAsync(
-            DnsQueryEvent message,
-            AsyncPublishStrategy publishStrategy,
-            CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("PublishAsync must not be used for live query events.");
+        public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken = default)
+        {
+            Published.Add(evt);
+            return default;
+        }
     }
 }

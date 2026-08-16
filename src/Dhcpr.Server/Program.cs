@@ -5,6 +5,7 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
 using Dhcpr.Server.Components;
 using Dhcpr.Server.LiveQueries;
+using Dhcpr.Server.Orleans.LiveQueries;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -53,6 +54,8 @@ builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 builder.AddDhcprOrleans();
 
+builder.Services.AddSingleton<ILiveQueryEventPublisher, OrleansLiveQueryEventPublisher>();
+builder.Services.AddHostedService<LiveQueryOrleansBridge>();
 builder.Services.AddSingleton<LiveQueryStore>();
 builder.Services.AddHostedService(static sp => sp.GetRequiredService<LiveQueryStore>());
 builder.Services.AddRazorComponents()

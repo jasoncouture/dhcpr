@@ -2,22 +2,21 @@ using System.Text;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-using MessagePipe;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Publishes completed client-facing queries for the live UI via MessagePipe.
-/// Uses fire-and-forget <see cref="IAsyncPublisher{T}.Publish"/> so subscribers never block DNS.
+/// Publishes completed client-facing queries for the live UI.
+/// Awaits <see cref="ILiveQueryEventPublisher.PublishAsync"/> which must complete quickly
+/// (Orleans OneWay local enqueue) so cluster fan-out never blocks DNS.
 /// </summary>
 public sealed class LiveQueryEventMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;
-    private readonly IAsyncPublisher<DnsQueryEvent> _publisher;
+    private readonly ILiveQueryEventPublisher _publisher;
 
     public LiveQueryEventMiddleware(
         IDomainMessageMiddleware inner,
-        IAsyncPublisher<DnsQueryEvent> publisher)
+        ILiveQueryEventPublisher publisher)
     {
         _inner = inner;
         _publisher = publisher;
@@ -51,8 +50,7 @@ public sealed class LiveQueryEventMiddleware : IDomainMessageMiddleware
                 FormatAnswerAddresses(result, question.Type),
                 _inner.Name);
 
-            // Fire-and-forget: do not await PublishAsync.
-            _publisher.Publish(evt);
+            await _publisher.PublishAsync(evt, cancellationToken);
         }
 
         return result;

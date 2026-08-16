@@ -67,6 +67,7 @@ main {
 
 .query-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
 }
 
@@ -76,6 +77,8 @@ main {
     padding: 0.35rem 0.5rem;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .query-table th {
@@ -86,10 +89,20 @@ main {
     background: var(--bg);
 }
 
+/* Name + Answers: wrap instead of widening the table. */
+.query-table th:nth-child(5),
 .query-table td:nth-child(5),
-.query-table td:nth-child(7) {
+.query-table th:nth-child(8),
+.query-table td:nth-child(8) {
     white-space: normal;
-    word-break: break-all;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.query-table th:nth-child(8),
+.query-table td:nth-child(8) {
+    width: 28%;
 }
 
 .query-table tr.error td {

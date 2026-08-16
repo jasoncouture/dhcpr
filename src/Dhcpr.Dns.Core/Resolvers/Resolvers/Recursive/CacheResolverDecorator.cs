@@ -18,7 +18,9 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
     public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        if (_cache.TryGet(context.DomainMessage, out var cached, out var securityStatus) && cached is not null)
+        if (!context.BypassCache &&
+            _cache.TryGet(context.DomainMessage, out var cached, out var securityStatus) &&
+            cached is not null)
         {
             context.CacheHit = true;
             context.CachedDnssecStatus = securityStatus;
@@ -26,7 +28,7 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
         }
 
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
-        if (result is not null && !context.DoNotCacheResponse)
+        if (result is not null && !context.DoNotCacheResponse && !context.BypassCache)
             _cache.Set(context.DomainMessage, result);
 
         return result;

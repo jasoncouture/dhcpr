@@ -17,6 +17,7 @@ public interface IDnsQueryExecutor
 
     /// <summary>
     /// Run a typed request through the shared resolver pipeline (used by health checks).
+    /// Bypasses the response cache so probes always hit live resolution.
     /// </summary>
     ValueTask<DomainMessage?> QueryAsync(
         DomainMessage request,

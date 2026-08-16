@@ -55,6 +55,11 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public bool DoNotCacheResponse { get; set; }
 
     /// <summary>
+    /// When true, skip both cache lookup and store (e.g. health-check probes).
+    /// </summary>
+    public bool BypassCache { get; init; }
+
+    /// <summary>
     /// Human-readable reason when the pipeline is about to return SERVFAIL.
     /// Surfaced by query logging at Error level.
     /// </summary>

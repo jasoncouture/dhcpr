@@ -68,17 +68,26 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
     }
 
     public ValueTask<DomainMessage?> QueryAsync(DomainMessage request, CancellationToken cancellationToken)
-        => QueryAsync(request, HealthCheckEndPoint, HealthCheckEndPoint, cancellationToken);
+        => QueryAsync(request, HealthCheckEndPoint, HealthCheckEndPoint, bypassCache: true, cancellationToken);
+
+    private ValueTask<DomainMessage?> QueryAsync(
+        DomainMessage request,
+        IPEndPoint clientEndPoint,
+        IPEndPoint serverEndPoint,
+        CancellationToken cancellationToken)
+        => QueryAsync(request, clientEndPoint, serverEndPoint, bypassCache: false, cancellationToken);
 
     private async ValueTask<DomainMessage?> QueryAsync(
         DomainMessage request,
         IPEndPoint clientEndPoint,
         IPEndPoint serverEndPoint,
+        bool bypassCache,
         CancellationToken cancellationToken)
     {
         var context = new DomainMessageContext(clientEndPoint, serverEndPoint, request)
         {
             IsInternal = false,
+            BypassCache = bypassCache,
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget()
         };

@@ -169,6 +169,40 @@ public class DnsResponseCacheTests
         Assert.Equal(address, ((IPAddressData)second!.Records.Answers[0].Data).Address);
     }
 
+    [Fact]
+    public async Task CacheDecorator_BypassCacheSkipsLookupAndStore()
+    {
+        var cache = CreateCache();
+        var address = IPAddress.Parse("203.0.113.10");
+        var request = DomainMessage.CreateRequest("bypass.example", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(
+            request,
+            new[]
+            {
+                new DomainResourceRecord(
+                    new DomainLabels("bypass.example"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(120),
+                    new IPAddressData(address))
+            },
+            responseCode: DomainResponseCode.NoError);
+        cache.Set(request, response);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+
+        var decorator = new CacheResolverDecorator(inner, cache);
+        var context = new DomainMessageContext(null, null, request) { BypassCache = true };
+
+        var result = await decorator.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.False(context.CacheHit);
+        await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
     private static DnsResponseCache CreateCache()
         => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
 }

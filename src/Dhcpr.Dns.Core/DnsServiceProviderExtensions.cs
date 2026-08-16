@@ -56,18 +56,19 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Blackhole → Unsupported → Shuffle → Metrics → Dnssec → …
+        // Outermost last: Logging → Metrics → Blackhole → Unsupported → Shuffle → Dnssec → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
-        services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
         // Unknown QTYPE (e.g. ANY/255) → NOTIMP before cache/upstream.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
+        // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
+        services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
 

@@ -72,6 +72,37 @@ public class MetricsDomainMessageMiddlewareTests
         Assert.Equal(1, observed);
     }
 
+    [Fact]
+    public async Task CountsBlackholeNxDomain()
+    {
+        long observed = 0;
+        using var listener = CreateListener(measurement => observed += measurement);
+
+        var leaf = Substitute.For<IDomainMessageMiddleware>();
+        var monitor = Substitute.For<Microsoft.Extensions.Options.IOptionsMonitor<DnsConfiguration>>();
+        monitor.CurrentValue.Returns(new DnsConfiguration { BlackholeDomains = ["dhitc.com"] });
+        var blackhole = new BlackholeDomainMiddleware(leaf, monitor);
+
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        var middleware = new MetricsDomainMessageMiddleware(
+            blackhole,
+            services.BuildServiceProvider().GetRequiredService<IMeterFactory>());
+
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            DomainMessage.CreateRequest("www.dhitc.com", DomainRecordType.A));
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Equal(1, observed);
+        await leaf.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
     private static MetricsDomainMessageMiddleware CreateMiddleware(DomainMessage? response)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();

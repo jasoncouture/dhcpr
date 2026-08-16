@@ -3,6 +3,11 @@ using Orleans.Utilities;
 
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
+/// <summary>
+/// Singleton fan-out grain. Activations are single-threaded; high-rate DNS publish
+/// ingress is absorbed by <see cref="LiveQueryPublishWorkerGrain"/> ([StatelessWorker])
+/// so callers only queue work here instead of blocking on this grain's turn.
+/// </summary>
 [KeepAlive]
 public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
 {
@@ -32,7 +37,7 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
     public Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
-        return Task.CompletedTask;
+        // Await Notify on this grain's turn (observers are OneWay — enqueue only).
+        return _observers.Notify(observer => observer.OnEvent(evt, cancellationToken));
     }
 }

@@ -3,8 +3,9 @@ using Orleans.Concurrency;
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
 /// <summary>
-/// Local-only entry point: DNS middleware OneWay-invokes this worker,
-/// which then publishes to the cluster-wide hub grain.
+/// Local [StatelessWorker] ingress: DNS can OneWay-publish concurrently here without
+/// contending on the single-threaded <see cref="LiveQueryHubGrain"/> activation.
+/// This worker then OneWay-forwards to the hub.
 /// </summary>
 [StatelessWorker]
 public sealed class LiveQueryPublishWorkerGrain : Grain, ILiveQueryPublishWorker

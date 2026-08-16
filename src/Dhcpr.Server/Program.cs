@@ -15,6 +15,8 @@ using Microsoft.Extensions.Options;
 
 using OpenTelemetry.Metrics;
 
+using Orleans.Dashboard;
+
 ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
 ThreadPool.GetMinThreads(out var workerMinThreads, out _);
 ThreadPool.SetMaxThreads(workerMaxThreads, 16384);
@@ -79,6 +81,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+app.MapOrleansDashboard(routePrefix: "/orleans");
 app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 app.MapDnsOverHttp();

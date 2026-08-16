@@ -2,6 +2,7 @@ using k8s;
 
 using Orleans.Clustering.Kubernetes;
 using Orleans.Configuration;
+using Orleans.Dashboard;
 using Orleans.Hosting;
 
 namespace Dhcpr.Server;
@@ -28,6 +29,8 @@ public static class OrleansServiceCollectionExtensions
             {
                 silo.UseLocalhostClustering();
             }
+
+            silo.AddDashboard();
         });
 
         return builder;

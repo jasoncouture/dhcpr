@@ -113,6 +113,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
                     "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)",
                     name,
                     question?.Type);
+                context.ServFailReason = $"DNSSEC validation bogus for {name}/{question?.Type}";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,

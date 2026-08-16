@@ -53,4 +53,10 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// (e.g. answers from authoritative zone files).
     /// </summary>
     public bool DoNotCacheResponse { get; set; }
+
+    /// <summary>
+    /// Human-readable reason when the pipeline is about to return SERVFAIL.
+    /// Surfaced by query logging at Error level.
+    /// </summary>
+    public string? ServFailReason { get; set; }
 }

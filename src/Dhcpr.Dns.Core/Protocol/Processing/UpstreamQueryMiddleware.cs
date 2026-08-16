@@ -84,6 +84,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
             return nameErrorFallback;
 
         // Every nameserver endpoint failed.
+        context.ServFailReason = "all upstream nameservers failed";
         return DomainMessage.CreateResponse(
             context.DomainMessage,
             DomainResourceRecords.Empty,

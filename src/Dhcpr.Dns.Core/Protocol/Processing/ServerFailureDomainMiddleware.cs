@@ -5,6 +5,7 @@ public sealed class ServerFailureDomainMiddleware : IDomainMessageMiddleware
 {
     public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
     {
+        context.ServFailReason = $"no handler answered ({Name})";
         return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
             context.DomainMessage,
             DomainResourceRecords.Empty,

@@ -134,6 +134,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
             }
 
+            context.ServFailReason = "recursive resolver exception";
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
         }

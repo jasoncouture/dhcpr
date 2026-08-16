@@ -24,6 +24,7 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
         {
             if (!Enum.IsDefined(question.Type))
             {
+                context.ServFailReason = $"unsupported query type {(ushort)question.Type}";
                 return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,

@@ -41,8 +41,23 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
     private void LogResponse(DomainMessageContext context, DomainMessage result, Guid queryId)
     {
         var hitString = context.CacheHit ? "HIT" : "MISS";
+        var isServFail = result.Flags.ResponseCode is DomainResponseCode.ServerFailure;
         foreach (var question in context.DomainMessage.Questions)
         {
+            if (isServFail)
+            {
+                _logger.LogError(
+                    "SERVFAIL [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} reason={Reason} cache={CacheState}",
+                    queryId,
+                    context.ClientEndPoint,
+                    context.ServerEndPoint,
+                    question.Type,
+                    question.Name.ToString(),
+                    context.ServFailReason ?? "unspecified",
+                    hitString);
+                continue;
+            }
+
             var addresses = FormatAnswerAddresses(result, question.Type);
             _logger.LogInformation("{CacheState} [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
                 hitString,

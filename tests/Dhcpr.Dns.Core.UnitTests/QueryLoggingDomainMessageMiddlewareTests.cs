@@ -99,9 +99,37 @@ public class QueryLoggingDomainMessageMiddlewareTests
         Assert.Equal(1, logger.InformationCount);
     }
 
+    [Fact]
+    public async Task LogsServFailAsErrorWithReason()
+    {
+        var request = DomainMessage.CreateRequest("dhitc.com", (DomainRecordType)255);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.ServerFailure);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                call.Arg<DomainMessageContext>().ServFailReason = "unsupported query type 255";
+                return new ValueTask<DomainMessage?>(response);
+            });
+
+        var logger = new CountingLogger();
+        var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Equal(0, logger.InformationCount);
+        Assert.Equal(1, logger.ErrorCount);
+    }
+
     private sealed class CountingLogger : ILogger<QueryLoggingDomainMessageMiddleware>
     {
         public int InformationCount { get; private set; }
+        public int ErrorCount { get; private set; }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
@@ -115,6 +143,8 @@ public class QueryLoggingDomainMessageMiddlewareTests
         {
             if (logLevel == LogLevel.Information)
                 InformationCount++;
+            if (logLevel == LogLevel.Error)
+                ErrorCount++;
         }
     }
 }

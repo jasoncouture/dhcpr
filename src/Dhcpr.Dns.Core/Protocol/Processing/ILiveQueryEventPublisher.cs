@@ -6,5 +6,5 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public interface ILiveQueryEventPublisher
 {
-    ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken = default);
+    ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken);
 }

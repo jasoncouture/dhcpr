@@ -9,7 +9,7 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
     private readonly HashSet<ILiveQueryObserver> _observers = new();
     private readonly LinkedList<DnsQueryEventMessage> _ring = new();
 
-    public async Task Subscribe(ILiveQueryObserver observer, CancellationToken cancellationToken = default)
+    public async Task Subscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Add(observer);
@@ -34,15 +34,17 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         }
     }
 
-    public Task Unsubscribe(ILiveQueryObserver observer, CancellationToken cancellationToken = default)
+    public Task Unsubscribe(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Remove(observer);
         return Task.CompletedTask;
     }
 
-    public async Task Publish(DnsQueryEventMessage evt)
+    public async Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         lock (_ring)
         {
             _ring.AddFirst(evt);
@@ -53,10 +55,14 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         List<ILiveQueryObserver>? dead = null;
         foreach (var observer in _observers)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                // Fan-out is not tied to the originating DNS request lifetime.
-                await observer.OnEvent(evt, CancellationToken.None);
+                await observer.OnEvent(evt, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {

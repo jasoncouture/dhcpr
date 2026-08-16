@@ -58,7 +58,7 @@ public sealed class LiveQueryOrleansBridge : IHostedService
 
     private sealed class HubObserver(IAsyncPublisher<DnsQueryEvent> publisher) : ILiveQueryObserver
     {
-        public async Task OnEvent(DnsQueryEventMessage evt, CancellationToken cancellationToken = default)
+        public async Task OnEvent(DnsQueryEventMessage evt, CancellationToken cancellationToken)
         {
             await publisher.PublishAsync(evt.ToDnsQueryEvent(), cancellationToken);
         }

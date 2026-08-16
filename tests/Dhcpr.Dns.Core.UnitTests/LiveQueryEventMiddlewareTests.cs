@@ -106,7 +106,7 @@ public class LiveQueryEventMiddlewareTests
     {
         public List<DnsQueryEvent> Published { get; } = new();
 
-        public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken = default)
+        public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken)
         {
             Published.Add(evt);
             return default;

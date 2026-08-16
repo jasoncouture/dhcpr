@@ -9,9 +9,9 @@ namespace Dhcpr.Server.Orleans.LiveQueries;
 [StatelessWorker]
 public sealed class LiveQueryPublishWorkerGrain : Grain, ILiveQueryPublishWorker
 {
-    public Task Publish(DnsQueryEventMessage evt)
+    public Task Publish(DnsQueryEventMessage evt, CancellationToken cancellationToken)
     {
         var hub = GrainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
-        return hub.Publish(evt);
+        return hub.Publish(evt, cancellationToken);
     }
 }

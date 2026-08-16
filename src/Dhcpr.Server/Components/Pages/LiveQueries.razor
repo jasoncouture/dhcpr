@@ -5,10 +5,14 @@
 
 <div class="live-queries">
     <div class="toolbar">
-        <span class="count">@(_rows.Count) shown</span>
+        <span class="count">@VisibleCount shown</span>
         <label>
             <input type="checkbox" @bind="_paused" @bind:after="OnPauseChanged" />
             Pause
+        </label>
+        <label>
+            <input type="checkbox" @bind="_hideBlackhole" @bind:after="StateHasChanged" />
+            Hide blackhole
         </label>
     </div>
 
@@ -26,7 +30,7 @@
         </tr>
         </thead>
         <tbody>
-        @foreach (var row in _rows)
+        @foreach (var row in VisibleRows())
         {
             <tr class="@(row.ResponseCode is DomainResponseCode.NoError ? null : "error")">
                 <td>@row.Timestamp.ToString("HH:mm:ss.fff")</td>
@@ -44,11 +48,27 @@
 </div>
 
 @code {
+    private const string BlackholeMiddleware = "Blackhole";
+
     private readonly List<DnsQueryEvent> _rows = new(LiveQueryStore.SnapshotCapacity);
     private IDisposable? _subscription;
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
     private bool _paused;
+    private bool _hideBlackhole;
+
+    private int VisibleCount =>
+        _hideBlackhole
+            ? _rows.Count(static r => r.Middleware != BlackholeMiddleware)
+            : _rows.Count;
+
+    private IEnumerable<DnsQueryEvent> VisibleRows()
+    {
+        if (!_hideBlackhole)
+            return _rows;
+
+        return _rows.Where(static r => r.Middleware != BlackholeMiddleware);
+    }
 
     protected override void OnInitialized()
     {

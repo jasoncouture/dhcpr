@@ -106,7 +106,7 @@ public sealed class LiveQueryOrleansBridge : IHostedService
         {
             try
             {
-                await _hub!.RefreshSubscription(_observer!, cancellationToken);
+                await _hub!.Subscribe(_observer!, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

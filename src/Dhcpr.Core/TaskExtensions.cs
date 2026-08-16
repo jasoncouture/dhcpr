@@ -8,8 +8,17 @@ public static class TaskExtensions
     {
         await task.IgnoreExceptionsAsync().ConfigureAwait(false);
     }
-    public static Task IgnoreExceptionsAsync(this Task task)
-        => IgnoreExceptionsAsync(task, CancellationToken.None);
+    public static async Task IgnoreExceptionsAsync(this Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception)
+        {
+            // Ignored.
+        }
+    }
 
     public static async Task IgnoreExceptionsAsync(this Task task, CancellationToken cancellationToken)
     {
@@ -17,7 +26,7 @@ public static class TaskExtensions
         {
             task = task.WaitAsync(cancellationToken);
             // Keep swallowing failures if the linked wait itself is cancelled mid-flight.
-            task = task.ContinueWith(static async t => await t.IgnoreExceptionsAsync(CancellationToken.None));
+            task = task.ContinueWith(static async t => await t.IgnoreExceptionsAsync());
             await task.WaitAsync(cancellationToken);
         }
         catch (Exception)

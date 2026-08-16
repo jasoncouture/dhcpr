@@ -22,7 +22,7 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
@@ -34,14 +34,15 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
                 if (!IsBlackholed(question.Name, blackholes))
                     continue;
 
-                return DomainMessage.CreateResponse(
+                return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,
-                    DomainResponseCode.NameError);
+                    DomainResponseCode.NameError));
             }
         }
 
-        return await _inner.ProcessAsync(context, cancellationToken);
+        // Pass through the inner ValueTask — do not async/await; this runs on every query.
+        return _inner.ProcessAsync(context, cancellationToken);
     }
 
     internal static bool IsBlackholed(DomainLabels name, string[] blackholes)

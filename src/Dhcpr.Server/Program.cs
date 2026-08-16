@@ -51,6 +51,7 @@ builder.Services.AddCoreServices();
 builder.Services.AddDns();
 builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
+builder.AddDhcprOrleans();
 
 builder.Services.AddSingleton<LiveQueryStore>();
 builder.Services.AddHostedService(static sp => sp.GetRequiredService<LiveQueryStore>());

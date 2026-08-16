@@ -4,6 +4,8 @@ metadata:
   name: {{ include "dhcpr.fullname" . }}
   labels:
     {{- include "dhcpr.labels" . | nindent 4 }}
+    orleans/serviceId: dhcpr
+    orleans/clusterId: dhcpr
   {{- with (include "dhcpr.annotations" .) }}
   annotations:
     {{- . | nindent 4 }}
@@ -21,6 +23,8 @@ spec:
     metadata:
       labels:
         {{- include "dhcpr.labels" . | nindent 8 }}
+        orleans/serviceId: dhcpr
+        orleans/clusterId: dhcpr
       {{- with (include "dhcpr.annotations" .) }}
       annotations:
         {{- . | nindent 8 }}
@@ -41,11 +45,33 @@ spec:
             - name: dns-tcp
               containerPort: 53
               protocol: TCP
+            - name: orleans-silo
+              containerPort: 11111
+              protocol: TCP
+            - name: orleans-gw
+              containerPort: 30000
+              protocol: TCP
           env:
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: ORLEANS_SERVICE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['orleans/serviceId']
+            - name: ORLEANS_CLUSTER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['orleans/clusterId']
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

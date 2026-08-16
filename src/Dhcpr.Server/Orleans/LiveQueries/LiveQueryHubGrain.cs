@@ -1,7 +1,10 @@
 using System.Collections.Immutable;
 
+using Orleans.Concurrency;
+
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
+[KeepAlive]
 public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
 {
     public const int RingCapacity = 250;

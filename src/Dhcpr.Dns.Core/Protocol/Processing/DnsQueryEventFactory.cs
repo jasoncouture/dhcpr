@@ -49,7 +49,7 @@ public static class DnsQueryEventFactory
                 continue;
 
             if (builder.Length > 0)
-                builder.Append(',');
+                builder.Append(", ");
             builder.Append(addressData.Address);
         }
 

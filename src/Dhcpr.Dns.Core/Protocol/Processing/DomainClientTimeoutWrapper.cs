@@ -15,8 +15,8 @@ public sealed class DomainClientTimeoutWrapper : IDomainClient
 
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
     {
-        using var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        source.CancelAfter(_timeout);
-        return await _implementation.SendAsync(message, source.Token);
+        using var timeoutTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutTokenSource.CancelAfter(_timeout);
+        return await _implementation.SendAsync(message, timeoutTokenSource.Token);
     }
 }

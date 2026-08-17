@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.DynamicDns;
 
-public sealed class DynamicDnsStore : IDynamicDnsStore
+public sealed partial class DynamicDnsStore : IDynamicDnsStore
 {
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -63,11 +63,11 @@ public sealed class DynamicDnsStore : IDynamicDnsStore
                 _entries[key] = entry;
             }
 
-            _logger.LogInformation("Loaded {Count} dynamic DNS entr(y/ies) from {Path}", _entries.Count, path);
+            LogLoadedEntries(_logger, _entries.Count, path);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load dynamic DNS file {Path}", path);
+            LogLoadFailed(_logger, ex, path);
         }
     }
 
@@ -159,4 +159,10 @@ public sealed class DynamicDnsStore : IDynamicDnsStore
             Ipv6 = entry.Ipv6,
             UpdatedAt = entry.UpdatedAt
         };
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Loaded {Count} dynamic DNS entr(y/ies) from {Path}")]
+    private static partial void LogLoadedEntries(ILogger logger, int count, string path);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load dynamic DNS file {Path}")]
+    private static partial void LogLoadFailed(ILogger logger, Exception exception, string path);
 }

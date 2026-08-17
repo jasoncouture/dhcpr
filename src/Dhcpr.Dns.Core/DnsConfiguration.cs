@@ -62,11 +62,10 @@ public sealed class DnsConfiguration : IValidateSelf
             return false;
         }
 
-        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-        Routes ??= new Dictionary<string, DnsRouteConfiguration>(StringComparer.OrdinalIgnoreCase);
+        var routes = Routes ?? new Dictionary<string, DnsRouteConfiguration>(StringComparer.OrdinalIgnoreCase);
         _parsedRoutes = new Dictionary<string, ParsedDnsRoute>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var route in Routes)
+        foreach (var route in routes)
         {
             var config = route.Value ?? new DnsRouteConfiguration();
             config.Upstreams ??= [];

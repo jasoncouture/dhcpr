@@ -36,7 +36,7 @@ public sealed class ReferralWalker : IReferralWalker
         {
             if (options.TryLocalCut is not null)
             {
-                var localCut = await options.TryLocalCut(lastCut, request, cancellationToken)
+                var localCut = await options.TryLocalCut.Invoke(lastCut, request, cancellationToken)
                     .ConfigureAwait(false);
                 if (localCut is { Terminal: true })
                     return localCut.Message;

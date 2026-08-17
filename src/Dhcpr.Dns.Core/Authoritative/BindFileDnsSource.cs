@@ -22,7 +22,7 @@ public sealed class BindFileDnsSource : IDnsSource
     {
         var path = string.IsNullOrWhiteSpace(fileName) ? _startPath : fileName;
         var text = File.ReadAllText(path);
-        return _filter(text);
+        return _filter.Invoke(text);
     }
 
     public string ResolveFile(string fileName, string? referrer)

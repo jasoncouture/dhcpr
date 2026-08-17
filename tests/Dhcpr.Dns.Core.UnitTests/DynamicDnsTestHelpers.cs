@@ -4,6 +4,8 @@ using Dhcpr.Dns.Core.DynamicDns;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 internal static class DynamicDnsTestHelpers
@@ -24,16 +26,16 @@ internal static class DynamicDnsTestHelpers
         };
 
         return new DynamicDnsStore(
-            new StaticOptionsMonitor<ApplicationConfiguration>(new ApplicationConfiguration { DataPath = dataPath }),
-            new StaticOptionsMonitor<DynamicDnsConfiguration>(config),
+            Monitor(new ApplicationConfiguration { DataPath = dataPath }),
+            Monitor(config),
             NullLogger<DynamicDnsStore>.Instance);
     }
 
-    public sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

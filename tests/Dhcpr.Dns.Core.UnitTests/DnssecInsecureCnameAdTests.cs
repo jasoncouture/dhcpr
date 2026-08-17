@@ -10,6 +10,8 @@ using Dhcpr.Dns.Core.Validation;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnssecInsecureCnameAdTests
@@ -51,7 +53,7 @@ public class DnssecInsecureCnameAdTests
         var validator = new DnssecMessageValidator(
             new DnssecValidator(NullLogger<DnssecValidator>.Instance),
             new NoopInternalClient(),
-            new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration()),
+            Monitor(new DnsConfiguration()),
             NullLogger<DnssecMessageValidator>.Instance);
 
         await validator.ValidateResponseAsync(
@@ -135,11 +137,11 @@ public class DnssecInsecureCnameAdTests
             => SendAsync(message, cancellationToken);
     }
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

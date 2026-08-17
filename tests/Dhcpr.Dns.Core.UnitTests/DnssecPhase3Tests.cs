@@ -13,6 +13,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnssecPhase3Tests
@@ -241,7 +243,7 @@ public class DnssecPhase3Tests
     private static DnssecValidationMiddleware CreateMiddleware(DomainMessage response)
     {
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
-        var options = new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+        var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
         });
@@ -255,7 +257,7 @@ public class DnssecPhase3Tests
             new FixedInner(response),
             messageValidator,
             new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 })),
-            new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+            Monitor(new DnsConfiguration
             {
                 TrustAnchors = [new TrustAnchorConfiguration()]
             }),
@@ -393,11 +395,11 @@ public class DnssecPhase3Tests
             => SendAsync(message, cancellationToken);
     }
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

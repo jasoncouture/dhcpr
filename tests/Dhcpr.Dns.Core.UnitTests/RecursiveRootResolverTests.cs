@@ -10,6 +10,8 @@ using Dhcpr.Dns.Core.RootZone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class RecursiveRootResolverTests
@@ -732,7 +734,7 @@ public class RecursiveRootResolverTests
 
     private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
     {
-        var tips = new RootServerTips(new TestOptionsMonitor(new RootServerConfiguration
+        var tips = new RootServerTips(Monitor(new RootServerConfiguration
         {
             Addresses = new[] { _rootServer.ToString() }
         }));
@@ -841,12 +843,12 @@ public class RecursiveRootResolverTests
         => new(new DomainLabels(owner), DomainRecordType.A, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new IPAddressData(address));
 
-    private sealed class TestOptionsMonitor : IOptionsMonitor<RootServerConfiguration>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public TestOptionsMonitor(RootServerConfiguration current) => CurrentValue = current;
-        public RootServerConfiguration CurrentValue { get; }
-        public RootServerConfiguration Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<RootServerConfiguration, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 
     /// <summary>

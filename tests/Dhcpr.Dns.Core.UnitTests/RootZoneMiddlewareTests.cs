@@ -9,6 +9,8 @@ using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class RootZoneMiddlewareTests
@@ -222,16 +224,16 @@ public class RootZoneMiddlewareTests
     private static RootZoneMiddleware CreateMiddleware(IRootZoneStore store, bool dnssecEnabled)
         => new(
             store,
-            new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+            Monitor(new DnsConfiguration
             {
                 Dnssec = new DnssecConfiguration { Enabled = dnssecEnabled }
             }));
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

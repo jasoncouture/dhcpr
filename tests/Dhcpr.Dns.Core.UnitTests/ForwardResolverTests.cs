@@ -11,6 +11,8 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class ForwardResolverTests
@@ -275,18 +277,18 @@ public class ForwardResolverTests
         Assert.True(configuration.Validate());
 
         return new ForwardResolver(
-            new TestOptionsMonitor(configuration),
+            Monitor(configuration),
             internalClient,
             new AuthoritativeZoneStore(),
             NullLogger<ForwardResolver>.Instance);
     }
 
-    private sealed class TestOptionsMonitor : IOptionsMonitor<DnsConfiguration>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public TestOptionsMonitor(DnsConfiguration current) => CurrentValue = current;
-        public DnsConfiguration CurrentValue { get; }
-        public DnsConfiguration Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<DnsConfiguration, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 
     private sealed class CapturingInternalDomainClient : IInternalDomainClient

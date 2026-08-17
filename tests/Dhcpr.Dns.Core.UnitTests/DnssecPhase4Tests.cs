@@ -194,7 +194,7 @@ public class DnssecPhase4Tests
         var cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache);
         // Seed already done; second layer: dnssec around a hit-returning inner.
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
-        var options = new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+        var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
         });
@@ -317,7 +317,7 @@ public class DnssecPhase4Tests
         var cnameDecorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var cache = CreateCache();
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
-        var options = new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+        var options = Monitor(new DnsConfiguration
         {
             TrustAnchors =
             [
@@ -393,7 +393,7 @@ public class DnssecPhase4Tests
         var cnameDecorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var cache = CreateCache();
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
-        var options = new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+        var options = Monitor(new DnsConfiguration
         {
             TrustAnchors =
             [
@@ -534,11 +534,11 @@ public class DnssecPhase4Tests
             => SendAsync(message, cancellationToken);
     }
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

@@ -14,6 +14,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class AuthoritativeZoneTests
@@ -306,7 +308,7 @@ public class AuthoritativeZoneTests
         });
 
         var forwarder = new ForwardResolver(
-            new StaticOptionsMonitor<DnsConfiguration>(configuration),
+            Monitor(configuration),
             client,
             store,
             NullLogger<ForwardResolver>.Instance);
@@ -387,12 +389,12 @@ public class AuthoritativeZoneTests
         AuthoritativeZoneStore store)
         => new(store, new ReferralWalker(client));
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 
     private sealed class FixedMiddleware : IDomainMessageMiddleware

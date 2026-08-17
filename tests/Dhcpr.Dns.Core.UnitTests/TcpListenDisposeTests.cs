@@ -10,6 +10,8 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class TcpListenDisposeTests
@@ -20,7 +22,7 @@ public class TcpListenDisposeTests
         var queue = new CapturingQueue();
         var server = new DnsServer(
             queue,
-            new StaticOptionsMonitor(new DnsConfiguration()),
+            Monitor(new DnsConfiguration()),
             NullLogger<DnsServer>.Instance);
 
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -94,11 +96,11 @@ public class TcpListenDisposeTests
         public Task<DnsPacketReceivedMessage> WaitAsync() => _item.Task;
     }
 
-    private sealed class StaticOptionsMonitor : IOptionsMonitor<DnsConfiguration>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(DnsConfiguration current) => CurrentValue = current;
-        public DnsConfiguration CurrentValue { get; }
-        public DnsConfiguration Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<DnsConfiguration, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

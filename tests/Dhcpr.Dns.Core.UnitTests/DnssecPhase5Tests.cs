@@ -496,8 +496,13 @@ public class DnssecPhase5Tests
             NullLogger<DnssecValidationMiddleware>.Instance);
     }
 
-    private static StaticOptionsMonitor<DnsConfiguration> Options(DnsConfiguration config)
-        => new(config);
+    private static IOptionsMonitor<DnsConfiguration> Options(DnsConfiguration config)
+    {
+        var monitor = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
+        monitor.CurrentValue.Returns(config);
+        monitor.Get(Arg.Any<string?>()).Returns(config);
+        return monitor;
+    }
 
     private static DomainResourceRecord A(string name, string ip) => new(
         new DomainLabels(name),
@@ -651,11 +656,4 @@ public class DnssecPhase5Tests
                 message));
     }
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
-    {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
 }

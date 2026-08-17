@@ -10,6 +10,8 @@ using Dhcpr.Dns.Core.Validation;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnssecNsec3Tests
@@ -297,7 +299,7 @@ public class DnssecNsec3Tests
     private static DnssecMessageValidator CreateValidator()
     {
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
-        var options = new StaticOptionsMonitor<DnsConfiguration>(new DnsConfiguration
+        var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
         });
@@ -416,11 +418,11 @@ public class DnssecNsec3Tests
             => SendAsync(message, cancellationToken);
     }
 
-    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
+    private static IOptionsMonitor<T> Monitor<T>(T value)
     {
-        public StaticOptionsMonitor(T current) => CurrentValue = current;
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

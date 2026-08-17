@@ -108,12 +108,4 @@ public static class DnsServiceProviderExtensions
         client.Timeout = TimeSpan.FromMinutes(5);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("dhcpr/1.0");
     }
-
-    private sealed class DnsConfigurationValidator : IValidateOptions<DnsConfiguration>
-    {
-        public ValidateOptionsResult Validate(string? name, DnsConfiguration options)
-            => options.TryValidate(out var error)
-                ? ValidateOptionsResult.Success
-                : ValidateOptionsResult.Fail(error!);
-    }
 }

@@ -195,8 +195,7 @@ public class AuthoritativeZoneTests
         var store = new AuthoritativeZoneStore();
         store.Publish([BuildZone(FooBarZone, "foo.bar.bind")]);
 
-        var client = new CountingInternalClient(_ => throw new InvalidOperationException("should not query upstream"));
-        var middleware = CreateAuthoritative(client, store);
+        var middleware = CreateAuthoritative(store);
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -205,7 +204,6 @@ public class AuthoritativeZoneTests
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
         Assert.True(result!.Flags.Authoritative);
-        Assert.Empty(client.Queries);
     }
 
     [Fact]
@@ -238,7 +236,7 @@ public class AuthoritativeZoneTests
             return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
         });
 
-        var middleware = CreateAuthoritative(client, store);
+        var middleware = CreateAuthoritativeNsCut(client, store);
         var request = DomainMessage.CreateRequest("host.child.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -268,8 +266,7 @@ public class AuthoritativeZoneTests
         var store = new AuthoritativeZoneStore();
         store.Publish([parent, child]);
 
-        var client = new CountingInternalClient(_ => throw new InvalidOperationException("no upstream"));
-        var middleware = CreateAuthoritative(client, store);
+        var middleware = CreateAuthoritative(store);
         var request = DomainMessage.CreateRequest("host.child.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -279,7 +276,6 @@ public class AuthoritativeZoneTests
         Assert.True(context.DoNotCacheResponse);
         Assert.Contains(result!.Records.Answers, r =>
             ((IPAddressData)r.Data).Address.Equals(IPAddress.Parse("192.0.2.88")));
-        Assert.Empty(client.Queries);
     }
 
     [Fact]
@@ -383,7 +379,10 @@ public class AuthoritativeZoneTests
         return AuthoritativeZoneBuilder.FromRecords(records, path);
     }
 
-    private static AuthoritativeZoneMiddleware CreateAuthoritative(
+    private static AuthoritativeZoneMiddleware CreateAuthoritative(AuthoritativeZoneStore store)
+        => new(store);
+
+    private static AuthoritativeNsCutMiddleware CreateAuthoritativeNsCut(
         IInternalDomainClient client,
         AuthoritativeZoneStore store)
         => new(store, client);

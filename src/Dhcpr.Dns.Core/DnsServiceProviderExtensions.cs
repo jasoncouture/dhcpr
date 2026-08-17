@@ -53,6 +53,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, DynamicDnsMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
+        services.AddSingleton<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
         services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();

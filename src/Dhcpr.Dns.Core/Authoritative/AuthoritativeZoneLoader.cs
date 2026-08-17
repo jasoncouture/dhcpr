@@ -17,13 +17,13 @@ public sealed class AuthoritativeZoneLoader : BackgroundService
 {
     private static readonly TimeSpan _debounce = TimeSpan.FromMilliseconds(500);
 
-    private readonly AuthoritativeZoneStore _store;
+    private readonly IAuthoritativeZoneStore _store;
     private readonly IDnsResponseCache _cache;
     private readonly IOptionsMonitor<ApplicationConfiguration> _application;
     private readonly ILogger<AuthoritativeZoneLoader> _logger;
 
     public AuthoritativeZoneLoader(
-        AuthoritativeZoneStore store,
+        IAuthoritativeZoneStore store,
         IDnsResponseCache cache,
         IOptionsMonitor<ApplicationConfiguration> application,
         ILogger<AuthoritativeZoneLoader> logger)

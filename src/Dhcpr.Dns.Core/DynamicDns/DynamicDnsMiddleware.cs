@@ -10,9 +10,9 @@ namespace Dhcpr.Dns.Core.DynamicDns;
 public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
 {
     private readonly DynamicDnsStore _store;
-    private readonly AuthoritativeZoneStore _zones;
+    private readonly IAuthoritativeZoneStore _zones;
 
-    public DynamicDnsMiddleware(DynamicDnsStore store, AuthoritativeZoneStore zones)
+    public DynamicDnsMiddleware(DynamicDnsStore store, IAuthoritativeZoneStore zones)
     {
         _store = store;
         _zones = zones;

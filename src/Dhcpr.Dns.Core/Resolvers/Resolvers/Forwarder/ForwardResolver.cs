@@ -18,7 +18,7 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
 {
     private readonly IInternalDomainClient _internalClient;
-    private readonly AuthoritativeZoneStore _authoritativeZones;
+    private readonly IAuthoritativeZoneStore _authoritativeZones;
     private readonly ILogger<ForwardResolver> _logger;
     private DnsConfiguration _configuration;
     private readonly IDisposable? _subscription;
@@ -26,7 +26,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
     public ForwardResolver(
         IOptionsMonitor<DnsConfiguration> options,
         IInternalDomainClient internalClient,
-        AuthoritativeZoneStore authoritativeZones,
+        IAuthoritativeZoneStore authoritativeZones,
         ILogger<ForwardResolver> logger)
     {
         _internalClient = internalClient;

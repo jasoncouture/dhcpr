@@ -12,11 +12,11 @@ namespace Dhcpr.Dns.Core.Authoritative;
 /// </summary>
 public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
 {
-    private readonly AuthoritativeZoneStore _zones;
+    private readonly IAuthoritativeZoneStore _zones;
     private readonly IReferralWalker _referralWalker;
 
     public AuthoritativeNsCutMiddleware(
-        AuthoritativeZoneStore zones,
+        IAuthoritativeZoneStore zones,
         IReferralWalker referralWalker)
     {
         _zones = zones;

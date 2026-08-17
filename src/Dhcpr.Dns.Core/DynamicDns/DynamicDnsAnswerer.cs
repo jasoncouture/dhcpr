@@ -11,7 +11,7 @@ public static class DynamicDnsAnswerer
 {
     public static DomainMessage? TryAnswer(
         DynamicDnsStore store,
-        AuthoritativeZoneStore zones,
+        IAuthoritativeZoneStore zones,
         DomainMessage request)
     {
         if (request.Questions.Length == 0)

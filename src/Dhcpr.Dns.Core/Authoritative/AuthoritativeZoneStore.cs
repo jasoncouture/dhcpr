@@ -5,7 +5,7 @@ using Dhcpr.Dns.Core.Protocol.Zone;
 
 namespace Dhcpr.Dns.Core.Authoritative;
 
-public sealed class AuthoritativeZoneStore
+public sealed class AuthoritativeZoneStore : IAuthoritativeZoneStore
 {
     private ImmutableLabelTreeNode _root = new(
         ImmutableDictionary<string, ImmutableLabelTreeNode>.Empty,

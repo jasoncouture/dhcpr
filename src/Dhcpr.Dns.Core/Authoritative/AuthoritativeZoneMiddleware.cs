@@ -9,9 +9,9 @@ namespace Dhcpr.Dns.Core.Authoritative;
 /// </summary>
 public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
 {
-    private readonly AuthoritativeZoneStore _zones;
+    private readonly IAuthoritativeZoneStore _zones;
 
-    public AuthoritativeZoneMiddleware(AuthoritativeZoneStore zones)
+    public AuthoritativeZoneMiddleware(IAuthoritativeZoneStore zones)
     {
         _zones = zones;
     }

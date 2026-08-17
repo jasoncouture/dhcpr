@@ -21,7 +21,7 @@ public static class DynDnsEndpointExtensions
     private static Task<IResult> HandleUpdateAsync(
         HttpContext httpContext,
         DynamicDnsStore store,
-        AuthoritativeZoneStore zones,
+        IAuthoritativeZoneStore zones,
         IOptions<DynamicDnsConfiguration> options)
     {
         var config = options.Value;

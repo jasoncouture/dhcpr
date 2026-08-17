@@ -13,7 +13,7 @@ public static class DynDnsUpdateProcessor
 {
     public static string Process(
         DynamicDnsStore store,
-        AuthoritativeZoneStore zones,
+        IAuthoritativeZoneStore zones,
         DynamicDnsConfiguration config,
         string? authorizationHeader,
         string? hostnameParam,
@@ -76,7 +76,7 @@ public static class DynDnsUpdateProcessor
 
     private static string UpdateOne(
         DynamicDnsStore store,
-        AuthoritativeZoneStore zones,
+        IAuthoritativeZoneStore zones,
         string hostname,
         IPAddress? ipv4,
         IPAddress? ipv6,

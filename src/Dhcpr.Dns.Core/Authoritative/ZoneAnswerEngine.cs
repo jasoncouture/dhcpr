@@ -6,20 +6,6 @@ using Dhcpr.Dns.Core.Protocol.Zone;
 
 namespace Dhcpr.Dns.Core.Authoritative;
 
-public enum ZoneAnswerKind
-{
-    NoMatch,
-    Answer,
-    NoData,
-    NameError,
-    Referral
-}
-
-public sealed record ZoneAnswerResult(
-    ZoneAnswerKind Kind,
-    DomainMessage? Message,
-    string? ReferralCutApex = null);
-
 public static class ZoneAnswerEngine
 {
     public static ZoneAnswerResult Answer(AuthoritativeZone zone, DomainMessage request)

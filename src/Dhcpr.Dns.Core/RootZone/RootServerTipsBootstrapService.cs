@@ -14,7 +14,7 @@ namespace Dhcpr.Dns.Core.RootZone;
 /// Ensures root tip IPs exist: prefer config Addresses; otherwise load/fetch named.root
 /// (IP mirrors allowed — DNS may not work yet).
 /// </summary>
-public sealed class RootServerTipsBootstrapService : IHostedService
+public sealed partial class RootServerTipsBootstrapService : IHostedService
 {
     private readonly IRootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
@@ -40,8 +40,7 @@ public sealed class RootServerTipsBootstrapService : IHostedService
     {
         if (_options.CurrentValue.Addresses.Length > 0)
         {
-            _logger.LogInformation("Using {Count} configured root server addresses",
-                _options.CurrentValue.Addresses.Length);
+            LogUsingConfiguredAddresses(_logger, _options.CurrentValue.Addresses.Length);
             return;
         }
 
@@ -55,13 +54,13 @@ public sealed class RootServerTipsBootstrapService : IHostedService
                 if (fromCache.Length > 0)
                 {
                     _tips.SetDownloadedTips(fromCache);
-                    _logger.LogInformation("Loaded {Count} root tips from {Path}", fromCache.Length, cachePath);
+                    LogLoadedTipsFromCache(_logger, fromCache.Length, cachePath);
                     return;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to load root tip cache from {Path}", cachePath);
+                LogLoadTipCacheFailed(_logger, ex, cachePath);
             }
         }
 
@@ -82,16 +81,16 @@ public sealed class RootServerTipsBootstrapService : IHostedService
                 var tipLines = string.Join('\n', addresses.Select(static a => a.ToString()));
                 await AtomicFileReplace.WriteAsync(cachePath, $"{tipLines}\n", cancellationToken)
                     .ConfigureAwait(false);
-                _logger.LogInformation("Downloaded {Count} root tips from {Url}", addresses.Length, url);
+                LogDownloadedTips(_logger, addresses.Length, url);
                 return;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to download named.root from {Url}", url);
+                LogDownloadNamedRootFailed(_logger, ex, url);
             }
         }
 
-        _logger.LogError("No root server tips available from config or named.root");
+        LogNoRootTipsAvailable(_logger);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -112,4 +111,22 @@ public sealed class RootServerTipsBootstrapService : IHostedService
 
         return ZoneFileParser.ParseNamedRootAddresses(text).ToArray();
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Using {Count} configured root server addresses")]
+    private static partial void LogUsingConfiguredAddresses(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Loaded {Count} root tips from {Path}")]
+    private static partial void LogLoadedTipsFromCache(ILogger logger, int count, string path);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load root tip cache from {Path}")]
+    private static partial void LogLoadTipCacheFailed(ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Downloaded {Count} root tips from {Url}")]
+    private static partial void LogDownloadedTips(ILogger logger, int count, string url);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to download named.root from {Url}")]
+    private static partial void LogDownloadNamedRootFailed(ILogger logger, Exception exception, string url);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "No root server tips available from config or named.root")]
+    private static partial void LogNoRootTipsAvailable(ILogger logger);
 }

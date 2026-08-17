@@ -11,7 +11,10 @@ public record DomainResourceRecords
 ) : IEnumerable<DomainResourceRecord>, ISelfComputeEstimatedSize
 {
     private int? _size;
-    public int EstimatedSize => _size ??= this.Select(i => i.EstimatedSize).DefaultIfEmpty(0).Sum();
+    public int EstimatedSize => _size ??=
+        Answers.Sum(static i => i.EstimatedSize) +
+        Authorities.Sum(static i => i.EstimatedSize) +
+        Additional.Sum(static i => i.EstimatedSize);
     public static DomainResourceRecords Empty { get; } = new();
 
     private DomainResourceRecords() : this(ImmutableArray<DomainResourceRecord>.Empty,

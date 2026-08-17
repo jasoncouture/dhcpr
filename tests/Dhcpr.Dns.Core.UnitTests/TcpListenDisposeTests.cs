@@ -53,7 +53,7 @@ public class TcpListenDisposeTests
             Assert.IsType<TcpDnsPacketReceivedMessage>(item);
             var tcpMessage = (TcpDnsPacketReceivedMessage)item;
 
-            await Task.Delay(50);
+            Assert.False(handleTask.IsCompleted);
             Assert.False(IsDisposed(accepted));
 
             tcpMessage.SendCompleted.TrySetResult();

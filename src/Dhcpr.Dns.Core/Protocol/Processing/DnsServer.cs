@@ -171,10 +171,11 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
-    private async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
+    internal async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var pendingReplies = new List<Task>();
         try
         {
             while (client.Connected && !cancellationTokenSource.IsCancellationRequested)
@@ -189,7 +190,9 @@ public sealed class DnsServer : BackgroundService
                     return;
 
                 await ReadExactAsync(client.Client, buffer.AsMemory(0, length), token);
-                CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
+                var pending = CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
+                if (pending is not null)
+                    pendingReplies.Add(pending);
 
                 if (!cancellationTokenSource.TryReset())
                 {
@@ -208,6 +211,16 @@ public sealed class DnsServer : BackgroundService
         }
         finally
         {
+            try
+            {
+                if (pendingReplies.Count > 0)
+                    await Task.WhenAll(pendingReplies).WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Host is shutting down — close the socket even if a reply is still queued.
+            }
+
             cancellationTokenSource.Dispose();
             ArrayPool<byte>.Shared.Return(buffer);
             client.Dispose();
@@ -226,7 +239,7 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
-    private void CreateContextAndQueueForProcessing(
+    private Task? CreateContextAndQueueForProcessing(
         TcpClient tcpClient,
         byte[] buffer,
         CancellationToken cancellationToken
@@ -235,7 +248,7 @@ public sealed class DnsServer : BackgroundService
         if (tcpClient.Client.RemoteEndPoint is not IPEndPoint remoteIPEndPoint ||
             tcpClient.Client.LocalEndPoint is not IPEndPoint localEndPoint)
         {
-            return;
+            return null;
         }
 
         var message = DomainMessageEncoder.Decode(buffer);
@@ -247,6 +260,7 @@ public sealed class DnsServer : BackgroundService
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient);
         _messageQueue.Enqueue(messageToQueue, cancellationToken);
+        return messageToQueue.SendCompleted.Task;
     }
 
     private void CreateContextAndQueueForProcessing(

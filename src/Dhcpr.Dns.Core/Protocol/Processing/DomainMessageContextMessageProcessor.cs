@@ -91,6 +91,11 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
 
             _logger.LogError(ex, "Failed to process message due to an exception");
         }
+        finally
+        {
+            if (message is TcpDnsPacketReceivedMessage tcp)
+                tcp.SendCompleted.TrySetResult();
+        }
     }
 
     private static async Task SendResponseAsync(

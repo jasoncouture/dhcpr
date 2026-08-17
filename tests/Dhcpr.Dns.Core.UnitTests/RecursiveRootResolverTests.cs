@@ -389,6 +389,93 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task NsQueryPromotesParentReferralIntoAnswers()
+    {
+        // TLD (and often the child) put apex NS in AUTHORITY. Go LookupNS / cert-manager
+        // DNS-01 only read ANSWER; treating that referral as unresolved SERVFAILs.
+        var vultrNs = IPAddress.Parse("108.61.10.10");
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS &&
+                name.Equals("instigaterevolution.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("instigaterevolution.com", "ns1.vultr.com", vultrNs);
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(internalClient);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("instigaterevolution.com", DomainRecordType.NS)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r =>
+            r.Type == DomainRecordType.NS &&
+            ((NameData)r.Data).Name.ToString()
+                .Equals("ns1.vultr.com", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result.Records.Authorities, r => r.Type == DomainRecordType.NS);
+    }
+
+    [Fact]
+    public async Task NsQueryForNonApexDoesNotLoopOnParentNsInAuthority()
+    {
+        var exampleNs = IPAddress.Parse("192.0.2.53");
+        var hops = 0;
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("example.com", "ns1.example.com", exampleNs);
+
+            if (type == DomainRecordType.NS &&
+                name.Equals("www.example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                Interlocked.Increment(ref hops);
+                var nodata = NodataWithSoa("www.example.com");
+                return nodata with
+                {
+                    Records = nodata.Records with
+                    {
+                        Authorities = nodata.Records.Authorities.Add(
+                            NsRecord("example.com", "ns1.example.com")),
+                        Additional = ImmutableArray.Create(ARecord("ns1.example.com", exampleNs))
+                    }
+                };
+            }
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(internalClient);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("www.example.com", DomainRecordType.NS)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Empty(result.Records.Answers);
+        Assert.True(hops <= 2, $"self-referral looped {hops} times");
+    }
+
+    [Fact]
     public async Task UpstreamDirectedContextIsIgnored()
     {
         var internalClient = new ScriptedInternalDomainClient(_ =>

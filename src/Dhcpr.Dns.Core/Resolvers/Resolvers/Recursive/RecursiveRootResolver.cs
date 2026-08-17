@@ -166,6 +166,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         {
             last = await QueryUpstreamAsync(parentContext, request, endPoints, cancellationToken);
 
+            if (TryPromoteExactNsAnswer(request, last) is { } promoted)
+                return promoted;
+
             if (last.Records.Answers.Length > 0)
                 return last;
 
@@ -183,6 +186,12 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     return ServFail(request);
             }
 
+            // Parent NODATA often repeats the current zone's NS in AUTHORITY.
+            // Following those is a self-referral loop → SERVFAIL (cert-manager NS walk).
+            var currentAddresses = endPoints.Select(static e => e.Address).ToHashSet();
+            if (referralAddresses.All(currentAddresses.Contains))
+                return last;
+
             endPoints.Clear();
             endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
         }
@@ -191,7 +200,60 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     }
 
     private static DomainMessage FinalizeRecursiveResponse(DomainMessage request, DomainMessage response)
-        => IsUnresolvedReferral(response) ? ServFail(request) : response with { Id = request.Id };
+    {
+        if (TryPromoteExactNsAnswer(request, response) is { } promoted)
+            response = promoted;
+        return IsUnresolvedReferral(response) ? ServFail(request) : response with { Id = request.Id };
+    }
+
+    /// <summary>
+    /// Parent/TLD referrals put apex NS in AUTHORITY, not ANSWER. Recursive clients
+    /// (Go LookupNS, cert-manager DNS-01) only read ANSWER. The delegation NS RRset
+    /// is a valid answer for QTYPE NS — promote it rather than SERVFAILing as an
+    /// unresolved referral.
+    /// </summary>
+    private static DomainMessage? TryPromoteExactNsAnswer(DomainMessage request, DomainMessage response)
+    {
+        if (request.Questions.Length == 0 ||
+            request.Questions[0].Type is not DomainRecordType.NS)
+            return null;
+        if (response.Flags.ResponseCode is not DomainResponseCode.NoError)
+            return null;
+        if (response.Records.Answers.Length > 0)
+            return null;
+
+        var qname = request.Questions[0].Name;
+        var promoted = response.Records
+            .Where(r => RecordIsExactNsOrCoveringSig(r, qname))
+            .ToImmutableArray();
+        if (!promoted.Any(static r => r.Type is DomainRecordType.NS))
+            return null;
+
+        return response with
+        {
+            Records = response.Records with
+            {
+                Answers = promoted,
+                Authorities = response.Records.Authorities
+                    .Where(r => !RecordIsExactNsOrCoveringSig(r, qname))
+                    .ToImmutableArray(),
+                Additional = response.Records.Additional
+                    .Where(r => !RecordIsExactNsOrCoveringSig(r, qname))
+                    .ToImmutableArray()
+            }
+        };
+    }
+
+    private static bool RecordIsExactNsOrCoveringSig(DomainResourceRecord record, DomainLabels qname)
+    {
+        if (!record.Name.Equals(qname))
+            return false;
+        if (record.Type is DomainRecordType.NS)
+            return true;
+        return record.Type is DomainRecordType.RRSIG &&
+               record.Data is ResourceRecordSignatureData sig &&
+               sig.TypeCovered is DomainRecordType.NS;
+    }
 
     private static DomainMessage ServFail(DomainMessage request)
         => DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
@@ -201,6 +263,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         if (message.Records.Answers.Length != 0)
             return false;
         if (message.Flags.ResponseCode is not DomainResponseCode.NoError)
+            return false;
+        // NODATA: SOA in authority. A referral has NS and no SOA.
+        if (message.Records.Authorities.Any(static r => r.Type is DomainRecordType.SOA))
             return false;
         var qname = message.Questions.Length > 0 ? message.Questions[0].Name : DomainLabels.Empty;
         return GetNameserverNames(message.Records, qname).Any();

@@ -190,7 +190,7 @@ public class DnsResponseCacheTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        var decorator = new CacheResolverDecorator(inner, cache);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
         var request = DomainMessage.CreateRequest("cached.example", DomainRecordType.A);
         var context = new DomainMessageContext(null, null, request);
 
@@ -227,7 +227,7 @@ public class DnsResponseCacheTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage?>(response));
 
-        var decorator = new CacheResolverDecorator(inner, cache);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
         var context = new DomainMessageContext(null, null, request) { BypassCache = true };
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);

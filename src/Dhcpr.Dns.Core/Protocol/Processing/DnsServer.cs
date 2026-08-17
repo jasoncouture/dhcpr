@@ -171,7 +171,7 @@ public sealed class DnsServer : BackgroundService
         }
     }
 
-    internal async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
+    public async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

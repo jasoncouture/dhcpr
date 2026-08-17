@@ -9,10 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Dhcpr.Dns.Core.UnitTests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="DnsZone" Version="2.1.0" />
     <PackageReference Include="MessagePipe" Version="1.8.2" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />

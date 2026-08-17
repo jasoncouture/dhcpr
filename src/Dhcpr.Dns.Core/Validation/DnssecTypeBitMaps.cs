@@ -7,7 +7,7 @@ namespace Dhcpr.Dns.Core.Validation;
 /// <summary>
 /// RFC 4034 §4.1.2 / RFC 5155 type bit map helpers for NSEC / NSEC3.
 /// </summary>
-internal static class DnssecTypeBitMaps
+public static class DnssecTypeBitMaps
 {
     public static bool Contains(ImmutableArray<byte> typeBitMaps, DomainRecordType type)
     {

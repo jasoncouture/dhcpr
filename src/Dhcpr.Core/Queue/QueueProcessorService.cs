@@ -116,7 +116,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         }
     }
 
-    internal static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
+    public static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
     {
         using var completedTasks = tasks
             .Select((task, index) => (task, index))

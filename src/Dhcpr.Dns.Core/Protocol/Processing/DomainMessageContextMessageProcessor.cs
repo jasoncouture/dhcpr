@@ -176,7 +176,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         return true;
     }
 
-    internal static int TruncateAndEncodeMessage(DomainMessage response, int sizeLimit, Span<byte> buffer)
+    public static int TruncateAndEncodeMessage(DomainMessage response, int sizeLimit, Span<byte> buffer)
     {
         while (true)
         {

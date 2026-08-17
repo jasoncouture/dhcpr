@@ -4,7 +4,7 @@ namespace Dhcpr.Dns.Core.Validation;
 /// RFC 4648 Base32hex (extended hex) used for NSEC3 owner labels.
 /// Alphabet: 0-9A-V, no padding in DNS owner names.
 /// </summary>
-internal static class DnssecBase32Hex
+public static class DnssecBase32Hex
 {
     private static readonly sbyte[] _decodeMap = CreateDecodeMap();
 

@@ -8,7 +8,7 @@ namespace Dhcpr.Dns.Core.Validation;
 /// <summary>
 /// RFC 5155 NSEC3 closest-encloser / NODATA / Opt-Out proof helpers.
 /// </summary>
-internal static class DnssecNsec3Proof
+public static class DnssecNsec3Proof
 {
     public const byte OptOutFlag = 0x01;
 

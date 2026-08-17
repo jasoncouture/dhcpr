@@ -5,6 +5,8 @@ using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class InternalDomainClientTests
@@ -13,7 +15,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_AbortsWithServerFailure_WhenHopDepthExceedsLimit()
     {
         var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue);
+        var client = new InternalDomainClient(queue.Queue);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             InternalHopDepth = InternalDomainClient.MaxInternalHops
@@ -32,7 +34,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_DirectedUpstream_DoesNotConsumeBudgetOrIncrementDepth()
     {
         var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue);
+        var client = new InternalDomainClient(queue.Queue);
         var budget = new QueryWorkBudget(limit: 1);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -66,7 +68,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_Undirected_IncrementsHopDepthAndConsumesBudget()
     {
         var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue);
+        var client = new InternalDomainClient(queue.Queue);
         var budget = new QueryWorkBudget(limit: 1);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -97,7 +99,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_AbortsWithServerFailure_WhenWorkBudgetExhausted()
     {
         var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue);
+        var client = new InternalDomainClient(queue.Queue);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             WorkBudget = new QueryWorkBudget(limit: 0)
@@ -112,18 +114,22 @@ public class InternalDomainClientTests
         Assert.Equal(0, queue.EnqueueCount);
     }
 
-    private sealed class CountingQueue : IMessageQueue<DnsPacketReceivedMessage>
+    private sealed class CountingQueue
     {
+        public IMessageQueue<DnsPacketReceivedMessage> Queue { get; }
         public int EnqueueCount { get; private set; }
         public InternalDnsRequestReceivedMessage? LastMessage { get; private set; }
 
-        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken)
+        public CountingQueue()
         {
-            EnqueueCount++;
-            LastMessage = (InternalDnsRequestReceivedMessage)item;
+            var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
+            queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
+                .Do(ci =>
+                {
+                    EnqueueCount++;
+                    LastMessage = (InternalDnsRequestReceivedMessage)ci.Arg<DnsPacketReceivedMessage>();
+                });
+            Queue = queue;
         }
-
-        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken)
-            => throw new NotSupportedException();
     }
 }

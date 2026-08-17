@@ -19,7 +19,11 @@ public class TcpListenDisposeTests
     [Fact]
     public async Task DoesNotDisposeTcpClientUntilQueuedReplyFinishes()
     {
-        var queue = new CapturingQueue();
+        var queued = new TaskCompletionSource<DnsPacketReceivedMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
+        queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
+            .Do(ci => queued.TrySetResult(ci.Arg<DnsPacketReceivedMessage>()));
         var server = new DnsServer(
             queue,
             Monitor(new DnsConfiguration()),
@@ -45,9 +49,9 @@ public class TcpListenDisposeTests
             await queryClient.GetStream().WriteAsync(framed);
             queryClient.Client.Shutdown(SocketShutdown.Send);
 
-            var queued = await queue.WaitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.IsType<TcpDnsPacketReceivedMessage>(queued);
-            var tcpMessage = (TcpDnsPacketReceivedMessage)queued;
+            var item = await queued.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.IsType<TcpDnsPacketReceivedMessage>(item);
+            var tcpMessage = (TcpDnsPacketReceivedMessage)item;
 
             await Task.Delay(50);
             Assert.False(IsDisposed(accepted));
@@ -80,20 +84,6 @@ public class TcpListenDisposeTests
         {
             return true;
         }
-    }
-
-    private sealed class CapturingQueue : IMessageQueue<DnsPacketReceivedMessage>
-    {
-        private readonly TaskCompletionSource<DnsPacketReceivedMessage> _item = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken)
-            => _item.TrySetResult(item);
-
-        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public Task<DnsPacketReceivedMessage> WaitAsync() => _item.Task;
     }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

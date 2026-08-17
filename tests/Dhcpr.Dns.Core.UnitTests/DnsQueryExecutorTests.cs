@@ -8,6 +8,8 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnsQueryExecutorTests
@@ -15,7 +17,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_EmptyRequest_ReturnsEmptyStatus()
     {
-        var executor = CreateExecutor(new CountingQueue());
+        var executor = CreateExecutor(new CountingQueue().Queue);
 
         var result = await executor.ExecuteAsync(
             ReadOnlyMemory<byte>.Empty,
@@ -30,7 +32,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_TooLarge_ReturnsRequestTooLarge()
     {
-        var executor = CreateExecutor(new CountingQueue(), maxRequestBytes: 12);
+        var executor = CreateExecutor(new CountingQueue().Queue, maxRequestBytes: 12);
         var wire = new byte[13];
 
         var result = await executor.ExecuteAsync(
@@ -45,7 +47,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_InvalidWire_ReturnsInvalidWireFormat()
     {
-        var executor = CreateExecutor(new CountingQueue());
+        var executor = CreateExecutor(new CountingQueue().Queue);
 
         var result = await executor.ExecuteAsync(
             new byte[] { 1, 2, 3 },
@@ -60,7 +62,7 @@ public class DnsQueryExecutorTests
     public async Task ExecuteAsync_QueuesExternalContextAndReturnsEncodedResponse()
     {
         var queue = new CountingQueue();
-        var executor = CreateExecutor(queue);
+        var executor = CreateExecutor(queue.Queue);
         var request = DomainMessage.CreateRequest("example.com");
         var requestWire = Encode(request);
 
@@ -95,7 +97,7 @@ public class DnsQueryExecutorTests
     public async Task QueryAsync_QueuesRequestAndReturnsResponse()
     {
         var queue = new CountingQueue();
-        var executor = CreateExecutor(queue);
+        var executor = CreateExecutor(queue.Queue);
         var request = DomainMessage.CreateRequest("health.example");
 
         var queryTask = executor.QueryAsync(request, CancellationToken.None).AsTask();
@@ -138,18 +140,22 @@ public class DnsQueryExecutorTests
         return buffer.AsSpan(0, length).ToArray();
     }
 
-    private sealed class CountingQueue : IMessageQueue<DnsPacketReceivedMessage>
+    private sealed class CountingQueue
     {
+        public IMessageQueue<DnsPacketReceivedMessage> Queue { get; }
         public int EnqueueCount { get; private set; }
         public HttpDnsPacketReceivedMessage? LastMessage { get; private set; }
 
-        public void Enqueue(DnsPacketReceivedMessage item, CancellationToken cancellationToken)
+        public CountingQueue()
         {
-            EnqueueCount++;
-            LastMessage = (HttpDnsPacketReceivedMessage)item;
+            var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
+            queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
+                .Do(ci =>
+                {
+                    EnqueueCount++;
+                    LastMessage = (HttpDnsPacketReceivedMessage)ci.Arg<DnsPacketReceivedMessage>();
+                });
+            Queue = queue;
         }
-
-        public ValueTask<QueueItem<DnsPacketReceivedMessage>> DequeueAsync(CancellationToken cancellationToken)
-            => throw new NotSupportedException();
     }
 }

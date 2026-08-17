@@ -23,24 +23,3 @@ public interface IDnsQueryExecutor
         DomainMessage request,
         CancellationToken cancellationToken);
 }
-
-public enum DnsQueryExecutionStatus
-{
-    Success,
-    EmptyRequest,
-    RequestTooLarge,
-    InvalidWireFormat,
-    NoResponse,
-    Cancelled
-}
-
-public readonly record struct DnsQueryExecutionResult(
-    DnsQueryExecutionStatus Status,
-    byte[]? ResponseWire)
-{
-    public static DnsQueryExecutionResult Ok(byte[] wire)
-        => new(DnsQueryExecutionStatus.Success, wire);
-
-    public static DnsQueryExecutionResult Fail(DnsQueryExecutionStatus status)
-        => new(status, null);
-}

@@ -77,6 +77,7 @@ public static class DnsServiceProviderExtensions
         // Live UI publishes from DomainMessageContextMessageProcessor (once per external answer).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
 
+        services.AddSingleton<IReferralWalker, ReferralWalker>();
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();
         services.AddSingleton<IDomainClientFactory, DomainClientFactory>();

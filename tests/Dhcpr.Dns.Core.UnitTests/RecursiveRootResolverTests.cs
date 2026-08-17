@@ -740,6 +740,7 @@ public class RecursiveRootResolverTests
         return new RecursiveRootResolver(
             tips,
             internalClient,
+            new ReferralWalker(internalClient),
             NullLogger<RecursiveRootResolver>.Instance);
     }
 

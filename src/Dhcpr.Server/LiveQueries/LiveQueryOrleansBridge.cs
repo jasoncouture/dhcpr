@@ -23,7 +23,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
     private HubObserver? _observerInstance;
     private ILiveQueryObserver? _observer;
     private ILiveQueryHubGrain? _hub;
-    private CancellationTokenSource? _resubscribeCancellation;
+    private CancellationTokenSource? _resubscribeCancellationTokenSource;
     private Task? _resubscribeLoop;
 
     public LiveQueryOrleansBridge(
@@ -46,18 +46,18 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
 
         // Do not await the first Subscribe here: after a rolling deploy the hub may still
         // be registered on a dying silo, and a blocking grain call stalls Kestrel/DNS startup.
-        _resubscribeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _resubscribeLoop = MaintainSubscriptionAsync(_resubscribeCancellation.Token);
+        _resubscribeCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _resubscribeLoop = MaintainSubscriptionAsync(_resubscribeCancellationTokenSource.Token);
         return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (_resubscribeCancellation is not null)
+        if (_resubscribeCancellationTokenSource is not null)
         {
-            await _resubscribeCancellation.CancelAsync();
-            _resubscribeCancellation.Dispose();
-            _resubscribeCancellation = null;
+            await _resubscribeCancellationTokenSource.CancelAsync();
+            _resubscribeCancellationTokenSource.Dispose();
+            _resubscribeCancellationTokenSource = null;
         }
 
         if (_resubscribeLoop is not null)

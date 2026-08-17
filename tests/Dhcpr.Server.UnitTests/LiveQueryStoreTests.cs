@@ -38,8 +38,8 @@ public class LiveQueryStoreTests
             var evt = CreateEvent(7);
             await store.HandleAsync(evt, CancellationToken.None);
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            var received = await reader.ReadAsync(cts.Token);
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var received = await reader.ReadAsync(cancellationTokenSource.Token);
             Assert.Equal(evt.Id, received.Id);
             Assert.Equal("q-7.example", received.Name);
         }

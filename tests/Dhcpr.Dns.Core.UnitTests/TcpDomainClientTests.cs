@@ -41,10 +41,10 @@ public class TcpDomainClientTests
 
             var client = new TcpDomainClient(new SocketFactory(), ep);
             var request = DomainMessage.CreateRequest("example.com");
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                async () => await client.SendAsync(request, cts.Token));
+                async () => await client.SendAsync(request, cancellationTokenSource.Token));
             await serverTask;
         }
         finally

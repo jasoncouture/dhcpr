@@ -41,8 +41,8 @@ public class UdpDomainClientReceiveTests
             await SendEncodedAsync(server, real, incoming.RemoteEndPoint);
         });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var result = await client.SendAsync(request, cts.Token);
+        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var result = await client.SendAsync(request, cancellationTokenSource.Token);
         await serverTask;
 
         var answer = Assert.Single(result.Records.Answers);

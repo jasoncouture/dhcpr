@@ -16,7 +16,8 @@ public static class BindZoneUnsupportedFilter
     public static string Filter(string text)
     {
         var expanded = ExpandParentheses(text);
-        return string.Join('\n', expanded.Split('\n').Where(ShouldKeepLine));
+        // DnsZone's $INCLUDE handler always dequeues a NewLine after the filename.
+        return string.Join('\n', expanded.Split('\n').Where(ShouldKeepLine)) + '\n';
     }
 
     private static bool ShouldKeepLine(string rawLine)

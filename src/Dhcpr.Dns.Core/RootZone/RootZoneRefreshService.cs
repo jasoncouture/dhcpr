@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.RootZone;
 
-public sealed class RootZoneRefreshService : BackgroundService
+public sealed partial class RootZoneRefreshService : BackgroundService
 {
     private readonly IRootZoneStore _store;
     private readonly IRootServerTips _tips;
@@ -53,7 +53,7 @@ public sealed class RootZoneRefreshService : BackgroundService
     {
         if (_tips.GetEndpoints().Length == 0)
         {
-            _logger.LogDebug("Root tips not ready; delaying root.zone fetch");
+            LogRootTipsNotReady(_logger);
             return TimeSpan.FromSeconds(30);
         }
 
@@ -63,10 +63,7 @@ public sealed class RootZoneRefreshService : BackgroundService
             var delay = TimeUntilRefresh(current, DateTimeOffset.UtcNow);
             if (delay > TimeSpan.Zero)
             {
-                _logger.LogInformation(
-                    "root.zone still fresh (mtime {LoadedAt:u}); next refresh in {Delay}s",
-                    current.LoadedAt,
-                    (int)delay.TotalSeconds);
+                LogRootZoneStillFresh(_logger, current.LoadedAt, (int)delay.TotalSeconds);
                 return delay;
             }
         }
@@ -91,8 +88,8 @@ public sealed class RootZoneRefreshService : BackgroundService
             var snapshot = ZoneFileParser.ParseRootZone(text, loadedAt);
             _store.Set(snapshot);
 
-            _logger.LogInformation(
-                "Downloaded root.zone ({Count} owners, refresh={Refresh}s, expire={Expire}s)",
+            LogDownloadedRootZone(
+                _logger,
                 snapshot.RecordsByOwner.Count,
                 (int)snapshot.Soa.RefreshInterval.TotalSeconds,
                 (int)snapshot.Soa.ExpireInterval.TotalSeconds);
@@ -101,7 +98,7 @@ public sealed class RootZoneRefreshService : BackgroundService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to refresh root.zone from {Url}", RootZonePaths.RootZoneUrl);
+            LogRefreshFailed(_logger, ex, RootZonePaths.RootZoneUrl);
 
             var cached = _store.CurrentIgnoringExpiry;
             if (cached is null)
@@ -116,7 +113,7 @@ public sealed class RootZoneRefreshService : BackgroundService
             if (cached.IsExpired(DateTimeOffset.UtcNow))
             {
                 _store.Set(null);
-                _logger.LogWarning("Cached root.zone expired; falling back to live root queries");
+                LogCachedRootZoneExpired(_logger);
                 return cached.Soa.RetryInterval;
             }
 
@@ -137,22 +134,16 @@ public sealed class RootZoneRefreshService : BackgroundService
             var snapshot = ZoneFileParser.ParseRootZone(text, loadedAt);
             if (snapshot.IsExpired(DateTimeOffset.UtcNow))
             {
-                _logger.LogWarning(
-                    "On-disk root.zone at {Path} is expired (mtime {LoadedAt:u}); keeping until refresh succeeds",
-                    path,
-                    loadedAt);
+                LogOnDiskRootZoneExpired(_logger, path, loadedAt);
             }
 
             // Keep serving until expire check in IRootZoneStore.Current / refresh loop clears it.
             _store.Set(snapshot);
-            _logger.LogInformation(
-                "Loaded root.zone from disk ({Count} owners, mtime {LoadedAt:u})",
-                snapshot.RecordsByOwner.Count,
-                loadedAt);
+            LogLoadedRootZoneFromDisk(_logger, snapshot.RecordsByOwner.Count, loadedAt);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load on-disk root.zone from {Path}", path);
+            LogLoadFromDiskFailed(_logger, ex, path);
         }
     }
 
@@ -162,4 +153,28 @@ public sealed class RootZoneRefreshService : BackgroundService
         var remaining = due - utcNow;
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Root tips not ready; delaying root.zone fetch")]
+    private static partial void LogRootTipsNotReady(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "root.zone still fresh (mtime {LoadedAt:u}); next refresh in {Delay}s")]
+    private static partial void LogRootZoneStillFresh(ILogger logger, DateTimeOffset loadedAt, int delay);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Downloaded root.zone ({Count} owners, refresh={Refresh}s, expire={Expire}s)")]
+    private static partial void LogDownloadedRootZone(ILogger logger, int count, int refresh, int expire);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to refresh root.zone from {Url}")]
+    private static partial void LogRefreshFailed(ILogger logger, Exception exception, string url);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Cached root.zone expired; falling back to live root queries")]
+    private static partial void LogCachedRootZoneExpired(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "On-disk root.zone at {Path} is expired (mtime {LoadedAt:u}); keeping until refresh succeeds")]
+    private static partial void LogOnDiskRootZoneExpired(ILogger logger, string path, DateTimeOffset loadedAt);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Loaded root.zone from disk ({Count} owners, mtime {LoadedAt:u})")]
+    private static partial void LogLoadedRootZoneFromDisk(ILogger logger, int count, DateTimeOffset loadedAt);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load on-disk root.zone from {Path}")]
+    private static partial void LogLoadFromDiskFailed(ILogger logger, Exception exception, string path);
 }

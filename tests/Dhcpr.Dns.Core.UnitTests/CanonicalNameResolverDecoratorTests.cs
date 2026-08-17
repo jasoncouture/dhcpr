@@ -55,7 +55,7 @@ public class CanonicalNameResolverDecoratorTests
                 responseCode: DomainResponseCode.NoError);
         });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.facebook.com", DomainRecordType.A);
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -116,7 +116,7 @@ public class CanonicalNameResolverDecoratorTests
                 responseCode: DomainResponseCode.NoError);
         });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.example.com", DomainRecordType.A);
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -193,7 +193,7 @@ public class CanonicalNameResolverDecoratorTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.example", DomainRecordType.A);
         var result = await decorator.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -233,7 +233,7 @@ public class CanonicalNameResolverDecoratorTests
         var internalClient = CreateInternalClient(request =>
             DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure));
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var result = await decorator.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.example", DomainRecordType.A)),
             CancellationToken.None);
@@ -268,7 +268,7 @@ public class CanonicalNameResolverDecoratorTests
         var internalClient = CreateInternalClient(request =>
             DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.NameError));
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var result = await decorator.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.example", DomainRecordType.A)),
             CancellationToken.None);

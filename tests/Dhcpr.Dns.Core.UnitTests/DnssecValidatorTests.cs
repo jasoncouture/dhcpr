@@ -127,4 +127,26 @@ public class DnssecValidatorTests
         var keyTag = _validator.CalculateKeyTag(dnsKeyData, record);
         Assert.NotEqual(0, keyTag);
     }
+
+    [Fact]
+    public void NsecCoversNameUsesCanonicalLabelOrder()
+    {
+        // RFC 4034 §6.1: names compare right-to-left by label, not as dotted strings.
+        var nsec = new NextSecureData(new DomainLabels("z.example.com"), ImmutableArray<byte>.Empty);
+
+        // Lexical "a.example.com" < "example.com", but canonical
+        // example.com < a.example.com < z.example.com.
+        Assert.True(_validator.CoversName(
+            nsec,
+            new DomainLabels("example.com"),
+            new DomainLabels("a.example.com")));
+
+        // Lexical "a-b.example" < "a.example" ('-' < '.'), but canonical
+        // a.example < a-b.example < b.example.
+        var hyphenNsec = new NextSecureData(new DomainLabels("b.example"), ImmutableArray<byte>.Empty);
+        Assert.True(_validator.CoversName(
+            hyphenNsec,
+            new DomainLabels("a.example"),
+            new DomainLabels("a-b.example")));
+    }
 }

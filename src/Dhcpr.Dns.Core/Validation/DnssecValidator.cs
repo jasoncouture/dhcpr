@@ -229,17 +229,45 @@ public sealed class DnssecValidator : IDnssecValidator
 
     public bool CoversName(NextSecureData nsec, DomainLabels nsecOwner, DomainLabels nameToVerify)
     {
-        var owner = nsecOwner.ToString().ToLowerInvariant();
-        var next = nsec.NextDomainName.ToString().ToLowerInvariant();
-        var target = nameToVerify.ToString().ToLowerInvariant();
+        var ownerToTarget = CompareCanonicalName(nsecOwner, nameToVerify);
+        var targetToNext = CompareCanonicalName(nameToVerify, nsec.NextDomainName);
 
-        var ownerToTarget = string.CompareOrdinal(owner, target);
-        var targetToNext = string.CompareOrdinal(target, next);
-
-        if (string.CompareOrdinal(owner, next) < 0)
+        if (CompareCanonicalName(nsecOwner, nsec.NextDomainName) < 0)
             return ownerToTarget < 0 && targetToNext < 0;
-        
+
         return ownerToTarget < 0 || targetToNext < 0;
+    }
+
+    /// <summary>
+    /// RFC 4034 §6.1: compare labels from the right; fewer labels with a common suffix sort first.
+    /// </summary>
+    internal static int CompareCanonicalName(DomainLabels left, DomainLabels right)
+    {
+        var i = left.Count - 1;
+        var j = right.Count - 1;
+        while (i >= 0 && j >= 0)
+        {
+            var cmp = CompareCanonicalLabel(left[i], right[j]);
+            if (cmp != 0)
+                return cmp;
+            i--;
+            j--;
+        }
+
+        return left.Count.CompareTo(right.Count);
+    }
+
+    private static int CompareCanonicalLabel(string left, string right)
+    {
+        var len = Math.Min(left.Length, right.Length);
+        for (var k = 0; k < len; k++)
+        {
+            var cmp = char.ToLowerInvariant(left[k]).CompareTo(char.ToLowerInvariant(right[k]));
+            if (cmp != 0)
+                return cmp;
+        }
+
+        return left.Length.CompareTo(right.Length);
     }
 
     public bool CoversHash(NextSecure3Data nsec3, ReadOnlySpan<byte> nsec3OwnerHash, ReadOnlySpan<byte> hashToVerify)

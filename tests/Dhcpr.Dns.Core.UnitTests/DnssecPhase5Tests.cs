@@ -489,7 +489,7 @@ public class DnssecPhase5Tests
             NullLogger<DnssecMessageValidator>.Instance);
 
         return new DnssecValidationMiddleware(
-            new FixedInner(response),
+            FixedInner(response),
             messageValidator,
             new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 })),
             options,
@@ -610,13 +610,13 @@ public class DnssecPhase5Tests
         return Convert.ToHexString(SHA256.HashData(buffer.AsSpan(0, offset)));
     }
 
-    private sealed class FixedInner : IDomainMessageMiddleware
+    private static IDomainMessageMiddleware FixedInner(DomainMessage response)
     {
-        private readonly DomainMessage _response;
-        public FixedInner(DomainMessage response) => _response = response;
-        public int Priority => 1;
-        public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
-            => ValueTask.FromResult<DomainMessage?>(_response);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.Priority.Returns(1);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<DomainMessage?>(response));
+        return inner;
     }
 
     private sealed class ScriptedInternalClient : IInternalDomainClient

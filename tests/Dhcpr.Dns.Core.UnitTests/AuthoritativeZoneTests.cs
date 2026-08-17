@@ -326,22 +326,28 @@ public class AuthoritativeZoneTests
     {
         var memory = new MemoryCache(new MemoryCacheOptions { SizeLimit = 1000 });
         var cache = new DnsResponseCache(memory);
-        var inner = new FixedMiddleware(Priority: 1, (ctx, msg) =>
-        {
-            ctx.DoNotCacheResponse = true;
-            return DomainMessage.CreateResponse(
-                msg,
-                answers:
-                [
-                    new DomainResourceRecord(
-                        msg.Questions[0].Name,
-                        DomainRecordType.A,
-                        DomainRecordClass.IN,
-                        TimeSpan.FromSeconds(300),
-                        new IPAddressData(IPAddress.Parse("192.0.2.1")))
-                ],
-                responseCode: DomainResponseCode.NoError);
-        });
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.Priority.Returns(1);
+        inner.Name.Returns("Fixed");
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ctx = ci.Arg<DomainMessageContext>();
+                ctx.DoNotCacheResponse = true;
+                var msg = ctx.DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    msg,
+                    answers:
+                    [
+                        new DomainResourceRecord(
+                            msg.Questions[0].Name,
+                            DomainRecordType.A,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(300),
+                            new IPAddressData(IPAddress.Parse("192.0.2.1")))
+                    ],
+                    responseCode: DomainResponseCode.NoError));
+            });
 
         var decorator = new CacheResolverDecorator(inner, cache);
         var request = DomainMessage.CreateRequest("www.foo.bar");
@@ -395,21 +401,6 @@ public class AuthoritativeZoneTests
         monitor.CurrentValue.Returns(value);
         monitor.Get(Arg.Any<string?>()).Returns(value);
         return monitor;
-    }
-
-    private sealed class FixedMiddleware : IDomainMessageMiddleware
-    {
-        private readonly Func<DomainMessageContext, DomainMessage, DomainMessage> _handler;
-        public FixedMiddleware(int Priority, Func<DomainMessageContext, DomainMessage, DomainMessage> handler)
-        {
-            this.Priority = Priority;
-            _handler = handler;
-        }
-
-        public int Priority { get; }
-        public string Name => "Fixed";
-        public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
-            => ValueTask.FromResult<DomainMessage?>(_handler(context, context.DomainMessage));
     }
 
     private sealed class CountingInternalClient : IInternalDomainClient

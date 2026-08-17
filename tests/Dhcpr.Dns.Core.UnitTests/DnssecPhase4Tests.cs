@@ -199,7 +199,7 @@ public class DnssecPhase4Tests
             TrustAnchors = [new TrustAnchorConfiguration()]
         });
         var validator = new DnssecMessageValidator(
-            crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
             inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -332,7 +332,7 @@ public class DnssecPhase4Tests
             ]
         });
         var validator = new DnssecMessageValidator(
-            crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
             cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -408,7 +408,7 @@ public class DnssecPhase4Tests
             ]
         });
         var validator = new DnssecMessageValidator(
-            crypto, new NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
         var dnssec = new DnssecValidationMiddleware(
             cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -515,23 +515,32 @@ public class DnssecPhase4Tests
         return Convert.ToHexString(SHA256.HashData(buffer.AsSpan(0, offset)));
     }
 
-    private sealed class NoopInternalClient : IInternalDomainClient
+    private static IInternalDomainClient NoopInternalClient()
     {
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromResult(DomainMessage.CreateResponse(message, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure));
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.Arg<DomainMessage>(),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.ArgAt<DomainMessage>(1),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        client.SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<ImmutableArray<IPEndPoint>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.ArgAt<DomainMessage>(1),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        return client;
     }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

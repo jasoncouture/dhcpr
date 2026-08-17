@@ -91,7 +91,7 @@ public class DnssecNsecNodataTests
         var monitor = Monitor(options.Value);
         return new DnssecMessageValidator(
             new DnssecValidator(NullLogger<DnssecValidator>.Instance, monitor),
-            new NoopInternalClient(),
+            NoopInternalClient(),
             monitor,
             NullLogger<DnssecMessageValidator>.Instance);
     }
@@ -163,24 +163,32 @@ public class DnssecNsecNodataTests
         return new byte[] { 0, (byte)bytes.Length }.Concat(bytes).ToImmutableArray();
     }
 
-    private sealed class NoopInternalClient : IInternalDomainClient
+    private static IInternalDomainClient NoopInternalClient()
     {
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromResult(DomainMessage.CreateResponse(
-                message, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure));
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-            => SendAsync(message, cancellationToken);
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.Arg<DomainMessage>(),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.ArgAt<DomainMessage>(1),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        client.SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<ImmutableArray<IPEndPoint>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(
+                DomainMessage.CreateResponse(
+                    ci.ArgAt<DomainMessage>(1),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.ServerFailure)));
+        return client;
     }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

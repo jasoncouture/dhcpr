@@ -14,14 +14,17 @@ public sealed partial class DynamicDnsLoader : IHostedService
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _store.LoadFromDisk();
         LogStoreReady(_logger);
-        return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+    }
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Dynamic DNS store ready")]
     private static partial void LogStoreReady(ILogger logger);

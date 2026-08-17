@@ -93,7 +93,10 @@ public sealed partial class RootServerTipsBootstrapService : IHostedService
         LogNoRootTipsAvailable(_logger);
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+    }
 
     private static IPAddress[] ParseTipCacheOrNamedRoot(string text)
     {

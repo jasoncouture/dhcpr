@@ -108,24 +108,10 @@ public class DomainClientParallelWrapperTests
         var sawCancellation = false;
         var inner = Substitute.For<IDomainClient>();
         inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
-            .Returns(async ci =>
-            {
-                var cancellationToken = ci.Arg<CancellationToken>();
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    sawCancellation = cancellationToken.IsCancellationRequested;
-                    throw;
-                }
-
-                return DomainMessage.CreateResponse(
-                    ci.Arg<DomainMessage>(),
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.NoError);
-            });
+            .Returns(ci => ObserveCancellation(
+                ci.Arg<DomainMessage>(),
+                ci.Arg<CancellationToken>(),
+                cancelled => sawCancellation = cancelled));
         using var wrapper = new DomainClientTimeoutWrapper(inner, TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
@@ -162,12 +148,36 @@ public class DomainClientParallelWrapperTests
     {
         var client = Substitute.For<IDomainClient>();
         client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
-            .Returns(async ci =>
-            {
-                await Task.Delay(delay, ci.Arg<CancellationToken>());
-                return response with { Id = ci.Arg<DomainMessage>().Id };
-            });
+            .Returns(ci => DelayedSend(response, delay, ci.Arg<DomainMessage>(), ci.Arg<CancellationToken>()));
         return client;
+    }
+
+    private static async ValueTask<DomainMessage> DelayedSend(
+        DomainMessage response,
+        TimeSpan delay,
+        DomainMessage message,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(delay, cancellationToken);
+        return response with { Id = message.Id };
+    }
+
+    private static async ValueTask<DomainMessage> ObserveCancellation(
+        DomainMessage message,
+        CancellationToken cancellationToken,
+        Action<bool> onCancelled)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            onCancelled(cancellationToken.IsCancellationRequested);
+            throw;
+        }
+
+        return DomainMessage.CreateResponse(message, DomainResourceRecords.Empty, DomainResponseCode.NoError);
     }
 
     private static IDomainClient FixedClient(DomainMessage response)

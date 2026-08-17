@@ -12,19 +12,6 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.DynamicDns;
 
-public sealed class DynamicDnsEntry
-{
-    public string? Ipv4 { get; set; }
-    public string? Ipv6 { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-public enum DynamicDnsUpsertResult
-{
-    Updated,
-    Unchanged
-}
-
 public sealed class DynamicDnsStore
 {
     private static readonly JsonSerializerOptions _jsonOptions = new()

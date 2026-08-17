@@ -12,7 +12,7 @@ namespace Dhcpr.Server.Orleans.LiveQueries;
 /// </summary>
 public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, IHostedService
 {
-    private static readonly BoundedChannelOptions ChannelOptions = new(4096)
+    private static readonly BoundedChannelOptions _channelOptions = new(4096)
     {
         FullMode = BoundedChannelFullMode.DropOldest,
         SingleReader = true,
@@ -21,7 +21,7 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, I
 
     private readonly IGrainFactory _grainFactory;
     private readonly Channel<DnsQueryEventMessage> _channel =
-        Channel.CreateBounded<DnsQueryEventMessage>(ChannelOptions);
+        Channel.CreateBounded<DnsQueryEventMessage>(_channelOptions);
 
     private CancellationTokenSource? _runCancellation;
     private Task? _runLoop;

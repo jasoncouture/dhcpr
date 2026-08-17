@@ -6,13 +6,13 @@ namespace Dhcpr.Server.Orleans.LiveQueries;
 [KeepAlive]
 public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
 {
-    private static readonly TimeSpan ObserverExpiration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan _observerExpiration = TimeSpan.FromMinutes(5);
 
     private readonly ObserverManager<ILiveQueryObserver> _observers;
 
     public LiveQueryHubGrain(ILogger<LiveQueryHubGrain> logger)
     {
-        _observers = new ObserverManager<ILiveQueryObserver>(ObserverExpiration, logger);
+        _observers = new ObserverManager<ILiveQueryObserver>(_observerExpiration, logger);
     }
 
     public Task SubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)

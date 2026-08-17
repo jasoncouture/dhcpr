@@ -12,7 +12,7 @@ namespace Dhcpr.Server.LiveQueries;
 public sealed partial class LiveQueryOrleansBridge : IHostedService
 {
     // Backup if a membership notification is missed. Must stay well under ObserverManager expiration.
-    private static readonly TimeSpan ResubscribeInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan _resubscribeInterval = TimeSpan.FromSeconds(5);
 
     private readonly IGrainFactory _grainFactory;
     private readonly IAsyncPublisher<DnsQueryEvent> _publisher;
@@ -126,7 +126,7 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
 
     private async Task PeriodicSubscribeAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(ResubscribeInterval);
+        using var timer = new PeriodicTimer(_resubscribeInterval);
         while (await timer.WaitForNextTickAsync(cancellationToken))
             await TrySubscribeAsync(cancellationToken);
     }

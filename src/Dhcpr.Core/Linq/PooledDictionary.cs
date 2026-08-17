@@ -9,7 +9,7 @@ public sealed class PooledDictionary<TKey, TValue> : IDictionary<TKey, TValue>, 
     private bool _disposed;
     private int _estimatedCapacity;
 
-    private static readonly List<int> Primes = new()
+    private static readonly List<int> _primes = new()
     {
         3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
         1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
@@ -31,16 +31,16 @@ public sealed class PooledDictionary<TKey, TValue> : IDictionary<TKey, TValue>, 
 
     private static int EstimateCapacity(int count)
     {
-        var index = Primes.BinarySearch(count);
+        var index = _primes.BinarySearch(count);
         if (index < 0)
             index = ~index;
-        if (index >= Primes.Count)
-            index = Primes.Count - 1;
+        if (index >= _primes.Count)
+            index = _primes.Count - 1;
 
-        while (Primes[index] < count && Primes.Count > index)
+        while (_primes[index] < count && _primes.Count > index)
             index++;
 
-        return Primes[index];
+        return _primes[index];
     }
 
 

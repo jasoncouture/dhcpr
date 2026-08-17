@@ -4,7 +4,7 @@ namespace Dhcpr.Core.Linq;
 
 public static class LabelLookupCollectionPool<T> where T : class
 {
-    private static readonly ObjectPool<LabelLookupCollection<T>> Pool;
+    private static readonly ObjectPool<LabelLookupCollection<T>> _pool;
 
     private sealed class PoolPolicy : IPooledObjectPolicy<LabelLookupCollection<T>>
     {
@@ -13,9 +13,9 @@ public static class LabelLookupCollectionPool<T> where T : class
         public static IPooledObjectPolicy<LabelLookupCollection<T>> Instance { get; } = new PoolPolicy();
     }
 
-    static LabelLookupCollectionPool() => Pool = new DefaultObjectPool<LabelLookupCollection<T>>(PoolPolicy.Instance);
+    static LabelLookupCollectionPool() => _pool = new DefaultObjectPool<LabelLookupCollection<T>>(PoolPolicy.Instance);
 
-    public static LabelLookupCollection<T> Get() => Pool.Get();
+    public static LabelLookupCollection<T> Get() => _pool.Get();
 
-    public static void Return(LabelLookupCollection<T> collection) => Pool.Return(collection);
+    public static void Return(LabelLookupCollection<T> collection) => _pool.Return(collection);
 }

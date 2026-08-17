@@ -116,19 +116,20 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         }
     }
 
-    private static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
+    internal static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
     {
-        using var completedTasks = tasks.Where(i => i.IsCompleted)
-            .Select((i, index) => new { Task = i, Index = index })
-            .OrderByDescending(i => i.Index)
+        using var completedTasks = tasks
+            .Select((task, index) => (task, index))
+            .Where(i => i.task.IsCompleted)
+            .OrderByDescending(i => i.index)
             .ToPooledList();
 
         bool any = false;
         foreach (var item in completedTasks)
         {
             any = true;
-            tasks.RemoveAt(item.Index);
-            await item.Task;
+            tasks.RemoveAt(item.index);
+            await item.task;
         }
 
         return any;

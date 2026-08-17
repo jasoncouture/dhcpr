@@ -385,7 +385,7 @@ public class AuthoritativeZoneTests
     private static AuthoritativeNsCutMiddleware CreateAuthoritativeNsCut(
         IInternalDomainClient client,
         AuthoritativeZoneStore store)
-        => new(store, client);
+        => new(store, new ReferralWalker(client));
 
     private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
     {

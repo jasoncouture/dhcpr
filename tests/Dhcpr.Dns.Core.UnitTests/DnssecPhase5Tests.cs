@@ -605,11 +605,13 @@ public class DnssecPhase5Tests
         return Convert.ToHexString(SHA256.HashData(buffer.AsSpan(0, offset)));
     }
 
-    private sealed class FixedInner(DomainMessage response) : IDomainMessageMiddleware
+    private sealed class FixedInner : IDomainMessageMiddleware
     {
+        private readonly DomainMessage _response;
+        public FixedInner(DomainMessage response) => _response = response;
         public int Priority => 1;
         public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
-            => ValueTask.FromResult<DomainMessage?>(response);
+            => ValueTask.FromResult<DomainMessage?>(_response);
     }
 
     private sealed class ScriptedInternalClient : IInternalDomainClient
@@ -649,9 +651,10 @@ public class DnssecPhase5Tests
                 message));
     }
 
-    private sealed class StaticOptionsMonitor<T>(T current) : IOptionsMonitor<T>
+    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
     {
-        public T CurrentValue { get; } = current;
+        public StaticOptionsMonitor(T current) => CurrentValue = current;
+        public T CurrentValue { get; }
         public T Get(string? name) => CurrentValue;
         public IDisposable? OnChange(Action<T, string?> listener) => null;
     }

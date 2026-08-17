@@ -135,9 +135,10 @@ public class DnssecInsecureCnameAdTests
             => SendAsync(message, cancellationToken);
     }
 
-    private sealed class StaticOptionsMonitor<T>(T current) : IOptionsMonitor<T>
+    private sealed class StaticOptionsMonitor<T> : IOptionsMonitor<T>
     {
-        public T CurrentValue { get; } = current;
+        public StaticOptionsMonitor(T current) => CurrentValue = current;
+        public T CurrentValue { get; }
         public T Get(string? name) => CurrentValue;
         public IDisposable? OnChange(Action<T, string?> listener) => null;
     }

@@ -102,7 +102,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
     [Fact]
     public async Task LogsServFailAsErrorWithReason()
     {
-        var request = DomainMessage.CreateRequest("dhitc.com", (DomainRecordType)255);
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.ANY);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.ServerFailure);
 
         var inner = Substitute.For<IDomainMessageMiddleware>();

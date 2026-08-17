@@ -37,6 +37,9 @@ public enum DomainRecordType : ushort
     HTTPS = 0x41,
     CAA = 0x101,
 
+    /// <summary>RFC 1035 QTYPE * — request all records (typically NOTIMP per RFC 8482).</summary>
+    ANY = 255,
+
     /// <summary>Non-standard zone synthetic record (private-use).</summary>
     LUA = 0xFF90,
 

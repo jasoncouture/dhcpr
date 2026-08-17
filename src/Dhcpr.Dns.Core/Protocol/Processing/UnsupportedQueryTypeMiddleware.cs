@@ -6,9 +6,6 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {
-    // RFC 1035 / 8482: * / ANY
-    private const DomainRecordType AnyQueryType = (DomainRecordType)255;
-
     private readonly IDomainMessageMiddleware _inner;
 
     public UnsupportedQueryTypeMiddleware(IDomainMessageMiddleware inner)
@@ -25,7 +22,7 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     {
         foreach (var question in context.DomainMessage.Questions)
         {
-            if (question.Type == AnyQueryType || !Enum.IsDefined(question.Type))
+            if (question.Type is DomainRecordType.ANY || !Enum.IsDefined(question.Type))
             {
                 context.AnsweredBy = "UnsupportedQueryType";
                 return ValueTask.FromResult<DomainMessage?>(DomainMessage.CreateResponse(

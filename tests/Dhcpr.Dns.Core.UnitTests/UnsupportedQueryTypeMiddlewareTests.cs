@@ -14,7 +14,7 @@ public class UnsupportedQueryTypeMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
-        var request = DomainMessage.CreateRequest("dhitc.com", (DomainRecordType)255);
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.ANY);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),

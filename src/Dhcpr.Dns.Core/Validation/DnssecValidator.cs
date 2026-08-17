@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Validation;
 
-public sealed class DnssecValidator : IDnssecValidator
+public sealed partial class DnssecValidator : IDnssecValidator
 {
     private readonly ILogger<DnssecValidator> _logger;
     private readonly IOptionsMonitor<DnsConfiguration>? _options;
@@ -30,9 +30,7 @@ public sealed class DnssecValidator : IDnssecValidator
         var policy = _options?.CurrentValue.Dnssec ?? new DnssecConfiguration();
         if (!policy.IsAlgorithmAllowed((byte)rrsig.Algorithm))
         {
-            _logger.LogDebug(
-                "DNSSEC skipping disallowed algorithm {Algorithm}",
-                rrsig.Algorithm);
+            LogSkippingDisallowedAlgorithm(_logger, rrsig.Algorithm);
             return false;
         }
 
@@ -53,7 +51,7 @@ public sealed class DnssecValidator : IDnssecValidator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to verify signature for algorithm {Algorithm}", rrsig.Algorithm);
+            LogSignatureVerificationFailed(_logger, ex, rrsig.Algorithm);
             return false;
         }
         finally
@@ -282,4 +280,10 @@ public sealed class DnssecValidator : IDnssecValidator
 
         return ownerToTarget < 0 || targetToNext < 0;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC skipping disallowed algorithm {Algorithm}")]
+    private static partial void LogSkippingDisallowedAlgorithm(ILogger logger, DnssecAlgorithmType algorithm);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to verify signature for algorithm {Algorithm}")]
+    private static partial void LogSignatureVerificationFailed(ILogger logger, Exception exception, DnssecAlgorithmType algorithm);
 }

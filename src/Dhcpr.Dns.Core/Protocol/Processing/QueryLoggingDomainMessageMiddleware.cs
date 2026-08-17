@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddleware
+public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;
     private readonly ILogger<QueryLoggingDomainMessageMiddleware> _logger;
@@ -46,8 +47,8 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
         {
             if (isServFail)
             {
-                _logger.LogError(
-                    "SERVFAIL [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} reason={Reason} cache={CacheState}",
+                LogServFail(
+                    _logger,
                     queryId,
                     context.ClientEndPoint,
                     context.ServerEndPoint,
@@ -59,15 +60,15 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
             }
 
             var addresses = FormatAnswerAddresses(result, question.Type);
-            _logger.LogInformation("{CacheState} [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}",
+            LogQueryResponse(
+                _logger,
                 hitString,
                 queryId,
                 context.ClientEndPoint,
                 context.ServerEndPoint,
                 question.Type,
                 question.Name.ToString(),
-                addresses
-            );
+                addresses);
         }
     }
 
@@ -75,13 +76,13 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
     {
         foreach (var question in context.DomainMessage.Questions)
         {
-            _logger.LogDebug("[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}",
+            LogIncomingQuery(
+                _logger,
                 queryId,
                 context.ClientEndPoint,
                 context.ServerEndPoint,
                 question.Type,
-                question.Name.ToString()
-            );
+                question.Name.ToString());
         }
     }
 
@@ -100,4 +101,35 @@ public sealed class QueryLoggingDomainMessageMiddleware : IDomainMessageMiddlewa
 
         return builder.ToString();
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "SERVFAIL [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} reason={Reason} cache={CacheState}")]
+    private static partial void LogServFail(
+        ILogger logger,
+        Guid queryId,
+        IPEndPoint? client,
+        IPEndPoint? server,
+        DomainRecordType queryType,
+        string name,
+        string reason,
+        string cacheState);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{CacheState} [{QueryId:n}] {Client} <- {Server}: {QueryType} {Name} {Answers}")]
+    private static partial void LogQueryResponse(
+        ILogger logger,
+        string cacheState,
+        Guid queryId,
+        IPEndPoint? client,
+        IPEndPoint? server,
+        DomainRecordType queryType,
+        string name,
+        string answers);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}")]
+    private static partial void LogIncomingQuery(
+        ILogger logger,
+        Guid queryId,
+        IPEndPoint? client,
+        IPEndPoint? server,
+        DomainRecordType queryType,
+        string name);
 }

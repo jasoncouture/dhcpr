@@ -3,7 +3,7 @@
 static class Constants
 {
     public static readonly TimeSpan QueuePoolTimeout = TimeSpan.FromSeconds(0.2);
-    public static readonly int QueueWaitTimeoutJitterMilliseconds = 100;
+    public const int QueueWaitTimeoutJitterMilliseconds = 100;
 
     public static TimeSpan GetPollWaitTimeoutWithJitter()
     {

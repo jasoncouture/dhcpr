@@ -62,26 +62,26 @@ public sealed record DhcpOption(DhcpOptionCode Code, ImmutableArray<byte> Payloa
 
     static DhcpOption()
     {
-        StaticOptions[(byte)DhcpOptionCode.Pad] = new DhcpOption(DhcpOptionCode.Pad, ImmutableArray<byte>.Empty);
-        StaticOptions[(byte)DhcpOptionCode.End] = new DhcpOption(DhcpOptionCode.End, ImmutableArray<byte>.Empty);
-        StaticOptions[(byte)DhcpOptionCode.RapidCommit] =
+        _staticOptions[(byte)DhcpOptionCode.Pad] = new DhcpOption(DhcpOptionCode.Pad, ImmutableArray<byte>.Empty);
+        _staticOptions[(byte)DhcpOptionCode.End] = new DhcpOption(DhcpOptionCode.End, ImmutableArray<byte>.Empty);
+        _staticOptions[(byte)DhcpOptionCode.RapidCommit] =
             new DhcpOption(DhcpOptionCode.RapidCommit, ImmutableArray<byte>.Empty);
     }
 
-    public static DhcpOption End => StaticOptions[(byte)DhcpOptionCode.End]!;
-    public static DhcpOption Pad => StaticOptions[(byte)DhcpOptionCode.Pad]!;
-    public static DhcpOption RapidCommit => StaticOptions[(byte)DhcpOptionCode.RapidCommit]!;
+    public static DhcpOption End => _staticOptions[(byte)DhcpOptionCode.End]!;
+    public static DhcpOption Pad => _staticOptions[(byte)DhcpOptionCode.Pad]!;
+    public static DhcpOption RapidCommit => _staticOptions[(byte)DhcpOptionCode.RapidCommit]!;
 
     public int Length => GetEncodedLength(Code, Payload.Length);
 
-    private static readonly DhcpOption?[] StaticOptions = new DhcpOption?[256];
+    private static readonly DhcpOption?[] _staticOptions = new DhcpOption?[256];
 
     public static bool TryParse(ReadOnlySpan<byte> bytes, [NotNullWhen(true)] out DhcpOption? option)
     {
         option = null;
         if (bytes.Length == 0) return false;
         // Short circuit for options we know don't have a length byte, or any data.
-        option = StaticOptions[bytes[0]];
+        option = _staticOptions[bytes[0]];
         if (option is not null) return true;
 
         var code = (DhcpOptionCode)bytes[0];

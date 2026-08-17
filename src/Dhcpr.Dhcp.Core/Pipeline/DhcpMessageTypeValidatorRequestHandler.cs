@@ -6,7 +6,7 @@ namespace Dhcpr.Dhcp.Core.Pipeline;
 
 public sealed class DhcpMessageTypeValidatorRequestHandler : IDhcpRequestHandler
 {
-    private static readonly HashSet<DhcpMessageType> ValidMessageTypes = Enum.GetValues<DhcpMessageType>().ToHashSet();
+    private static readonly HashSet<DhcpMessageType> _validMessageTypes = Enum.GetValues<DhcpMessageType>().ToHashSet();
     private readonly ILogger<DhcpMessageTypeValidatorRequestHandler> _logger;
 
     public DhcpMessageTypeValidatorRequestHandler(ILogger<DhcpMessageTypeValidatorRequestHandler> logger)
@@ -28,7 +28,7 @@ public sealed class DhcpMessageTypeValidatorRequestHandler : IDhcpRequestHandler
 
         var dhcpMessageType = (DhcpMessageType)dhcpMessageTypeOption.Payload[0];
 
-        if (!ValidMessageTypes.Contains(dhcpMessageType))
+        if (!_validMessageTypes.Contains(dhcpMessageType))
         {
             _logger.LogWarning("Unknown DHCP Message type {messageType} from {clientAddress}", dhcpMessageType,
                 context.Message.HardwareAddress);

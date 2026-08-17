@@ -55,7 +55,7 @@ public sealed class DnsResolveHealthCheck : IHealthCheck
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var config = _options.CurrentValue.HealthCheck ?? new DnsHealthCheckConfiguration();
         if (!config.Enabled)
@@ -64,9 +64,9 @@ public sealed class DnsResolveHealthCheck : IHealthCheck
         if (config.Domains is not { Length: > 0 })
             return HealthCheckResult.Healthy("No DNS health-check domains configured");
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds));
-        var token = timeoutCts.Token;
+        using var timeoutTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutTokenSource.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds));
+        var timeoutCancellationToken = timeoutTokenSource.Token;
 
         var failures = new ConcurrentBag<(string Domain, string Reason)>();
 
@@ -76,16 +76,16 @@ public sealed class DnsResolveHealthCheck : IHealthCheck
             try
             {
                 var request = DomainMessage.CreateRequest(name, DomainRecordType.A);
-                var aErrorMessage = await ValidateRequestAsync(_executor, request, token);
+                var aErrorMessage = await ValidateRequestAsync(_executor, request, timeoutCancellationToken);
                 request = DomainMessage.CreateRequest(name, DomainRecordType.AAAA);
-                var aaaaErrorMessage = await ValidateRequestAsync(_executor, request, token);
+                var aaaaErrorMessage = await ValidateRequestAsync(_executor, request, timeoutCancellationToken);
                 if (aErrorMessage is not null && aaaaErrorMessage is not null)
                 {
                     failures.Add((name, aErrorMessage));
                     failures.Add((name, aaaaErrorMessage));
                 }
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            catch (OperationCanceledException) when (timeoutCancellationToken.IsCancellationRequested)
             {
                 failures.Add((name, cancellationToken.IsCancellationRequested ? "cancelled" : "timeout"));
             }

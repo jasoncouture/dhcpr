@@ -164,11 +164,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         {
             last = await QueryUpstreamAsync(parentContext, request, endPoints, cancellationToken);
 
-            if (last.Records.Answers.Length > 0)
+            // TLD servers often echo delegation NS in ANSWER for QTYPE NS without AA.
+            // That is still a referral — the signed apex RRset is on the child.
+            if (last.Flags.Authoritative && last.Records.Answers.Length > 0)
                 return last;
 
-            // Child AA sometimes puts the QTYPE RRset in AUTHORITY. Promote that,
-            // not a parent (AA=0) TLD referral.
             if (TryPromoteAuthoritativeAnswer(request, last) is { } promoted)
                 return promoted;
 
@@ -196,7 +196,12 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
         }
 
-        return IsUnresolvedReferral(last!) ? ServFail(request) : last!;
+        if (!last!.Flags.Authoritative &&
+            request.Questions[0].Type is DomainRecordType.NS or DomainRecordType.SOA
+                or DomainRecordType.DNSKEY)
+            return ServFail(request);
+
+        return IsUnresolvedReferral(last) ? ServFail(request) : last!;
     }
 
     private static DomainMessage FinalizeRecursiveResponse(DomainMessage request, DomainMessage response)
@@ -256,6 +261,38 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                sig.TypeCovered == type;
     }
 
+    private static DomainMessage CoalesceCoveringRrsigsIntoAnswers(DomainMessage response)
+    {
+        var covered = new HashSet<(string Name, DomainRecordType Type)>();
+        foreach (var record in response.Records.Answers)
+        {
+            if (record.Type is DomainRecordType.RRSIG or DomainRecordType.OPT)
+                continue;
+            covered.Add((record.Name.ToString(), record.Type));
+        }
+
+        if (covered.Count == 0)
+            return response;
+
+        var extra = response.Records.Authorities
+            .Concat(response.Records.Additional)
+            .Where(r =>
+                r.Type is DomainRecordType.RRSIG &&
+                r.Data is ResourceRecordSignatureData sig &&
+                covered.Contains((r.Name.ToString(), sig.TypeCovered)))
+            .ToImmutableArray();
+        if (extra.Length == 0)
+            return response;
+
+        return response with
+        {
+            Records = response.Records with
+            {
+                Answers = response.Records.Answers.AddRange(extra)
+            }
+        };
+    }
+
     /// <summary>
     /// Completed recursive answers are not TLD referrals: drop parent NS/NSEC(3)
     /// from AUTHORITY, keep same-owner SOA, keep NS glue, clear AA.
@@ -265,6 +302,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         var flags = response.Flags with { Authoritative = false };
         if (response.Records.Answers.Length == 0)
             return response with { Id = request.Id, Flags = flags };
+
+        response = CoalesceCoveringRrsigsIntoAnswers(response);
 
         var qname = request.Questions[0].Name;
         var nsTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

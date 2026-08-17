@@ -461,7 +461,16 @@ public class RecursiveRootResolverTests
                         FakeNsRrsig("google.com"));
                 }
 
-                return Referral("google.com", "ns1.google.com", googleNs);
+                // .com puts delegation NS in ANSWER without AA and without the
+                // child's RRSIG. That must not finish the lookup.
+                return new DomainMessage(
+                    request.Id,
+                    ResponseFlags(),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray.Create(NsRecord("google.com", "ns1.google.com")),
+                        ImmutableArray<DomainResourceRecord>.Empty,
+                        ImmutableArray.Create(ARecord("ns1.google.com", googleNs))));
             }
 
             return EmptyNoError(request);
@@ -633,7 +642,10 @@ public class RecursiveRootResolverTests
                 ImmutableArray<DomainResourceRecord>.Empty));
 
     private static DomainMessage Answer(DomainMessage request, params DomainResourceRecord[] answers)
-        => DomainMessage.CreateResponse(request, answers, responseCode: DomainResponseCode.NoError);
+    {
+        var response = DomainMessage.CreateResponse(request, answers, responseCode: DomainResponseCode.NoError);
+        return response with { Flags = response.Flags with { Authoritative = true } };
+    }
 
     private static DomainMessage EmptyNoError(DomainMessage request)
         => DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.NoError);
@@ -677,9 +689,8 @@ public class RecursiveRootResolverTests
             ResponseFlags(),
             ImmutableArray.Create(new DomainQuestion(new DomainLabels(zone), DomainRecordType.NS, DomainRecordClass.IN)),
             new DomainResourceRecords(
-                ImmutableArray<DomainResourceRecord>.Empty,
+                ImmutableArray.Create(NsRecord(zone, nsName)),
                 ImmutableArray.Create(
-                    NsRecord(zone, nsName),
                     new DomainResourceRecord(
                         new DomainLabels("CK0POJMG874LJREF7EFN8430QVIT8BSM.com"),
                         DomainRecordType.NSEC3,

@@ -73,7 +73,7 @@ public static class TaskExtensions
     }
 
     public static IServiceCollection AddAlias<TTargetService, TSourceService>(this IServiceCollection services,
-        ServiceLifetime lifetime = ServiceLifetime.Singleton)
+        ServiceLifetime lifetime = ServiceLifetime.Scoped)
         where TSourceService : TTargetService
         where TTargetService : notnull
     {

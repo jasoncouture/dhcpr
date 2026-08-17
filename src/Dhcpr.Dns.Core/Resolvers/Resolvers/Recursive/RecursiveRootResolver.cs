@@ -378,13 +378,12 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 .ToPooledList();
 
             var responses = await Task.WhenAll(nameserverQueries);
+            var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<IPAddress>();
             foreach (var nextMessage in responses)
             {
                 if (nextMessage is null) continue;
-                addresses.AddRange(nextMessage.Records
-                    .Where(i => i.Type is DomainRecordType.A or DomainRecordType.AAAA)
-                    .Select(i => ((IPAddressData)i.Data).Address));
+                addresses.AddRange(GetGlueAddresses(nextMessage.Records, nsNameSet));
             }
 
             return addresses;

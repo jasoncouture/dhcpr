@@ -185,6 +185,63 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task NsAddressResolveIgnoresAdditionalAForOtherOwners()
+    {
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DomainMessage(
+                    request.Id,
+                    ResponseFlags(),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray<DomainResourceRecord>.Empty,
+                        ImmutableArray.Create(NsRecord("com", "a.gtld-servers.net")),
+                        ImmutableArray<DomainResourceRecord>.Empty));
+            }
+
+            if (type == DomainRecordType.A && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DomainMessage(
+                    request.Id,
+                    ResponseFlags(authoritative: true),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray.Create(ARecord("a.gtld-servers.net", NsResolvedAddress)),
+                        ImmutableArray<DomainResourceRecord>.Empty,
+                        ImmutableArray.Create(ARecord("cdn.example.net", UnrelatedAddress))));
+            }
+
+            if (type == DomainRecordType.AAAA && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
+                return EmptyNoError(request);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return NodataWithSoa("example.com");
+
+            if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(NsResolvedAddress)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(internalClient);
+        var request = DomainMessage.CreateRequest("example.com");
+        await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
+
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
+    }
+
+    [Fact]
     public async Task UnrelatedAddressInAdditionalIsNotUsedAsNameserver()
     {
         var queried = new List<IPEndPoint>();

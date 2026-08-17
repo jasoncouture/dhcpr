@@ -488,6 +488,38 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task CnameFallbackKeepsOriginalQuestionType()
+    {
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return NodataWithSoa("example.com");
+
+            if (type == DomainRecordType.A && name.Equals("alias.example.com", StringComparison.OrdinalIgnoreCase))
+                return EmptyNoError(request);
+
+            if (type == DomainRecordType.CNAME && name.Equals("alias.example.com", StringComparison.OrdinalIgnoreCase))
+                return Answer(request, CnameRecord("alias.example.com", "target.example.com"));
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(internalClient);
+        var request = DomainMessage.CreateRequest("alias.example.com");
+        var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainRecordType.A, result!.Questions[0].Type);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.CNAME);
+    }
+
+    [Fact]
     public async Task NsQueryFollowsToChildAndPutsNsInAnswers()
     {
         // TLD referral has parent NS + NSEC3. Child returns the apex NS in ANSWER.

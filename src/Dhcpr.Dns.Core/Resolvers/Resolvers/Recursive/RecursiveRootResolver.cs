@@ -308,7 +308,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
     {
         var flags = response.Flags with { Authoritative = false };
         if (response.Records.Answers.Length == 0)
-            return response with { Id = request.Id, Flags = flags };
+            return response with { Id = request.Id, Questions = request.Questions, Flags = flags };
 
         response = CoalesceCoveringRrsigsIntoAnswers(response);
 
@@ -333,6 +333,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         return response with
         {
             Id = request.Id,
+            Questions = request.Questions,
             Flags = flags,
             Records = response.Records with
             {

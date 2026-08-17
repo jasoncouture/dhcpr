@@ -242,6 +242,48 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task DoesNotFollowNonNoErrorAsReferral()
+    {
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return NodataWithSoa("example.com");
+
+            if (type == DomainRecordType.A && name.Equals("noexist.example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DomainMessage(
+                    request.Id,
+                    new DomainMessageFlags(
+                        true, DomainOperationCode.Query, true, false, false, false, false, false,
+                        DomainResponseCode.NameError),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray<DomainResourceRecord>.Empty,
+                        ImmutableArray.Create(
+                            SoaRecord("example.com"),
+                            NsRecord("example.com", "evil.example.net")),
+                        ImmutableArray.Create(ARecord("evil.example.net", UnrelatedAddress))));
+            }
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(internalClient);
+        var request = DomainMessage.CreateRequest("noexist.example.com");
+        var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+    }
+
+    [Fact]
     public async Task UnrelatedAddressInAdditionalIsNotUsedAsNameserver()
     {
         var queried = new List<IPEndPoint>();

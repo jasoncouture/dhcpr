@@ -116,6 +116,9 @@ public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
             if (last.Records.Answers.Length > 0)
                 return last;
 
+            if (last.Flags.ResponseCode is not DomainResponseCode.NoError)
+                return last;
+
             using var nsNames = GetNameserverNames(last.Records).ToPooledList();
             if (nsNames.Count == 0)
                 return last;

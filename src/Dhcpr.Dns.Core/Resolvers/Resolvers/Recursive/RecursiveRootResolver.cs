@@ -78,6 +78,10 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     context.DnssecScope?.PopIgnoreStatus();
                 }
 
+                // NXDOMAIN/SERVFAIL/REFUSED are not referrals, even if NS is present.
+                if (responseMessage.Flags.ResponseCode is not DomainResponseCode.NoError)
+                    continue;
+
                 using var nsNames = GetNameserverNames(
                     responseMessage.Records, message.Questions[0].Name).ToPooledList();
 
@@ -171,6 +175,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
             if (TryPromoteAuthoritativeAnswer(request, last) is { } promoted)
                 return promoted;
+
+            if (last.Flags.ResponseCode is not DomainResponseCode.NoError)
+                return last;
 
             using var nsNames = GetNameserverNames(last.Records, request.Questions[0].Name).ToPooledList();
             if (nsNames.Count == 0)

@@ -2,33 +2,25 @@ using Dhcpr.Dns.Core.Protocol;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed record ReferralWalkOptions
+public sealed record ReferralWalkOptions(
+    bool DetectSelfReferral = true,
+    bool PromoteAuthoritativeAnswer = true,
+    bool ServFailNonAuthoritativeApexTypes = true,
+    bool FilterNsOwnerByQname = true,
+    bool IgnoreGlueHopDnssecStatus = true,
+    bool StopOnAuthoritativeAnswersOnly = true,
+    bool UseRecursiveUnresolvedReferral = true,
+    string? InitialCutApex = null,
+    Func<string?, DomainMessage, CancellationToken, ValueTask<LocalReferralCut?>>? TryLocalCut = null)
 {
     public static ReferralWalkOptions Recursive { get; } = new();
 
-    public static ReferralWalkOptions Authoritative { get; } = new()
-    {
-        DetectSelfReferral = false,
-        PromoteAuthoritativeAnswer = false,
-        ServFailNonAuthoritativeApexTypes = false,
-        FilterNsOwnerByQname = false,
-        IgnoreGlueHopDnssecStatus = false,
-        StopOnAuthoritativeAnswersOnly = false,
-        UseRecursiveUnresolvedReferral = false
-    };
-
-    public bool DetectSelfReferral { get; init; } = true;
-    public bool PromoteAuthoritativeAnswer { get; init; } = true;
-    public bool ServFailNonAuthoritativeApexTypes { get; init; } = true;
-    public bool FilterNsOwnerByQname { get; init; } = true;
-    public bool IgnoreGlueHopDnssecStatus { get; init; } = true;
-    public bool StopOnAuthoritativeAnswersOnly { get; init; } = true;
-    public bool UseRecursiveUnresolvedReferral { get; init; } = true;
-    public string? InitialCutApex { get; init; }
-
-    public Func<string?, DomainMessage, CancellationToken, ValueTask<LocalReferralCut?>>? TryLocalCut
-    {
-        get;
-        init;
-    }
+    public static ReferralWalkOptions Authoritative { get; } = new(
+        DetectSelfReferral: false,
+        PromoteAuthoritativeAnswer: false,
+        ServFailNonAuthoritativeApexTypes: false,
+        FilterNsOwnerByQname: false,
+        IgnoreGlueHopDnssecStatus: false,
+        StopOnAuthoritativeAnswersOnly: false,
+        UseRecursiveUnresolvedReferral: false);
 }

@@ -60,6 +60,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
+        // Outside CNAME so chased assemblies still get RA (previously stamped before chase).
+        services.Decorate<IDomainMessageMiddleware, RecursionAvailableMiddleware>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();

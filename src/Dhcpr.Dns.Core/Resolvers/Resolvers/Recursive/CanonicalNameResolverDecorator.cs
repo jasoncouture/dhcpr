@@ -29,7 +29,6 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
         if (result is null)
             return result;
-        result = result with { Flags = result.Flags with { RecursionAvailable = true } };
         if (!context.DomainMessage.Flags.RecursionDesired)
             return result;
 

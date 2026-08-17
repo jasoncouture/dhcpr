@@ -31,12 +31,15 @@ public static class DnsServiceProviderExtensions
             o.ExpirationScanFrequency = TimeSpan.FromMinutes(1);
         });
         services.AddMessagePipe();
+        // Process-bound: shared response cache across all queries.
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
         services.AddHttpClient(nameof(NamedRootHttpClient), ConfigureInternicHttpClient);
         services.AddHttpClient(nameof(RootZoneHttpClient), ConfigureInternicHttpClient);
+        // Process-bound: stateless IHttpClientFactory wrappers.
         services.AddSingleton<INamedRootHttpClient, NamedRootHttpClient>();
         services.AddSingleton<IRootZoneHttpClient, RootZoneHttpClient>();
+        // Process-bound: shared mutable root/zone/dyn-dns state.
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();
@@ -49,6 +52,7 @@ public static class DnsServiceProviderExtensions
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
+        // Process-bound: shared pipeline. ForwardResolver holds IOptionsMonitor.OnChange.
         services.AddSingleton<IDomainMessageMiddleware, RootZoneMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, DynamicDnsMiddleware>();
@@ -75,9 +79,10 @@ public static class DnsServiceProviderExtensions
         // Outermost logging so Unsupported/Blackhole answers are still recorded.
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
 
-        // Live UI publishes from DomainMessageContextMessageProcessor (once per external answer).
+        // Process-bound: process-wide live-query dispatch (MessagePipe).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
 
+        // Process-bound: shared by the process-wide middleware pipeline.
         services.AddSingleton<IReferralWalker, ReferralWalker>();
         services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
         services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();
@@ -85,11 +90,10 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
         services.AddSingleton<IDnssecValidator, DnssecValidator>();
         services.AddSingleton<IDnssecMessageValidator, DnssecMessageValidator>();
-
         services.AddSingleton<ISocketFactory, SocketFactory>();
-
+        // Process-bound: shared StringBuilder pool.
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
-
+        // Process-bound: options validators are resolved from the root provider.
         services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()
             .BindConfiguration("DNS");

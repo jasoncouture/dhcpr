@@ -137,6 +137,27 @@ public class AuthoritativeZoneTests
     }
 
     [Fact]
+    public void AnswerEngine_CnameOwnerReturnsCnameForOtherTypes()
+    {
+        var text = """
+            $ORIGIN foo.bar.
+            $TTL 3600
+            @ IN SOA ns.foo.bar. hostmaster.foo.bar. ( 1 7200 3600 1209600 3600 )
+            @ IN NS ns.foo.bar.
+            alias IN CNAME www.foo.bar.
+            www IN A 192.0.2.10
+            """;
+        var zone = BuildZone(text, "foo.bar.bind");
+        var request = DomainMessage.CreateRequest("alias.foo.bar");
+        var result = ZoneAnswerEngine.Answer(zone, request);
+
+        Assert.Equal(ZoneAnswerKind.Answer, result.Kind);
+        var answer = Assert.Single(result.Message!.Records.Answers);
+        Assert.Equal(DomainRecordType.CNAME, answer.Type);
+        Assert.Equal("www.foo.bar", ((NameData)answer.Data).Name.ToString());
+    }
+
+    [Fact]
     public void ParseFile_SupportsInclude()
     {
         var dir = Path.Combine(Path.GetTempPath(), "dhcpr-zone-" + Guid.NewGuid().ToString("n"));

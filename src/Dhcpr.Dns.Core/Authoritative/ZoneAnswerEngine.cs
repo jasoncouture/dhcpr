@@ -75,6 +75,18 @@ public static class ZoneAnswerEngine
                 WithAa(request, matching, null, additional, DomainResponseCode.NoError, authoritative: true));
         }
 
+        // RFC 1034 §3.6.2: a CNAME owner answers other QTYPEs with the CNAME.
+        if (question.Type is not DomainRecordType.CNAME)
+        {
+            var cnames = node.Records.Where(r => r.Type is DomainRecordType.CNAME).ToImmutableArray();
+            if (cnames.Length > 0)
+            {
+                return new ZoneAnswerResult(
+                    ZoneAnswerKind.Answer,
+                    WithAa(request, cnames, null, additional: null, DomainResponseCode.NoError, authoritative: true));
+            }
+        }
+
         // Exact name exists (RRs or empty non-terminal) → NODATA; wildcards suppressed.
         if (node.Records.Length > 0 || node.HasChildren)
         {

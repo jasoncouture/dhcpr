@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
+public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _innerMiddleware;
     private readonly IDnssecMessageValidator _validator;
@@ -63,10 +63,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         // fetched material is done by DnssecMessageValidator after the fetch returns.
         if (context.DnssecScope.SuppressKeyFetch)
         {
-            _logger.LogDebug(
-                "DNSSEC skip hop validation during key/DS fetch for {Name}/{Type}",
-                name,
-                question?.Type);
+            LogSkipHopValidation(_logger, name, question?.Type);
             return result;
         }
 
@@ -84,8 +81,8 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         // Hop noise stays at Debug; client outcomes that matter are louder below.
         if (context.IsInternal)
         {
-            _logger.LogDebug(
-                "DNSSEC hop {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth}, cache={Cache})",
+            LogHopStatus(
+                _logger,
                 name,
                 question?.Type,
                 result.Flags.ResponseCode,
@@ -96,8 +93,8 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
             return result;
         }
 
-        _logger.LogDebug(
-            "DNSSEC client {Name}/{Type} rcode={Rcode} status {Before} -> {After} (cache={Cache})",
+        LogClientStatus(
+            _logger,
             name,
             question?.Type,
             result.Flags.ResponseCode,
@@ -109,10 +106,7 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
         {
             if (!context.DomainMessage.Flags.CheckingDisabled)
             {
-                _logger.LogWarning(
-                    "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)",
-                    name,
-                    question?.Type);
+                LogServFailBogus(_logger, name, question?.Type);
                 context.ServFailReason = $"DNSSEC validation bogus for {name}/{question?.Type}";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
@@ -120,20 +114,50 @@ public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
                     DomainResponseCode.ServerFailure);
             }
 
-            _logger.LogWarning(
-                "DNSSEC returning bogus answer for {Name}/{Type} (CD=1)",
-                name,
-                question?.Type);
+            LogReturningBogusAnswer(_logger, name, question?.Type);
             return result;
         }
 
         // Client AD only when the whole query (including CNAME chase hops) is Secure.
         if (context.DnssecScope.Status == DnssecValidationStatus.Secure)
         {
-            _logger.LogDebug("DNSSEC setting AD for {Name}/{Type}", name, question?.Type);
+            LogSettingAuthenticData(_logger, name, question?.Type);
             result = result with { Flags = result.Flags with { Authentic = true } };
         }
 
         return result;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC skip hop validation during key/DS fetch for {Name}/{Type}")]
+    private static partial void LogSkipHopValidation(ILogger logger, string? name, DomainRecordType? type);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC hop {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth}, cache={Cache})")]
+    private static partial void LogHopStatus(
+        ILogger logger,
+        string? name,
+        DomainRecordType? type,
+        DomainResponseCode rcode,
+        DnssecValidationStatus before,
+        DnssecValidationStatus after,
+        int depth,
+        bool cache);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC client {Name}/{Type} rcode={Rcode} status {Before} -> {After} (cache={Cache})")]
+    private static partial void LogClientStatus(
+        ILogger logger,
+        string? name,
+        DomainRecordType? type,
+        DomainResponseCode rcode,
+        DnssecValidationStatus before,
+        DnssecValidationStatus after,
+        bool cache);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)")]
+    private static partial void LogServFailBogus(ILogger logger, string? name, DomainRecordType? type);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "DNSSEC returning bogus answer for {Name}/{Type} (CD=1)")]
+    private static partial void LogReturningBogusAnswer(ILogger logger, string? name, DomainRecordType? type);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC setting AD for {Name}/{Type}")]
+    private static partial void LogSettingAuthenticData(ILogger logger, string? name, DomainRecordType? type);
 }

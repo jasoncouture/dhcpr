@@ -48,8 +48,8 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
         var options = ReferralWalkOptions.Authoritative with
         {
             InitialCutApex = local.ReferralCutApex,
-            TryLocalCut = (cutApex, request, token) =>
-                TryLocalChildZoneAsync(context, cutApex, request, token)
+            TryLocalCut = (cutApex, request, cancellationToken) =>
+                TryLocalChildZoneAsync(context, cutApex, request, cancellationToken)
         };
 
         using var endPoints = ListPool<IPEndPoint>.Default.Get();

@@ -18,7 +18,7 @@ public static class DynDnsEndpointExtensions
         return app;
     }
 
-    private static Task<IResult> HandleUpdateAsync(
+    private static IResult HandleUpdateAsync(
         HttpContext httpContext,
         IDynamicDnsStore store,
         IAuthoritativeZoneStore zones,
@@ -51,7 +51,7 @@ public static class DynDnsEndpointExtensions
             httpContext.Connection.RemoteIpAddress,
             forwardedFirst);
 
-        return Task.FromResult(TextResult(body));
+        return TextResult(body);
     }
 
     private static IResult TextResult(string body)

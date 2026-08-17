@@ -23,7 +23,7 @@ public sealed class DnsConfiguration : IValidateSelf
 
     /// <summary>
     /// Domain suffixes that always receive NXDOMAIN (no cache / upstream).
-    /// Matches the name itself and any subdomain (e.g. <c>dhitc.com</c> → <c>*.dhitc.com</c>).
+    /// Matches the name itself and any subdomain (e.g. <c>example.com</c> → <c>*.example.com</c>).
     /// </summary>
     public string[] BlackholeDomains { get; set; } = Array.Empty<string>();
 

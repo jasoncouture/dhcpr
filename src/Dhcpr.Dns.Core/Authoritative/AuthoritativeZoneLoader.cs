@@ -15,7 +15,7 @@ namespace Dhcpr.Dns.Core.Authoritative;
 /// </summary>
 public sealed class AuthoritativeZoneLoader : BackgroundService
 {
-    private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan _debounce = TimeSpan.FromMilliseconds(500);
 
     private readonly AuthoritativeZoneStore _store;
     private readonly IDnsResponseCache _cache;
@@ -75,7 +75,7 @@ public sealed class AuthoritativeZoneLoader : BackgroundService
 
             try
             {
-                await Task.Delay(Debounce, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(_debounce, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

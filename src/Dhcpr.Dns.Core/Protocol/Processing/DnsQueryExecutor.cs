@@ -12,7 +12,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DnsQueryExecutor : IDnsQueryExecutor
 {
-    private static readonly IPEndPoint HealthCheckEndPoint = new(IPAddress.Loopback, 0);
+    private static readonly IPEndPoint _healthCheckEndPoint = new(IPAddress.Loopback, 0);
 
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
     private readonly DnsOverHttpConfiguration _dnsOverHttp;
@@ -68,7 +68,7 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
     }
 
     public ValueTask<DomainMessage?> QueryAsync(DomainMessage request, CancellationToken cancellationToken)
-        => QueryAsync(request, HealthCheckEndPoint, HealthCheckEndPoint, bypassCache: true, cancellationToken);
+        => QueryAsync(request, _healthCheckEndPoint, _healthCheckEndPoint, bypassCache: true, cancellationToken);
 
     private ValueTask<DomainMessage?> QueryAsync(
         DomainMessage request,

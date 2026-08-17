@@ -15,8 +15,8 @@ namespace Dhcpr.Dns.Core.Resolvers.Caching;
 /// </summary>
 public sealed class DnsResponseCache : IDnsResponseCache
 {
-    private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan MaxCacheTtl = TimeSpan.FromHours(1);
+    private static readonly TimeSpan _negativeCacheTtl = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan _maxCacheTtl = TimeSpan.FromHours(1);
 
     private readonly IMemoryCache _memoryCache;
 
@@ -128,8 +128,8 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (lifetime <= TimeSpan.Zero)
             return false;
 
-        if (lifetime > MaxCacheTtl)
-            lifetime = MaxCacheTtl;
+        if (lifetime > _maxCacheTtl)
+            lifetime = _maxCacheTtl;
 
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
         // Strip AD — security lives in SecurityStatus only.
@@ -209,7 +209,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return min;
 
         if (response.Flags.ResponseCode is DomainResponseCode.NameError or DomainResponseCode.NoError)
-            return NegativeCacheTtl;
+            return _negativeCacheTtl;
 
         return TimeSpan.Zero;
     }

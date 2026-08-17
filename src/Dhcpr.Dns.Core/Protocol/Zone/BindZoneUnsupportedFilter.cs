@@ -10,7 +10,7 @@ namespace Dhcpr.Dns.Core.Protocol.Zone;
 /// </summary>
 public static class BindZoneUnsupportedFilter
 {
-    private static readonly HashSet<string> SupportedTypes =
+    private static readonly HashSet<string> _supportedTypes =
         new(Enum.GetNames<ResourceRecordType>(), StringComparer.OrdinalIgnoreCase);
 
     public static string Filter(string text)
@@ -64,11 +64,11 @@ public static class BindZoneUnsupportedFilter
         if (index >= tokens.Count)
             return true;
 
-        return SupportedTypes.Contains(tokens[index]);
+        return _supportedTypes.Contains(tokens[index]);
     }
 
     private static bool LooksLikeOwner(string token)
-        => !IsClass(token) && !IsTtl(token) && !SupportedTypes.Contains(token);
+        => !IsClass(token) && !IsTtl(token) && !_supportedTypes.Contains(token);
 
     private static bool IsClass(string token)
         => token.Equals("IN", StringComparison.OrdinalIgnoreCase) ||

@@ -6,7 +6,7 @@ namespace Dhcpr.Dns.Core.Validation;
 /// </summary>
 internal static class DnssecBase32Hex
 {
-    private static readonly sbyte[] DecodeMap = CreateDecodeMap();
+    private static readonly sbyte[] _decodeMap = CreateDecodeMap();
 
     private static sbyte[] CreateDecodeMap()
     {
@@ -33,10 +33,10 @@ internal static class DnssecBase32Hex
         var bitsLeft = 0;
         foreach (var ch in input)
         {
-            if (ch >= DecodeMap.Length || DecodeMap[ch] < 0)
+            if (ch >= _decodeMap.Length || _decodeMap[ch] < 0)
                 return false;
 
-            buffer = (buffer << 5) | (byte)DecodeMap[ch];
+            buffer = (buffer << 5) | (byte)_decodeMap[ch];
             bitsLeft += 5;
             if (bitsLeft < 8)
                 continue;

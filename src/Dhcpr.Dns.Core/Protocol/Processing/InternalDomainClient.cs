@@ -16,11 +16,11 @@ public class InternalDomainClient : IInternalDomainClient
         _messageQueue = messageQueue;
     }
 
-    private static readonly IPEndPoint InternalEndPoint = new(IPAddress.Any, 53);
+    private static readonly IPEndPoint _internalEndPoint = new(IPAddress.Any, 53);
 
     public ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
         => EnqueueAsync(
-            new DomainMessageContext(InternalEndPoint, InternalEndPoint, domainMessage)
+            new DomainMessageContext(_internalEndPoint, _internalEndPoint, domainMessage)
             {
                 IsInternal = true,
                 InternalHopDepth = 1

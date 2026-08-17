@@ -17,7 +17,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class DnsServer : BackgroundService
 {
-    private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> LocalAddressCache =
+    private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
 
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
@@ -315,7 +315,7 @@ public sealed class DnsServer : BackgroundService
         if (addressFamily is not AddressFamily.InterNetwork and not AddressFamily.InterNetworkV6)
             throw new ArgumentException("Only IPv4 and IPv6 are supported.", nameof(addressFamily));
 
-        return LocalAddressCache.GetOrAdd((networkInterface, addressFamily), static key =>
+        return _localAddressCache.GetOrAdd((networkInterface, addressFamily), static key =>
         {
             foreach (var ipProperties in NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()))
             {

@@ -27,7 +27,7 @@ public enum DynamicDnsUpsertResult
 
 public sealed class DynamicDnsStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -63,7 +63,7 @@ public sealed class DynamicDnsStore
         try
         {
             var json = File.ReadAllText(path);
-            var loaded = JsonSerializer.Deserialize<Dictionary<string, DynamicDnsEntry>>(json, JsonOptions);
+            var loaded = JsonSerializer.Deserialize<Dictionary<string, DynamicDnsEntry>>(json, _jsonOptions);
             if (loaded is null)
                 return;
 
@@ -158,7 +158,7 @@ public sealed class DynamicDnsStore
                 static kv => kv.Key,
                 static kv => kv.Value,
                 StringComparer.OrdinalIgnoreCase);
-            var json = JsonSerializer.Serialize(snapshot, JsonOptions);
+            var json = JsonSerializer.Serialize(snapshot, _jsonOptions);
             AtomicFileReplace.WriteAsync(path, json, CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

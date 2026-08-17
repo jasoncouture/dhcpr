@@ -33,7 +33,7 @@ public class UpstreamQueryMiddlewareTests
 
         var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
         var request = DomainMessage.CreateRequest("example.com");
-        // First batch (3) is all unreachable; second batch contains the reachable peer.
+        // Unreachable IPv6 listed first; IPv4 is preferred into the first parallel group.
         var context = new DomainMessageContext(null, null, request)
         {
             UpstreamEndpoints = ImmutableArray.Create(unreachable1, unreachable2, unreachable3, reachable)
@@ -45,6 +45,37 @@ public class UpstreamQueryMiddlewareTests
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
         Assert.Contains(result.Records.Answers, r =>
             r.Type == DomainRecordType.A && ((IPAddressData)r.Data).Address.Equals(answer));
+    }
+
+    [Fact]
+    public async Task FirstParallelBatchPrefersIPv4()
+    {
+        var v6a = new IPEndPoint(IPAddress.Parse("2001:db8::1"), 53);
+        var v6b = new IPEndPoint(IPAddress.Parse("2001:db8::2"), 53);
+        var v6c = new IPEndPoint(IPAddress.Parse("2001:db8::3"), 53);
+        var v4 = new IPEndPoint(IPAddress.Parse("1.2.3.4"), 53);
+        IPEndPoint[]? firstBatch = null;
+
+        var factory = Substitute.For<IDomainClientFactory>();
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var options = callInfo.ArgAt<IEnumerable<DomainClientOptions>>(0).ToArray();
+                firstBatch ??= options.Select(o => o.EndPoint).ToArray();
+                var client = CreateClient(options[0].EndPoint, new HashSet<IPEndPoint>(), IPAddress.Parse("9.9.9.9"));
+                return new ValueTask<IDomainClient>(client);
+            });
+
+        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var context = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            UpstreamEndpoints = ImmutableArray.Create(v6a, v6b, v6c, v4)
+        };
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(firstBatch);
+        Assert.Equal(v4, firstBatch![0]);
     }
 
     [Fact]

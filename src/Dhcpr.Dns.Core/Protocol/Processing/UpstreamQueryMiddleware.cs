@@ -33,8 +33,9 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
             return null;
 
-        // Preserve caller order (RecursiveRootResolver shuffles before directing).
-        using var remaining = endPoints.ToPooledList();
+        // Preserve shuffle within a family; IPv4 first so a v6 blackhole does not fill the
+        // first parallel group and stall the hop for the full UDP timeout.
+        using var remaining = NameserverSelection.PreferIPv4(endPoints).ToPooledList();
 
         var queryMessage = AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
         DomainMessage? nameErrorFallback = null;

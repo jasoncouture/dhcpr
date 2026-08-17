@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 
@@ -36,7 +35,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         // Preserve caller order (RecursiveRootResolver shuffles before directing).
         using var remaining = endPoints.ToPooledList();
 
-        var queryMessage = AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
+        var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
         DomainMessage? nameErrorFallback = null;
 
         while (remaining.Count > 0)
@@ -89,26 +88,5 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
             context.DomainMessage,
             DomainResourceRecords.Empty,
             DomainResponseCode.ServerFailure);
-    }
-
-    private static DomainMessage AddOptRecordWithDoBit(DomainMessage message, IEdnsProtocolService ednsProtocolService)
-    {
-        var existingOpt = message.Records.Additional.FirstOrDefault(r => r.Type == DomainRecordType.OPT);
-        var optRecord = existingOpt is not null
-            ? ednsProtocolService.CreateOptRecord(4096, dnssecOk: true,
-                extendedRCode: ednsProtocolService.GetExtendedRCode(existingOpt),
-                version: ednsProtocolService.GetEdnsVersion(existingOpt),
-                optData: existingOpt.Data as RecordData.OptionData)
-            : ednsProtocolService.CreateOptRecord(4096, dnssecOk: true);
-
-        var newAdditional = message.Records.Additional
-            .Where(r => r.Type != DomainRecordType.OPT)
-            .Append(optRecord)
-            .ToImmutableArray();
-
-        return message with
-        {
-            Records = message.Records with { Additional = newAdditional }
-        };
     }
 }

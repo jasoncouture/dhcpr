@@ -10,7 +10,7 @@ public static class RootZonePaths
     public const string NamedRootFileName = ApplicationConfiguration.NamedRootFileName;
     public const string RootZoneUrl = "https://www.internic.net/domain/root.zone";
 
-    public static readonly string[] NamedRootUrls =
+    public static string[] NamedRootUrls { get; } =
     [
         "https://www.internic.net/domain/named.root",
         "https://192.0.46.9/domain/named.root",

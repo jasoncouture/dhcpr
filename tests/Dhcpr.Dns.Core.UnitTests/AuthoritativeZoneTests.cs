@@ -270,9 +270,9 @@ public class AuthoritativeZoneTests
         var configuration = new DnsConfiguration
         {
             RootServers = new RootServerConfiguration { Addresses = ["198.41.0.4:53"] },
-            Routes = new Dictionary<string, string[]>
+            Routes = new Dictionary<string, DnsRouteConfiguration>
             {
-                ["foo.bar"] = ["10.0.0.1:53"]
+                ["foo.bar"] = new() { Upstreams = ["10.0.0.1:53"] }
             },
             ListenAddresses = ["udp://127.0.0.1:5353"]
         };

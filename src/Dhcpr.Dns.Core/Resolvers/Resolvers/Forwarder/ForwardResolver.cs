@@ -54,7 +54,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
         if (_authoritativeZones.FindZone(questionName.ToString()) is not null)
             return null;
 
-        var endpoints = MatchRoute(questionName);
+        var endpoints = MatchRoute(questionName, context.ClientEndPoint?.Address);
         if (endpoints is null || endpoints.Length == 0)
             return null;
 
@@ -65,7 +65,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
             cancellationToken);
     }
 
-    private IPEndPoint[]? MatchRoute(DomainLabels name)
+    private IPEndPoint[]? MatchRoute(DomainLabels name, IPAddress? client)
     {
         var routes = _configuration.GetParsedRoutes();
         if (routes.Count == 0)
@@ -74,12 +74,12 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
         for (var i = 0; i < name.Labels.Length; i++)
         {
             var suffix = string.Join(".", name.Labels.Skip(i).Select(l => l.Label));
-            if (routes.TryGetValue(suffix, out var endpoints))
-                return endpoints;
+            if (routes.TryGetValue(suffix, out var route) && route.AllowsClient(client))
+                return route.Upstreams;
         }
 
-        if (routes.TryGetValue(".", out var defaultEndpoints))
-            return defaultEndpoints;
+        if (routes.TryGetValue(".", out var defaultRoute) && defaultRoute.AllowsClient(client))
+            return defaultRoute.Upstreams;
 
         return null;
     }

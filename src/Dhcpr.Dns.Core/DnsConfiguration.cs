@@ -12,14 +12,15 @@ public sealed class DnsConfiguration : IValidateSelf
     public RootServerConfiguration RootServers { get; set; } = new();
 
     /// <summary>
-    /// Conditional forwarder map: longest domain suffix → upstream nameserver endpoints.
+    /// Conditional forwarder map: longest domain suffix → upstream nameservers,
+    /// optionally limited to client CIDRs.
     /// Empty means all names fall through to recursive resolution.
     /// </summary>
-    public Dictionary<string, string[]> Routes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, DnsRouteConfiguration> Routes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    private Dictionary<string, IPEndPoint[]> _parsedRoutes = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, ParsedDnsRoute> _parsedRoutes = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyDictionary<string, IPEndPoint[]> GetParsedRoutes() => _parsedRoutes;
+    public IReadOnlyDictionary<string, ParsedDnsRoute> GetParsedRoutes() => _parsedRoutes;
 
     /// <summary>
     /// Domain suffixes that always receive NXDOMAIN (no cache / upstream).
@@ -62,30 +63,46 @@ public sealed class DnsConfiguration : IValidateSelf
         }
 
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-        Routes ??= new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-        _parsedRoutes = new Dictionary<string, IPEndPoint[]>(StringComparer.OrdinalIgnoreCase);
+        Routes ??= new Dictionary<string, DnsRouteConfiguration>(StringComparer.OrdinalIgnoreCase);
+        _parsedRoutes = new Dictionary<string, ParsedDnsRoute>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var route in Routes)
         {
-            if (route.Value is null || route.Value.Length == 0)
+            var config = route.Value ?? new DnsRouteConfiguration();
+            config.Upstreams ??= [];
+            config.Clients ??= [];
+
+            if (config.Upstreams.Length == 0)
             {
                 error = $"DNS:Routes[\"{route.Key}\"] is missing or empty";
                 return false;
             }
 
-            var endpoints = new IPEndPoint[route.Value.Length];
-            for (var i = 0; i < route.Value.Length; i++)
+            var endpoints = new IPEndPoint[config.Upstreams.Length];
+            for (var i = 0; i < config.Upstreams.Length; i++)
             {
-                if (!route.Value[i].TryGetEndPoint(53, out var endpoint))
+                if (!config.Upstreams[i].TryGetEndPoint(53, out var endpoint))
                 {
-                    error = $"DNS:Routes[\"{route.Key}\"] contains an invalid endpoint URI: {route.Value[i]}";
+                    error = $"DNS:Routes[\"{route.Key}\"] contains an invalid endpoint URI: {config.Upstreams[i]}";
                     return false;
                 }
 
                 endpoints[i] = (IPEndPoint)endpoint;
             }
 
-            _parsedRoutes[route.Key] = endpoints;
+            var clients = new IPNetwork[config.Clients.Length];
+            for (var i = 0; i < config.Clients.Length; i++)
+            {
+                if (!ParsedDnsRoute.TryParseClientNetwork(config.Clients[i], out var network))
+                {
+                    error = $"DNS:Routes[\"{route.Key}\"].Clients[{i}] is not a CIDR or IP: {config.Clients[i]}";
+                    return false;
+                }
+
+                clients[i] = network;
+            }
+
+            _parsedRoutes[route.Key] = new ParsedDnsRoute(endpoints, clients);
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract

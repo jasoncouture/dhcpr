@@ -15,7 +15,7 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 /// Unmatched names fall through to recursive resolution.
 /// Loaded authoritative zones win over forward routes.
 /// </summary>
-public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
+public sealed partial class ForwardResolver : IDomainMessageMiddleware, IDisposable
 {
     private readonly IInternalDomainClient _internalClient;
     private readonly IAuthoritativeZoneStore _authoritativeZones;
@@ -36,7 +36,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
         _subscription = options.OnChange(c =>
         {
             _configuration = c;
-            _logger.LogDebug("Forwarder routes configuration changed");
+            LogRoutesChanged(_logger);
         });
     }
 
@@ -88,4 +88,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware, IDisposable
 
     public string Name { get; } = "Forward Resolver";
     public int Priority { get; } = 500;
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Forwarder routes configuration changed")]
+    private static partial void LogRoutesChanged(ILogger logger);
 }

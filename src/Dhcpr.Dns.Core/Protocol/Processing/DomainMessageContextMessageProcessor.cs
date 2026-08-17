@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcessor<DnsPacketReceivedMessage>, IDisposable
+public sealed partial class DomainMessageContextMessageProcessor : IQueueMessageProcessor<DnsPacketReceivedMessage>, IDisposable
 {
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
@@ -89,7 +89,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
                 return;
             }
 
-            _logger.LogError(ex, "Failed to process message due to an exception");
+            LogProcessMessageFailed(_logger, ex);
         }
         finally
         {
@@ -236,4 +236,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
     {
         _middlewareChain.Dispose();
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to process message due to an exception")]
+    private static partial void LogProcessMessageFailed(ILogger logger, Exception exception);
 }

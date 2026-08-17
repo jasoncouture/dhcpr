@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
-public sealed class RecursiveRootResolver : IDomainMessageMiddleware
+public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
 {
     private readonly IInternalDomainClient _internalClient;
     private readonly ILogger<RecursiveRootResolver> _logger;
@@ -121,7 +121,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         {
             if (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "An unhandled exception occurred while resolving recursively.");
+                LogUnhandledException(_logger, ex);
             }
 
             context.ServFailReason = "recursive resolver exception";
@@ -144,4 +144,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
     public string Name { get; } = "Recursive Resolver";
     public int Priority { get; } = 5000;
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An unhandled exception occurred while resolving recursively.")]
+    private static partial void LogUnhandledException(ILogger logger, Exception exception);
 }

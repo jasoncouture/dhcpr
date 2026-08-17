@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed class DnsServer : BackgroundService
+public sealed partial class DnsServer : BackgroundService
 {
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
@@ -73,8 +73,8 @@ public sealed class DnsServer : BackgroundService
                             DnsListenProtocol.Tcp => ServeTcpDnsAsync(endPoint, listenerToken),
                             _ => throw new InvalidOperationException($"Unsupported listen protocol: {protocol}")
                         });
-                        _logger.LogInformation(
-                            "DNS server listening on {Scheme}://{EndPoint}{Interface}",
+                        LogListening(
+                            _logger,
                             protocol.ToString().ToLowerInvariant(),
                             endPoint,
                             listen.IsNetworkInterface ? $" (interface {listen.Host})" : string.Empty);
@@ -378,4 +378,7 @@ public sealed class DnsServer : BackgroundService
             await Task.WhenAll(pending).IgnoreExceptionsAsync();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "DNS server listening on {Scheme}://{EndPoint}{Interface}")]
+    private static partial void LogListening(ILogger logger, string scheme, IPEndPoint endPoint, string @interface);
 }

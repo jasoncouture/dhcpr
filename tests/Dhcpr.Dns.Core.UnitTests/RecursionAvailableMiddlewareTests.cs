@@ -21,7 +21,7 @@ public class RecursionAvailableMiddlewareTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(innerResult);
 
-        var decorator = new RecursionAvailableMiddleware(inner);
+        IDomainMessageMiddleware decorator = new RecursionAvailableMiddleware(inner);
         var result = await decorator.ProcessAsync(
             new DomainMessageContext(null, null, request),
             CancellationToken.None);
@@ -40,7 +40,7 @@ public class RecursionAvailableMiddlewareTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns((DomainMessage?)null);
 
-        var decorator = new RecursionAvailableMiddleware(inner);
+        IDomainMessageMiddleware decorator = new RecursionAvailableMiddleware(inner);
         var result = await decorator.ProcessAsync(
             new DomainMessageContext(null, null, request),
             CancellationToken.None);

@@ -38,7 +38,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();
-        services.AddSingleton<DynamicDnsStore>();
+        services.AddSingleton<IDynamicDnsStore, DynamicDnsStore>();
         // Tips bootstrap before root.zone refresh (registration order = start order).
         services.AddHostedService<RootServerTipsBootstrapService>();
         services.AddHostedService<RootZoneRefreshService>();

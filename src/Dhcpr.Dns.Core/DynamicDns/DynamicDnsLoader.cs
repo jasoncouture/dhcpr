@@ -5,10 +5,10 @@ namespace Dhcpr.Dns.Core.DynamicDns;
 
 public sealed class DynamicDnsLoader : IHostedService
 {
-    private readonly DynamicDnsStore _store;
+    private readonly IDynamicDnsStore _store;
     private readonly ILogger<DynamicDnsLoader> _logger;
 
-    public DynamicDnsLoader(DynamicDnsStore store, ILogger<DynamicDnsLoader> logger)
+    public DynamicDnsLoader(IDynamicDnsStore store, ILogger<DynamicDnsLoader> logger)
     {
         _store = store;
         _logger = logger;

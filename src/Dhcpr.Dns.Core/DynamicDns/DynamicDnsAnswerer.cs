@@ -10,7 +10,7 @@ namespace Dhcpr.Dns.Core.DynamicDns;
 public static class DynamicDnsAnswerer
 {
     public static DomainMessage? TryAnswer(
-        DynamicDnsStore store,
+        IDynamicDnsStore store,
         IAuthoritativeZoneStore zones,
         DomainMessage request)
     {

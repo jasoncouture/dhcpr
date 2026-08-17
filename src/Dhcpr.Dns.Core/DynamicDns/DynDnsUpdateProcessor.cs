@@ -12,7 +12,7 @@ namespace Dhcpr.Dns.Core.DynamicDns;
 public static class DynDnsUpdateProcessor
 {
     public static string Process(
-        DynamicDnsStore store,
+        IDynamicDnsStore store,
         IAuthoritativeZoneStore zones,
         DynamicDnsConfiguration config,
         string? authorizationHeader,
@@ -75,7 +75,7 @@ public static class DynDnsUpdateProcessor
         => $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"))}";
 
     private static string UpdateOne(
-        DynamicDnsStore store,
+        IDynamicDnsStore store,
         IAuthoritativeZoneStore zones,
         string hostname,
         IPAddress? ipv4,

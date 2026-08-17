@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.DynamicDns;
 
-public sealed class DynamicDnsStore
+public sealed class DynamicDnsStore : IDynamicDnsStore
 {
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {

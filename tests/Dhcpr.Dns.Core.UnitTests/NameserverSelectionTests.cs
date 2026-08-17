@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Sockets;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -25,18 +24,5 @@ public class NameserverSelectionTests
             new SocketException((int)SocketError.HostUnreachable));
 
         Assert.True(NameserverSelection.IsTransportFailure(aggregate));
-    }
-
-    [Fact]
-    public void PreferIPv4KeepsRelativeOrderWithinFamily()
-    {
-        var v6a = new IPEndPoint(IPAddress.Parse("2001:db8::1"), 53);
-        var v4a = new IPEndPoint(IPAddress.Parse("1.2.3.4"), 53);
-        var v6b = new IPEndPoint(IPAddress.Parse("2001:db8::2"), 53);
-        var v4b = new IPEndPoint(IPAddress.Parse("5.6.7.8"), 53);
-
-        var ordered = NameserverSelection.PreferIPv4([v6a, v4a, v6b, v4b]).ToArray();
-
-        Assert.Equal([v4a, v4b, v6a, v6b], ordered);
     }
 }

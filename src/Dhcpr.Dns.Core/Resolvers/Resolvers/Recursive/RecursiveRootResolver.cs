@@ -108,24 +108,11 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             var result = await _referralWalker.FollowAsync(
                 context, cloned, rootEndPoints, cancellationToken);
 
-            if (result.Records.Answers.Length != 0 ||
-                cloned.Questions[0].Type is not (DomainRecordType.A or DomainRecordType.AAAA))
+            if (result.Records.Answers.Length == 0 &&
+                cloned.Questions[0].Type is DomainRecordType.A or DomainRecordType.AAAA)
             {
-                return RecursiveResponseNormalizer.FinalizeRecursiveResponse(context.DomainMessage, result);
-            }
-
-            cloned = cloned with
-            {
-                Questions = cloned.Questions.Select(x => x with { Type = DomainRecordType.CNAME })
-                    .ToImmutableArray()
-            };
-            var cnameResponse =
-                await _referralWalker.FollowAsync(
-                    context, cloned, rootEndPoints, cancellationToken);
-            if (cnameResponse.Records.Answers.Length > 0 &&
-                cnameResponse.Flags.ResponseCode is DomainResponseCode.NoError)
-            {
-                return RecursiveResponseNormalizer.FinalizeRecursiveResponse(context.DomainMessage, cnameResponse);
+                result = await RecursiveCnameFallback.TryQueryAsync(
+                    context, cloned, result, rootEndPoints, _referralWalker, cancellationToken);
             }
 
             return RecursiveResponseNormalizer.FinalizeRecursiveResponse(context.DomainMessage, result);

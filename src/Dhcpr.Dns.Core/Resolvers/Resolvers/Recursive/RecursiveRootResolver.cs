@@ -80,7 +80,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                     context.DnssecScope?.PopIgnoreStatus();
                 }
 
-                using var nsNames = GetNameserverNames(responseMessage.Records).ToPooledList();
+                using var nsNames = GetNameserverNames(
+                    responseMessage.Records, message.Questions[0].Name).ToPooledList();
 
                 // Authoritative NODATA / no referral — keep current nameservers and continue.
                 if (nsNames.Count == 0)
@@ -168,7 +169,7 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             if (last.Records.Answers.Length > 0)
                 return last;
 
-            using var nsNames = GetNameserverNames(last.Records).ToPooledList();
+            using var nsNames = GetNameserverNames(last.Records, request.Questions[0].Name).ToPooledList();
             if (nsNames.Count == 0)
                 return last;
 
@@ -196,9 +197,14 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         => DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
 
     private static bool IsUnresolvedReferral(DomainMessage message)
-        => message.Records.Answers.Length == 0
-           && message.Flags.ResponseCode is DomainResponseCode.NoError
-           && message.Records.Any(r => r.Type is DomainRecordType.NS);
+    {
+        if (message.Records.Answers.Length != 0)
+            return false;
+        if (message.Flags.ResponseCode is not DomainResponseCode.NoError)
+            return false;
+        var qname = message.Questions.Length > 0 ? message.Questions[0].Name : DomainLabels.Empty;
+        return GetNameserverNames(message.Records, qname).Any();
+    }
 
     private async ValueTask<List<IPAddress>> ResolveNameserverAddressesAsync(
         DomainMessageContext parentContext,
@@ -244,7 +250,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         }
     }
 
-    private static IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)
+    private static IEnumerable<string> GetNameserverNames(
+        IEnumerable<DomainResourceRecord> records,
+        DomainLabels qname)
     {
         foreach (var record in records)
         {
@@ -252,8 +260,34 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 continue;
             if (record.Data is not NameData nameData)
                 continue;
+            // Authority NS for a CNAME target (e.g. v.aaplimg.com on itunes.apple.com)
+            // is not a zone cut for QNAME. Following it sends bag.itunes.apple.com to
+            // GSLB nameservers that REFUSE the name; the parent still has the answer.
+            if (!NsOwnerAppliesToQuery(record.Name, qname))
+                continue;
             yield return nameData.Name.ToString();
         }
+    }
+
+    /// <summary>
+    /// True when <paramref name="nsOwner"/> is QNAME or a parent of it.
+    /// </summary>
+    private static bool NsOwnerAppliesToQuery(DomainLabels nsOwner, DomainLabels qname)
+    {
+        if (nsOwner.Labels.Length == 0)
+            return true;
+        if (nsOwner.Labels.Length > qname.Labels.Length)
+            return false;
+
+        var offset = qname.Labels.Length - nsOwner.Labels.Length;
+        for (var i = 0; i < nsOwner.Labels.Length; i++)
+        {
+            if (!nsOwner.Labels[i].Label.Equals(
+                    qname.Labels[offset + i].Label, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
     }
 
     private static IEnumerable<IPAddress> GetGlueAddresses(

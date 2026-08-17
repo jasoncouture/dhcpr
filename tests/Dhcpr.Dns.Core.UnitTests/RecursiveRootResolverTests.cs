@@ -17,9 +17,11 @@ public class RecursiveRootResolverTests
     private static readonly IPEndPoint RootServer = new(IPAddress.Parse("198.41.0.4"), 53);
     private static readonly IPEndPoint ComServer = new(IPAddress.Parse("192.5.6.30"), 53);
     private static readonly IPEndPoint GoogleNs = new(IPAddress.Parse("216.239.32.10"), 53);
+    private static readonly IPEndPoint AppleNs = new(IPAddress.Parse("17.253.200.1"), 53);
     private static readonly IPAddress GoogleWwwAddress = IPAddress.Parse("142.250.80.36");
     private static readonly IPAddress UnrelatedAddress = IPAddress.Parse("1.2.3.4");
     private static readonly IPAddress NsResolvedAddress = IPAddress.Parse("9.9.9.9");
+    private static readonly IPAddress GslbAddress = IPAddress.Parse("17.253.201.8");
 
     [Fact]
     public async Task GoogleLikeNodataKeepsParentNameservers()
@@ -326,6 +328,67 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task CnameTargetAuthorityNsIsNotTreatedAsZoneCut()
+    {
+        // apple.com NS answer itunes.apple.com/NS with a CNAME plus NS for the
+        // CNAME target (v.aaplimg.com). Those GSLB servers REFUSE bag.itunes;
+        // the parent still has the CNAME. Do not switch nameservers.
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("apple.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("apple.com", "a.ns.apple.com", AppleNs.Address);
+
+            if (type == DomainRecordType.NS &&
+                name.Equals("itunes.apple.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DomainMessage(
+                    request.Id,
+                    ResponseFlags(authoritative: true),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray.Create(
+                            CnameRecord("itunes.apple.com", "itunes-cdn-itunes-apple-com.v.aaplimg.com")),
+                        ImmutableArray.Create(
+                            NsRecord("v.aaplimg.com", "a.gslb.aaplimg.com"),
+                            NsRecord("v.aaplimg.com", "b.gslb.aaplimg.com")),
+                        ImmutableArray.Create(
+                            ARecord("a.gslb.aaplimg.com", GslbAddress),
+                            ARecord("b.gslb.aaplimg.com", GslbAddress))));
+            }
+
+            if (type == DomainRecordType.A &&
+                name.Equals("bag.itunes.apple.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return Answer(
+                    request,
+                    CnameRecord("bag.itunes.apple.com", "bag-cdn.itunes-apple.com.akadns.net"));
+            }
+
+            return EmptyNoError(request);
+        });
+
+        var resolver = CreateResolver(internalClient);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("bag.itunes.apple.com")),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r =>
+            r.Type == DomainRecordType.CNAME &&
+            ((NameData)r.Data).Name.ToString()
+                .Equals("bag-cdn.itunes-apple.com.akadns.net", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(AppleNs.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GslbAddress));
+    }
+
+    [Fact]
     public async Task UpstreamDirectedContextIsIgnored()
     {
         var internalClient = new ScriptedInternalDomainClient(_ =>
@@ -396,6 +459,10 @@ public class RecursiveRootResolverTests
 
     private static DomainResourceRecord NsRecord(string owner, string target)
         => new(new DomainLabels(owner), DomainRecordType.NS, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
+            new NameData(new DomainLabels(target)));
+
+    private static DomainResourceRecord CnameRecord(string owner, string target)
+        => new(new DomainLabels(owner), DomainRecordType.CNAME, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new NameData(new DomainLabels(target)));
 
     private static DomainResourceRecord ARecord(string owner, IPAddress address)

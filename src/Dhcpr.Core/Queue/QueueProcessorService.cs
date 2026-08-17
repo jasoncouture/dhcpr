@@ -83,7 +83,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
                 {
                     while (tasks.Count >= _options.MaximumConcurrency && tasks.Count > 0)
                     {
-                        if (await RemoveCompletedTasksAsync(tasks))
+                        if (await RemoveCompletedTasksAsync(tasks, stoppingToken))
                             continue;
                         await Task.WhenAny(tasks);
                     }
@@ -116,7 +116,9 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         }
     }
 
-    public static async Task<bool> RemoveCompletedTasksAsync(IList<Task> tasks)
+    public static async Task<bool> RemoveCompletedTasksAsync(
+        IList<Task> tasks,
+        CancellationToken cancellationToken)
     {
         using var completedTasks = tasks
             .Select((task, index) => (task, index))
@@ -127,6 +129,7 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         bool any = false;
         foreach (var item in completedTasks)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             any = true;
             tasks.RemoveAt(item.index);
             await item.task;

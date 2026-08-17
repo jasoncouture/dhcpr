@@ -349,7 +349,7 @@ public class AuthoritativeZoneTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        var decorator = new CacheResolverDecorator(inner, cache);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 

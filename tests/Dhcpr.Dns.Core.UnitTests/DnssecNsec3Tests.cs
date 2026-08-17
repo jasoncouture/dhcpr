@@ -14,7 +14,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnssecNsec3Tests
 {
-    private static readonly byte[] Salt = Convert.FromHexString("AABBCCDD");
+    private static readonly byte[] _salt = Convert.FromHexString("AABBCCDD");
 
     [Fact]
     public void Base32Hex_RoundTrips()
@@ -43,7 +43,7 @@ public class DnssecNsec3Tests
             Nsec3HashAlgorithm.Sha1,
             1,
             12,
-            Salt.ToImmutableArray(),
+            _salt.ToImmutableArray(),
             ImmutableArray<byte>.Empty,
             ImmutableArray<byte>.Empty);
 
@@ -245,7 +245,7 @@ public class DnssecNsec3Tests
         Nsec3HashAlgorithm.Sha1,
         flags,
         12,
-        Salt.ToImmutableArray(),
+        _salt.ToImmutableArray(),
         ImmutableArray<byte>.Empty,
         ImmutableArray<byte>.Empty);
 

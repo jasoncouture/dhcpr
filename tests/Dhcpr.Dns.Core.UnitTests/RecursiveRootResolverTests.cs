@@ -14,14 +14,14 @@ namespace Dhcpr.Dns.Core.UnitTests;
 
 public class RecursiveRootResolverTests
 {
-    private static readonly IPEndPoint RootServer = new(IPAddress.Parse("198.41.0.4"), 53);
-    private static readonly IPEndPoint ComServer = new(IPAddress.Parse("192.5.6.30"), 53);
-    private static readonly IPEndPoint GoogleNs = new(IPAddress.Parse("216.239.32.10"), 53);
-    private static readonly IPEndPoint AppleNs = new(IPAddress.Parse("17.253.200.1"), 53);
-    private static readonly IPAddress GoogleWwwAddress = IPAddress.Parse("142.250.80.36");
-    private static readonly IPAddress UnrelatedAddress = IPAddress.Parse("1.2.3.4");
-    private static readonly IPAddress NsResolvedAddress = IPAddress.Parse("9.9.9.9");
-    private static readonly IPAddress GslbAddress = IPAddress.Parse("17.253.201.8");
+    private static readonly IPEndPoint _rootServer = new(IPAddress.Parse("198.41.0.4"), 53);
+    private static readonly IPEndPoint _comServer = new(IPAddress.Parse("192.5.6.30"), 53);
+    private static readonly IPEndPoint _googleNs = new(IPAddress.Parse("216.239.32.10"), 53);
+    private static readonly IPEndPoint _appleNs = new(IPAddress.Parse("17.253.200.1"), 53);
+    private static readonly IPAddress _googleWwwAddress = IPAddress.Parse("142.250.80.36");
+    private static readonly IPAddress _unrelatedAddress = IPAddress.Parse("1.2.3.4");
+    private static readonly IPAddress _nsResolvedAddress = IPAddress.Parse("9.9.9.9");
+    private static readonly IPAddress _gslbAddress = IPAddress.Parse("17.253.201.8");
 
     [Fact]
     public async Task GoogleLikeNodataKeepsParentNameservers()
@@ -34,12 +34,12 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
             {
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
             }
 
             if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+                return Referral("google.com", "ns1.google.com", _googleNs.Address);
             }
 
             // Leaf NS probe: authoritative NODATA with SOA only (no NS, no glue).
@@ -50,8 +50,8 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
-                    return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+                if (queried.Any(ep => ep.Address.Equals(_googleNs.Address)))
+                    return Answer(request, ARecord("www.google.com", _googleWwwAddress));
                 return EmptyNoError(request);
             }
 
@@ -68,9 +68,9 @@ public class RecursiveRootResolverTests
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
         Assert.Contains(result.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
-            ((IPAddressData)r.Data).Address.Equals(GoogleWwwAddress));
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleWwwAddress));
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
+            ((IPAddressData)r.Data).Address.Equals(_googleWwwAddress));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_googleWwwAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_googleNs.Address));
     }
 
     [Fact]
@@ -94,8 +94,8 @@ public class RecursiveRootResolverTests
                         ImmutableArray.Create(
                             NsRecord("com", "a.gtld-servers.net")),
                         ImmutableArray.Create(
-                            ARecord("a.gtld-servers.net", ComServer.Address),
-                            ARecord("unrelated.example", UnrelatedAddress))));
+                            ARecord("a.gtld-servers.net", _comServer.Address),
+                            ARecord("unrelated.example", _unrelatedAddress))));
             }
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
@@ -105,7 +105,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                if (queried.Any(ep => ep.Address.Equals(_comServer.Address)))
                     return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
                 return EmptyNoError(request);
             }
@@ -114,7 +114,7 @@ public class RecursiveRootResolverTests
         }, onUpstreamQuery: (_, endPoint) =>
         {
             queried.Add(endPoint);
-            if (endPoint.Address.Equals(ComServer.Address))
+            if (endPoint.Address.Equals(_comServer.Address))
                 nextHopAfterCom = endPoint;
         });
 
@@ -123,8 +123,8 @@ public class RecursiveRootResolverTests
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_comServer.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_unrelatedAddress));
         Assert.NotNull(nextHopAfterCom);
     }
 
@@ -151,7 +151,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
             {
-                return Answer(request, ARecord("a.gtld-servers.net", NsResolvedAddress));
+                return Answer(request, ARecord("a.gtld-servers.net", _nsResolvedAddress));
             }
 
             if (type == DomainRecordType.AAAA && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
@@ -166,7 +166,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(NsResolvedAddress)))
+                if (queried.Any(ep => ep.Address.Equals(_nsResolvedAddress)))
                     return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
                 return EmptyNoError(request);
             }
@@ -179,7 +179,7 @@ public class RecursiveRootResolverTests
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_nsResolvedAddress));
         Assert.Contains(internalClient.Queries,
             q => q.Equals("a.gtld-servers.net/A", StringComparison.OrdinalIgnoreCase));
     }
@@ -212,9 +212,9 @@ public class RecursiveRootResolverTests
                     ResponseFlags(authoritative: true),
                     request.Questions,
                     new DomainResourceRecords(
-                        ImmutableArray.Create(ARecord("a.gtld-servers.net", NsResolvedAddress)),
+                        ImmutableArray.Create(ARecord("a.gtld-servers.net", _nsResolvedAddress)),
                         ImmutableArray<DomainResourceRecord>.Empty,
-                        ImmutableArray.Create(ARecord("cdn.example.net", UnrelatedAddress))));
+                        ImmutableArray.Create(ARecord("cdn.example.net", _unrelatedAddress))));
             }
 
             if (type == DomainRecordType.AAAA && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
@@ -225,7 +225,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(NsResolvedAddress)))
+                if (queried.Any(ep => ep.Address.Equals(_nsResolvedAddress)))
                     return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
                 return EmptyNoError(request);
             }
@@ -237,8 +237,8 @@ public class RecursiveRootResolverTests
         var request = DomainMessage.CreateRequest("example.com");
         await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(NsResolvedAddress));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_unrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_nsResolvedAddress));
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
                 return NodataWithSoa("example.com");
@@ -268,7 +268,7 @@ public class RecursiveRootResolverTests
                         ImmutableArray.Create(
                             SoaRecord("example.com"),
                             NsRecord("example.com", "evil.example.net")),
-                        ImmutableArray.Create(ARecord("evil.example.net", UnrelatedAddress))));
+                        ImmutableArray.Create(ARecord("evil.example.net", _unrelatedAddress))));
             }
 
             return EmptyNoError(request);
@@ -280,7 +280,7 @@ public class RecursiveRootResolverTests
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_unrelatedAddress));
     }
 
     [Fact]
@@ -302,8 +302,8 @@ public class RecursiveRootResolverTests
                         ImmutableArray<DomainResourceRecord>.Empty,
                         ImmutableArray.Create(NsRecord("com", "a.gtld-servers.net")),
                         ImmutableArray.Create(
-                            ARecord("cdn.example.net", UnrelatedAddress),
-                            ARecord("a.gtld-servers.net", ComServer.Address))));
+                            ARecord("cdn.example.net", _unrelatedAddress),
+                            ARecord("a.gtld-servers.net", _comServer.Address))));
             }
 
             if (type == DomainRecordType.NS &&
@@ -315,7 +315,7 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.A && name.Equals("www.facebook.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                if (queried.Any(ep => ep.Address.Equals(_comServer.Address)))
                     return Answer(request, ARecord("www.facebook.com", IPAddress.Parse("157.240.3.35")));
                 return EmptyNoError(request);
             }
@@ -327,8 +327,8 @@ public class RecursiveRootResolverTests
         var request = DomainMessage.CreateRequest("www.facebook.com");
         await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(UnrelatedAddress));
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(ComServer.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_unrelatedAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_comServer.Address));
     }
 
     [Fact]
@@ -341,17 +341,17 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
-                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+                return Referral("google.com", "ns1.google.com", _googleNs.Address);
 
             if (type == DomainRecordType.A && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
             {
                 // TLD would only refer; authoritative NS answers.
-                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
-                    return Answer(request, ARecord("google.com", GoogleWwwAddress));
-                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+                if (queried.Any(ep => ep.Address.Equals(_googleNs.Address)))
+                    return Answer(request, ARecord("google.com", _googleWwwAddress));
+                return Referral("google.com", "ns1.google.com", _googleNs.Address);
             }
 
             return EmptyNoError(request);
@@ -364,8 +364,8 @@ public class RecursiveRootResolverTests
         Assert.NotNull(result);
         Assert.Contains(result!.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
-            ((IPAddressData)r.Data).Address.Equals(GoogleWwwAddress));
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GoogleNs.Address));
+            ((IPAddressData)r.Data).Address.Equals(_googleWwwAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_googleNs.Address));
     }
 
     [Fact]
@@ -375,7 +375,7 @@ public class RecursiveRootResolverTests
         // This unit tests the resolver in isolation; simulate cache by memoizing NS/com responses.
         var comNsQueries = 0;
         var queried = new List<IPEndPoint>();
-        var comNsResponse = Referral("com", "a.gtld-servers.net", ComServer.Address);
+        var comNsResponse = Referral("com", "a.gtld-servers.net", _comServer.Address);
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -388,21 +388,21 @@ public class RecursiveRootResolverTests
             }
 
             if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
-                return Referral("google.com", "ns1.google.com", GoogleNs.Address);
+                return Referral("google.com", "ns1.google.com", _googleNs.Address);
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
                 return NodataWithSoa("example.com");
 
             if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(GoogleNs.Address)))
-                    return Answer(request, ARecord("www.google.com", GoogleWwwAddress));
+                if (queried.Any(ep => ep.Address.Equals(_googleNs.Address)))
+                    return Answer(request, ARecord("www.google.com", _googleWwwAddress));
                 return EmptyNoError(request);
             }
 
             if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (queried.Any(ep => ep.Address.Equals(ComServer.Address)))
+                if (queried.Any(ep => ep.Address.Equals(_comServer.Address)))
                     return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
                 return EmptyNoError(request);
             }
@@ -438,10 +438,10 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("apple.com", StringComparison.OrdinalIgnoreCase))
-                return Referral("apple.com", "a.ns.apple.com", AppleNs.Address);
+                return Referral("apple.com", "a.ns.apple.com", _appleNs.Address);
 
             if (type == DomainRecordType.NS &&
                 name.Equals("itunes.apple.com", StringComparison.OrdinalIgnoreCase))
@@ -457,8 +457,8 @@ public class RecursiveRootResolverTests
                             NsRecord("v.aaplimg.com", "a.gslb.aaplimg.com"),
                             NsRecord("v.aaplimg.com", "b.gslb.aaplimg.com")),
                         ImmutableArray.Create(
-                            ARecord("a.gslb.aaplimg.com", GslbAddress),
-                            ARecord("b.gslb.aaplimg.com", GslbAddress))));
+                            ARecord("a.gslb.aaplimg.com", _gslbAddress),
+                            ARecord("b.gslb.aaplimg.com", _gslbAddress))));
             }
 
             if (type == DomainRecordType.A &&
@@ -483,8 +483,8 @@ public class RecursiveRootResolverTests
             r.Type == DomainRecordType.CNAME &&
             ((NameData)r.Data).Name.ToString()
                 .Equals("bag-cdn.itunes-apple.com.akadns.net", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(AppleNs.Address));
-        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(GslbAddress));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_appleNs.Address));
+        Assert.DoesNotContain(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_gslbAddress));
     }
 
     [Fact]
@@ -496,7 +496,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
                 return NodataWithSoa("example.com");
@@ -532,7 +532,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS &&
                 name.Equals("instigaterevolution.com", StringComparison.OrdinalIgnoreCase))
@@ -579,7 +579,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
             {
@@ -635,7 +635,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
                 return Referral("example.com", "ns1.example.com", exampleNs);
@@ -675,7 +675,7 @@ public class RecursiveRootResolverTests
             var type = request.Questions[0].Type;
 
             if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
-                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
 
             if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
                 return Referral("example.com", "ns1.example.com", exampleNs);
@@ -722,7 +722,7 @@ public class RecursiveRootResolverTests
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
-            UpstreamEndpoints = ImmutableArray.Create(RootServer)
+            UpstreamEndpoints = ImmutableArray.Create(_rootServer)
         };
 
         var result = await resolver.ProcessAsync(context, CancellationToken.None);
@@ -734,7 +734,7 @@ public class RecursiveRootResolverTests
     {
         var tips = new RootServerTips(new TestOptionsMonitor(new RootServerConfiguration
         {
-            Addresses = new[] { RootServer.ToString() }
+            Addresses = new[] { _rootServer.ToString() }
         }));
 
         return new RecursiveRootResolver(

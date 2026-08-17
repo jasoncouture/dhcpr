@@ -15,8 +15,8 @@ namespace Dhcpr.Dns.Core.UnitTests;
 
 public class ForwardResolverTests
 {
-    private static readonly IPEndPoint NebulaForwarder = new(IPAddress.Parse("10.245.1.1"), 5301);
-    private static readonly IPAddress AnswerAddress = IPAddress.Parse("10.0.0.50");
+    private static readonly IPEndPoint _nebulaForwarder = new(IPAddress.Parse("10.245.1.1"), 5301);
+    private static readonly IPAddress _answerAddress = IPAddress.Parse("10.0.0.50");
 
     [Fact]
     public async Task MatchingSuffixForwardsToRouteEndpoints()
@@ -34,14 +34,14 @@ public class ForwardResolverTests
                         DomainRecordType.A,
                         DomainRecordClass.IN,
                         TimeSpan.FromSeconds(60),
-                        new IPAddressData(AnswerAddress))
+                        new IPAddressData(_answerAddress))
                 },
                 responseCode: DomainResponseCode.NoError);
         });
 
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString())
+            ["nebula"] = Route(_nebulaForwarder.ToString())
         });
 
         var request = DomainMessage.CreateRequest("nas.nebula", DomainRecordType.A);
@@ -51,10 +51,10 @@ public class ForwardResolverTests
 
         Assert.NotNull(result);
         Assert.NotNull(directed);
-        Assert.Contains(NebulaForwarder, directed!.Value);
+        Assert.Contains(_nebulaForwarder, directed!.Value);
         Assert.Contains(result!.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
-            ((IPAddressData)r.Data).Address.Equals(AnswerAddress));
+            ((IPAddressData)r.Data).Address.Equals(_answerAddress));
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class ForwardResolverTests
             throw new InvalidOperationException("should not forward"));
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString())
+            ["nebula"] = Route(_nebulaForwarder.ToString())
         });
 
         var result = await resolver.ProcessAsync(
@@ -126,13 +126,13 @@ public class ForwardResolverTests
             throw new InvalidOperationException("should not forward"));
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString())
+            ["nebula"] = Route(_nebulaForwarder.ToString())
         });
 
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("nas.nebula"))
             {
-                UpstreamEndpoints = ImmutableArray.Create(NebulaForwarder)
+                UpstreamEndpoints = ImmutableArray.Create(_nebulaForwarder)
             },
             CancellationToken.None);
 
@@ -154,7 +154,7 @@ public class ForwardResolverTests
 
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString(), "10.245.0.0/16")
+            ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
 
         var result = await resolver.ProcessAsync(
@@ -165,7 +165,7 @@ public class ForwardResolverTests
             CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Contains(NebulaForwarder, directed!.Value);
+        Assert.Contains(_nebulaForwarder, directed!.Value);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class ForwardResolverTests
             throw new InvalidOperationException("should not forward"));
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString(), "10.245.0.0/16")
+            ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
 
         var result = await resolver.ProcessAsync(
@@ -229,7 +229,7 @@ public class ForwardResolverTests
             throw new InvalidOperationException("should not forward"));
         var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
         {
-            ["nebula"] = Route(NebulaForwarder.ToString(), "10.245.0.0/16")
+            ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
 
         var result = await resolver.ProcessAsync(
@@ -247,7 +247,7 @@ public class ForwardResolverTests
             RootServers = new RootServerConfiguration { Addresses = ["198.41.0.4:53"] },
             Routes = new Dictionary<string, DnsRouteConfiguration>
             {
-                ["nebula"] = Route(NebulaForwarder.ToString(), "not-a-network")
+                ["nebula"] = Route(_nebulaForwarder.ToString(), "not-a-network")
             },
             ListenAddresses = ["udp://127.0.0.1:5353"]
         };

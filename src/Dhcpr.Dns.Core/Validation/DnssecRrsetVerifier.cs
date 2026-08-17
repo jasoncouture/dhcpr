@@ -118,7 +118,7 @@ public static class DnssecRrsetVerifier
 
     private sealed class GroupKeyComparer : IEqualityComparer<(string Name, DomainRecordType Type)>
     {
-        public static readonly GroupKeyComparer Instance = new();
+        public static GroupKeyComparer Instance { get; } = new();
 
         public bool Equals((string Name, DomainRecordType Type) x, (string Name, DomainRecordType Type) y)
             => x.Type == y.Type &&
@@ -142,7 +142,7 @@ public static class DnssecRrsetVerifier
 
     private sealed class ByteArrayComparer : IComparer<byte[]>
     {
-        public static readonly ByteArrayComparer Instance = new();
+        public static ByteArrayComparer Instance { get; } = new();
 
         public int Compare(byte[]? x, byte[]? y)
         {

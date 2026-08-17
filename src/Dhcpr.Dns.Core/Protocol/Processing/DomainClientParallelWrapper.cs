@@ -19,8 +19,8 @@ public sealed class DomainClientParallelWrapper : IDomainClient
 
     public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
     {
-        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var tasks = _innerClients.Select(i => i.SendAsync(message, source.Token).AsTask()).ToPooledList();
+        var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var tasks = _innerClients.Select(i => i.SendAsync(message, cancellationTokenSource.Token).AsTask()).ToPooledList();
         using var exceptions = ListPool<Exception>.Default.Get();
         DomainMessage? truncatedFallback = null;
         DomainMessage? nameErrorFallback = null;
@@ -42,7 +42,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
                 // a lame/unreachable peer timing out must not let a single NXDOMAIN win.
                 if (result.Flags.ResponseCode is DomainResponseCode.NoError)
                 {
-                    CancelRemaining(tasks, source);
+                    CancelRemaining(tasks, cancellationTokenSource);
                     return result;
                 }
 
@@ -79,14 +79,14 @@ public sealed class DomainClientParallelWrapper : IDomainClient
             DomainResponseCode.ServerFailure);
     }
 
-    private static void CancelRemaining(PooledList<Task<DomainMessage>> tasks, CancellationTokenSource source)
+    private static void CancelRemaining(PooledList<Task<DomainMessage>> tasks, CancellationTokenSource cancellationTokenSource)
     {
         foreach (var task in tasks)
         {
             task.IgnoreExceptionsAsync().OrphanAsync();
         }
 
-        source.Cancel();
+        cancellationTokenSource.Cancel();
     }
 
     public void Dispose()

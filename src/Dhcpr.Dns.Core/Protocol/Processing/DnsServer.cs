@@ -41,8 +41,8 @@ public sealed class DnsServer : BackgroundService
             throw new InvalidOperationException("DNS ListenAddresses must contain at least one listen URI.");
 
         // Shared token: if any listener dies, cancel the rest so the host fails closed.
-        using var listenerCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        var listenerToken = listenerCts.Token;
+        using var listenerTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var listenerToken = listenerTokenSource.Token;
 
         try
         {
@@ -85,13 +85,13 @@ public sealed class DnsServer : BackgroundService
             var completed = await Task.WhenAny(tasks);
             if (stoppingToken.IsCancellationRequested)
             {
-                listenerCts.Cancel();
+                listenerTokenSource.Cancel();
                 await Task.WhenAll(tasks).IgnoreExceptionsAsync();
                 return;
             }
 
             // A listener exited while the host is still running — tear down everything.
-            listenerCts.Cancel();
+            listenerTokenSource.Cancel();
             await Task.WhenAll(tasks).IgnoreExceptionsAsync();
             await completed;
             throw new InvalidOperationException("DNS listener stopped unexpectedly.");
@@ -182,14 +182,14 @@ public sealed class DnsServer : BackgroundService
             {
                 // Idle timeout to limit how long a client can hold the connection open.
                 cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(10));
-                var token = cancellationTokenSource.Token;
+                var idleCancellationToken = cancellationTokenSource.Token;
 
-                await ReadExactAsync(client.Client, buffer.AsMemory(0, 2), token);
+                await ReadExactAsync(client.Client, buffer.AsMemory(0, 2), idleCancellationToken);
                 var length = BitConverter.ToUInt16(buffer.AsSpan(0, 2)).ToHostByteOrder();
                 if (length == 0 || length > buffer.Length)
                     return;
 
-                await ReadExactAsync(client.Client, buffer.AsMemory(0, length), token);
+                await ReadExactAsync(client.Client, buffer.AsMemory(0, length), idleCancellationToken);
                 var pending = CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
                 if (pending is not null)
                     pendingReplies.Add(pending);

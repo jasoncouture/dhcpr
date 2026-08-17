@@ -41,7 +41,7 @@ public class ForwardResolverTests
                 responseCode: DomainResponseCode.NoError);
         });
 
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString())
         });
@@ -74,7 +74,7 @@ public class ForwardResolverTests
                 DomainResponseCode.NoError);
         });
 
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["example"] = Route(broad.ToString()),
             ["b.example"] = Route(specific.ToString())
@@ -94,7 +94,7 @@ public class ForwardResolverTests
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
             throw new InvalidOperationException("should not forward"));
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString())
         });
@@ -112,7 +112,7 @@ public class ForwardResolverTests
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
             throw new InvalidOperationException("should not forward"));
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>());
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>());
 
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("nas.nebula")),
@@ -126,7 +126,7 @@ public class ForwardResolverTests
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
             throw new InvalidOperationException("should not forward"));
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString())
         });
@@ -154,7 +154,7 @@ public class ForwardResolverTests
                 DomainResponseCode.NoError);
         });
 
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
@@ -175,7 +175,7 @@ public class ForwardResolverTests
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
             throw new InvalidOperationException("should not forward"));
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
@@ -206,7 +206,7 @@ public class ForwardResolverTests
                 DomainResponseCode.NoError);
         });
 
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["b.example"] = Route(specific.ToString(), "10.0.0.0/8"),
             ["example"] = Route(broad.ToString())
@@ -229,7 +229,7 @@ public class ForwardResolverTests
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
             throw new InvalidOperationException("should not forward"));
-        var resolver = CreateResolver(internalClient, new Dictionary<string, DnsRouteConfiguration>
+        var resolver = CreateResolver(internalClient.Client, new Dictionary<string, DnsRouteConfiguration>
         {
             ["nebula"] = Route(_nebulaForwarder.ToString(), "10.245.0.0/16")
         });
@@ -291,35 +291,31 @@ public class ForwardResolverTests
         return monitor;
     }
 
-    private sealed class CapturingInternalDomainClient : IInternalDomainClient
+    private sealed class CapturingInternalDomainClient
     {
-        private readonly Func<DomainMessage, ImmutableArray<IPEndPoint>, DomainMessage> _handler;
+        public IInternalDomainClient Client { get; }
+        public List<string> Calls { get; } = [];
 
         public CapturingInternalDomainClient(
             Func<DomainMessage, ImmutableArray<IPEndPoint>, DomainMessage> handler)
         {
-            _handler = handler;
-        }
-
-        public List<string> Calls { get; } = new();
-
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => throw new NotSupportedException();
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-        {
-            Calls.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
-            return ValueTask.FromResult(_handler(message, upstreamEndpoints));
+            var client = Substitute.For<IInternalDomainClient>();
+            client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(_ => ValueTask.FromException<DomainMessage>(new NotSupportedException()));
+            client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(_ => ValueTask.FromException<DomainMessage>(new NotSupportedException()));
+            client.SendAsync(
+                    Arg.Any<DomainMessageContext>(),
+                    Arg.Any<DomainMessage>(),
+                    Arg.Any<ImmutableArray<IPEndPoint>>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ci =>
+                {
+                    var message = ci.ArgAt<DomainMessage>(1);
+                    Calls.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
+                    return new ValueTask<DomainMessage>(handler(message, ci.ArgAt<ImmutableArray<IPEndPoint>>(2)));
+                });
+            Client = client;
         }
     }
 }

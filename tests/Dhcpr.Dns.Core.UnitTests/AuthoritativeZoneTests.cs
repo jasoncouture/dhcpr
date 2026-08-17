@@ -238,7 +238,7 @@ public class AuthoritativeZoneTests
             return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
         });
 
-        var middleware = CreateAuthoritativeNsCut(client, store);
+        var middleware = CreateAuthoritativeNsCut(client.Client, store);
         var request = DomainMessage.CreateRequest("host.child.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -309,7 +309,7 @@ public class AuthoritativeZoneTests
 
         var forwarder = new ForwardResolver(
             Monitor(configuration),
-            client,
+            client.Client,
             store,
             NullLogger<ForwardResolver>.Instance);
 
@@ -403,9 +403,11 @@ public class AuthoritativeZoneTests
         return monitor;
     }
 
-    private sealed class CountingInternalClient : IInternalDomainClient
+    private sealed class CountingInternalClient
     {
-        private readonly Func<DomainMessage, ImmutableArray<IPEndPoint>, DomainMessage> _handler;
+        public IInternalDomainClient Client { get; }
+        public List<string> Queries { get; } = [];
+        public List<IPEndPoint> UpstreamEndPoints { get; } = [];
 
         public CountingInternalClient(Func<DomainMessage, DomainMessage> handler)
             : this((m, _) => handler(m))
@@ -414,31 +416,28 @@ public class AuthoritativeZoneTests
 
         public CountingInternalClient(Func<DomainMessage, ImmutableArray<IPEndPoint>, DomainMessage> handler)
         {
-            _handler = handler;
-        }
+            var client = Substitute.For<IInternalDomainClient>();
 
-        public List<string> Queries { get; } = [];
-        public List<IPEndPoint> UpstreamEndPoints { get; } = [];
+            ValueTask<DomainMessage> Send(DomainMessage message, ImmutableArray<IPEndPoint> upstreamEndpoints)
+            {
+                Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
+                if (!upstreamEndpoints.IsDefaultOrEmpty)
+                    UpstreamEndPoints.AddRange(upstreamEndpoints);
+                return ValueTask.FromResult(handler(message, upstreamEndpoints));
+            }
 
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => SendAsync(new DomainMessageContext(null, null, message) { IsInternal = true }, message, default, cancellationToken);
+            client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.Arg<DomainMessage>(), default));
+            client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.ArgAt<DomainMessage>(1), default));
+            client.SendAsync(
+                    Arg.Any<DomainMessageContext>(),
+                    Arg.Any<DomainMessage>(),
+                    Arg.Any<ImmutableArray<IPEndPoint>>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.ArgAt<DomainMessage>(1), ci.ArgAt<ImmutableArray<IPEndPoint>>(2)));
 
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => SendAsync(parentContext, message, default, cancellationToken);
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-        {
-            Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
-            if (!upstreamEndpoints.IsDefaultOrEmpty)
-                UpstreamEndPoints.AddRange(upstreamEndpoints);
-            return ValueTask.FromResult(_handler(message, upstreamEndpoints));
+            Client = client;
         }
     }
 }

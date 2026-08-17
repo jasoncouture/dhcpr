@@ -125,7 +125,7 @@ public class DnssecPhase5Tests
         var childDnsKeySig = SignRrset(childPrivate, childKey, [childKey], DomainRecordType.DNSKEY);
         var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
 
-        var internalClient = new ScriptedInternalClient(request =>
+        var internalClient = ScriptedInternalClient(request =>
         {
             var q = request.Questions[0];
             var name = q.Name.ToString();
@@ -184,7 +184,7 @@ public class DnssecPhase5Tests
         var childDnsKeySig = SignRrset(childPrivate, childKey, [childKey], DomainRecordType.DNSKEY);
         var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
 
-        var internalClient = new ScriptedInternalClient(request =>
+        var internalClient = ScriptedInternalClient(request =>
         {
             var q = request.Questions[0];
             var name = q.Name.ToString();
@@ -241,7 +241,7 @@ public class DnssecPhase5Tests
         var childDnsKeySig = SignRrset(childPrivate, childKey, [childKey], DomainRecordType.DNSKEY);
         var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
 
-        var internalClient = new ScriptedInternalClient(request =>
+        var internalClient = ScriptedInternalClient(request =>
         {
             var q = request.Questions[0];
             var name = q.Name.ToString();
@@ -301,7 +301,7 @@ public class DnssecPhase5Tests
         var sawDirectedKeyFetch = false;
         var sawUndirectedKeyFetch = false;
 
-        var internalClient = new ScriptedInternalClient((parentContext, request) =>
+        var internalClient = ScriptedInternalClient((parentContext, request) =>
         {
             var q = request.Questions[0];
             if (q.Type is DomainRecordType.DNSKEY)
@@ -419,7 +419,7 @@ public class DnssecPhase5Tests
         });
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, options);
         var validator = new DnssecMessageValidator(
-            crypto, new ScriptedInternalClient(_ =>
+            crypto, ScriptedInternalClient(_ =>
                 DomainMessage.CreateResponse(
                     DomainMessage.CreateRequest("."), DomainResourceRecords.Empty, DomainResponseCode.ServerFailure)),
             options, NullLogger<DnssecMessageValidator>.Instance);
@@ -482,7 +482,7 @@ public class DnssecPhase5Tests
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, options);
         var messageValidator = new DnssecMessageValidator(
             crypto,
-            internalClient ?? new ScriptedInternalClient(_ =>
+            internalClient ?? ScriptedInternalClient(_ =>
                 DomainMessage.CreateResponse(
                     DomainMessage.CreateRequest("."), DomainResourceRecords.Empty, DomainResponseCode.ServerFailure)),
             options,
@@ -619,41 +619,34 @@ public class DnssecPhase5Tests
         return inner;
     }
 
-    private sealed class ScriptedInternalClient : IInternalDomainClient
+    private static IInternalDomainClient ScriptedInternalClient(Func<DomainMessage, DomainMessage> handler)
+        => ScriptedInternalClient((_, request) => handler(request));
+
+    private static IInternalDomainClient ScriptedInternalClient(
+        Func<DomainMessageContext, DomainMessage, DomainMessage> handler)
     {
-        private readonly Func<DomainMessageContext, DomainMessage, DomainMessage> _handler;
-
-        public ScriptedInternalClient(Func<DomainMessage, DomainMessage> handler)
-            : this((_, request) => handler(request))
-        {
-        }
-
-        public ScriptedInternalClient(Func<DomainMessageContext, DomainMessage, DomainMessage> handler)
-        {
-            _handler = handler;
-        }
-
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromResult(_handler(
-                new DomainMessageContext(null, null, message) { IsInternal = true },
-                message));
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => ValueTask.FromResult(_handler(
-                parentContext with { UpstreamEndpoints = null },
-                message));
-
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-            => ValueTask.FromResult(_handler(
-                parentContext with { UpstreamEndpoints = upstreamEndpoints },
-                message));
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var message = ci.Arg<DomainMessage>();
+                return new ValueTask<DomainMessage>(handler(
+                    new DomainMessageContext(null, null, message) { IsInternal = true },
+                    message));
+            });
+        client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(handler(
+                ci.ArgAt<DomainMessageContext>(0) with { UpstreamEndpoints = null },
+                ci.ArgAt<DomainMessage>(1))));
+        client.SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<ImmutableArray<IPEndPoint>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(handler(
+                ci.ArgAt<DomainMessageContext>(0) with { UpstreamEndpoints = ci.ArgAt<ImmutableArray<IPEndPoint>>(2) },
+                ci.ArgAt<DomainMessage>(1))));
+        return client;
     }
 
 }

@@ -60,7 +60,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("www.google.com");
         var context = new DomainMessageContext(null, null, request);
 
@@ -120,7 +120,7 @@ public class RecursiveRootResolverTests
                 nextHopAfterCom = endPoint;
         });
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -176,7 +176,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -235,7 +235,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("example.com");
         await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -276,7 +276,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("noexist.example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -325,7 +325,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("www.facebook.com");
         await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -359,7 +359,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("google.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -416,7 +416,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint), cacheUpstreamNs: true);
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         await resolver.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.google.com")),
             CancellationToken.None);
@@ -474,7 +474,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("bag.itunes.apple.com")),
             CancellationToken.None);
@@ -512,7 +512,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("alias.example.com");
         var result = await resolver.ProcessAsync(new DomainMessageContext(null, null, request), CancellationToken.None);
 
@@ -553,7 +553,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(
                 null,
@@ -609,7 +609,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(
                 null,
@@ -652,7 +652,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(
                 null,
@@ -701,7 +701,7 @@ public class RecursiveRootResolverTests
             return EmptyNoError(request);
         });
 
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var result = await resolver.ProcessAsync(
             new DomainMessageContext(
                 null,
@@ -720,7 +720,7 @@ public class RecursiveRootResolverTests
     {
         var internalClient = new ScriptedInternalDomainClient(_ =>
             throw new InvalidOperationException("should not query"));
-        var resolver = CreateResolver(internalClient);
+        var resolver = CreateResolver(internalClient.Client);
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -855,74 +855,61 @@ public class RecursiveRootResolverTests
     /// Stands in for the middleware pipeline: upstream endpoints simulate UpstreamQueryMiddleware.
     /// Glue A/AAAA are directed at the current nameserver set (same as production).
     /// </summary>
-    private sealed class ScriptedInternalDomainClient : IInternalDomainClient
+    private sealed class ScriptedInternalDomainClient
     {
-        private readonly Func<DomainMessage, DomainMessage> _script;
-        private readonly Action<DomainMessage, IPEndPoint>? _onUpstreamQuery;
-        private readonly bool _cacheUpstreamNs;
-        private readonly Dictionary<string, DomainMessage> _nsCache = new(StringComparer.OrdinalIgnoreCase);
+        public IInternalDomainClient Client { get; }
+        public List<IPEndPoint> QueriedEndPoints { get; } = [];
+        public List<string> Queries { get; } = [];
 
         public ScriptedInternalDomainClient(
             Func<DomainMessage, DomainMessage> script,
             Action<DomainMessage, IPEndPoint>? onUpstreamQuery = null,
             bool cacheUpstreamNs = false)
         {
-            _script = script;
-            _onUpstreamQuery = onUpstreamQuery;
-            _cacheUpstreamNs = cacheUpstreamNs;
-        }
+            var nsCache = new Dictionary<string, DomainMessage>(StringComparer.OrdinalIgnoreCase);
+            var client = Substitute.For<IInternalDomainClient>();
 
-        public List<IPEndPoint> QueriedEndPoints { get; } = new();
-        public List<string> Queries { get; } = new();
+            ValueTask<DomainMessage> Send(DomainMessage message, ImmutableArray<IPEndPoint> upstreamEndpoints)
+            {
+                Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
 
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => SendAsync(
-                new DomainMessageContext(null, null, message) { IsInternal = true },
-                message,
-                upstreamEndpoints: default,
-                cancellationToken);
+                if (upstreamEndpoints.IsDefaultOrEmpty)
+                    return ValueTask.FromResult(Handle(message));
 
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            CancellationToken cancellationToken)
-            => SendAsync(parentContext, message, upstreamEndpoints: default, cancellationToken);
+                foreach (var endPoint in upstreamEndpoints)
+                {
+                    QueriedEndPoints.Add(endPoint);
+                    onUpstreamQuery?.Invoke(message, endPoint);
+                }
 
-        public ValueTask<DomainMessage> SendAsync(
-            DomainMessageContext parentContext,
-            DomainMessage message,
-            ImmutableArray<IPEndPoint> upstreamEndpoints,
-            CancellationToken cancellationToken)
-        {
-            Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
+                if (cacheUpstreamNs && message.Questions[0].Type == DomainRecordType.NS)
+                {
+                    var key = message.Questions[0].Name.ToString();
+                    if (nsCache.TryGetValue(key, out var cached))
+                        return ValueTask.FromResult(cached with { Id = message.Id });
 
-            if (upstreamEndpoints.IsDefaultOrEmpty)
+                    var response = Handle(message);
+                    nsCache[key] = response;
+                    return ValueTask.FromResult(response);
+                }
+
                 return ValueTask.FromResult(Handle(message));
-
-            foreach (var endPoint in upstreamEndpoints)
-            {
-                QueriedEndPoints.Add(endPoint);
-                _onUpstreamQuery?.Invoke(message, endPoint);
             }
 
-            if (_cacheUpstreamNs && message.Questions[0].Type == DomainRecordType.NS)
-            {
-                var key = message.Questions[0].Name.ToString();
-                if (_nsCache.TryGetValue(key, out var cached))
-                    return ValueTask.FromResult(cached with { Id = message.Id });
+            DomainMessage Handle(DomainMessage request) => script(request) with { Id = request.Id };
 
-                var response = Handle(message);
-                _nsCache[key] = response;
-                return ValueTask.FromResult(response);
-            }
+            client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.Arg<DomainMessage>(), default));
+            client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.ArgAt<DomainMessage>(1), default));
+            client.SendAsync(
+                    Arg.Any<DomainMessageContext>(),
+                    Arg.Any<DomainMessage>(),
+                    Arg.Any<ImmutableArray<IPEndPoint>>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(ci => Send(ci.ArgAt<DomainMessage>(1), ci.ArgAt<ImmutableArray<IPEndPoint>>(2)));
 
-            return ValueTask.FromResult(Handle(message));
-        }
-
-        private DomainMessage Handle(DomainMessage request)
-        {
-            var response = _script(request);
-            return response with { Id = request.Id };
+            Client = client;
         }
     }
 }

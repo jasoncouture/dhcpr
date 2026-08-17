@@ -1,8 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 
-using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+
+using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -23,12 +24,12 @@ public class DomainClientDisposeTests
     [Fact]
     public void TimeoutWrapperDisposeClosesInner()
     {
-        var inner = new DisposableClient();
+        var inner = Substitute.For<IDomainClient>();
         var wrapper = new DomainClientTimeoutWrapper(inner, TimeSpan.FromSeconds(1));
 
         wrapper.Dispose();
 
-        Assert.True(inner.Disposed);
+        inner.Received(1).Dispose();
     }
 
     [Fact]
@@ -44,13 +45,4 @@ public class DomainClientDisposeTests
         Assert.Null(udp.Client);
     }
 
-    private sealed class DisposableClient : IDomainClient
-    {
-        public bool Disposed { get; private set; }
-
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromResult(DomainMessage.CreateResponse(message));
-
-        public void Dispose() => Disposed = true;
-    }
 }

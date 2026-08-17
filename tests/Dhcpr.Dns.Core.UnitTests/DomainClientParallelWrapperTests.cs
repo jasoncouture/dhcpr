@@ -3,6 +3,8 @@ using System.Collections.Immutable;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DomainClientParallelWrapperTests
@@ -13,8 +15,8 @@ public class DomainClientParallelWrapperTests
         var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(failure, TimeSpan.Zero),
-            new DelayedClient(failure, TimeSpan.Zero)
+            DelayedClient(failure, TimeSpan.Zero),
+            DelayedClient(failure, TimeSpan.Zero)
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -30,8 +32,8 @@ public class DomainClientParallelWrapperTests
         // Slow success, fast failure — wrapper must wait for an acceptable response.
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(failure, TimeSpan.FromMilliseconds(10)),
-            new DelayedClient(success, TimeSpan.FromMilliseconds(50))
+            DelayedClient(failure, TimeSpan.FromMilliseconds(10)),
+            DelayedClient(success, TimeSpan.FromMilliseconds(50))
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -46,8 +48,8 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
-            new DelayedClient(success, TimeSpan.FromMilliseconds(50))
+            DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
+            DelayedClient(success, TimeSpan.FromMilliseconds(50))
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -61,8 +63,8 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
-            new ThrowingClient(new IOException("timed out"))
+            DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
+            ThrowingClient(new IOException("timed out"))
         });
 
         await Assert.ThrowsAnyAsync<Exception>(async () =>
@@ -76,8 +78,8 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(nameError, TimeSpan.Zero),
-            new DelayedClient(nameError, TimeSpan.Zero)
+            DelayedClient(nameError, TimeSpan.Zero),
+            DelayedClient(nameError, TimeSpan.Zero)
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -92,8 +94,8 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            new DelayedClient(truncated, TimeSpan.FromMilliseconds(10)),
-            new DelayedClient(complete, TimeSpan.FromMilliseconds(40))
+            DelayedClient(truncated, TimeSpan.FromMilliseconds(10)),
+            DelayedClient(complete, TimeSpan.FromMilliseconds(40))
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -103,27 +105,47 @@ public class DomainClientParallelWrapperTests
     [Fact]
     public async Task TimeoutWrapperCancelsViaLinkedToken()
     {
-        var inner = new TokenObservingClient(TimeSpan.FromSeconds(5));
+        var sawCancellation = false;
+        var inner = Substitute.For<IDomainClient>();
+        inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(async ci =>
+            {
+                var cancellationToken = ci.Arg<CancellationToken>();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    sawCancellation = cancellationToken.IsCancellationRequested;
+                    throw;
+                }
+
+                return DomainMessage.CreateResponse(
+                    ci.Arg<DomainMessage>(),
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.NoError);
+            });
         using var wrapper = new DomainClientTimeoutWrapper(inner, TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None));
 
-        Assert.True(inner.SawCancellation);
+        Assert.True(sawCancellation);
     }
 
     [Fact]
     public async Task TruncationFallbackRetriesOverTcp()
     {
-        var udp = new FixedClient(CreateResponse(DomainResponseCode.NoError, truncated: true));
-        var tcp = new FixedClient(CreateResponse(DomainResponseCode.NoError, truncated: false));
+        var udp = FixedClient(CreateResponse(DomainResponseCode.NoError, truncated: true));
+        var tcp = FixedClient(CreateResponse(DomainResponseCode.NoError, truncated: false));
         using var wrapper = new DomainClientTruncationFallbackWrapper(udp, tcp);
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
 
         Assert.False(result.Flags.Truncated);
-        Assert.Equal(1, udp.CallCount);
-        Assert.Equal(1, tcp.CallCount);
+        await udp.Received(1).SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
+        await tcp.Received(1).SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
     }
 
     private static DomainMessage CreateResponse(DomainResponseCode code, bool truncated)
@@ -136,68 +158,31 @@ public class DomainClientParallelWrapperTests
             DomainResourceRecords.Empty);
     }
 
-    private sealed class DelayedClient : IDomainClient
+    private static IDomainClient DelayedClient(DomainMessage response, TimeSpan delay)
     {
-        private readonly DomainMessage _response;
-        private readonly TimeSpan _delay;
-
-        public DelayedClient(DomainMessage response, TimeSpan delay)
-        {
-            _response = response;
-            _delay = delay;
-        }
-
-        public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-        {
-            await Task.Delay(_delay, cancellationToken);
-            return _response with { Id = message.Id };
-        }
-    }
-
-    private sealed class FixedClient : IDomainClient
-    {
-        private readonly DomainMessage _response;
-        public int CallCount { get; private set; }
-
-        public FixedClient(DomainMessage response) => _response = response;
-
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-        {
-            CallCount++;
-            return ValueTask.FromResult(_response with { Id = message.Id });
-        }
-    }
-
-    private sealed class ThrowingClient : IDomainClient
-    {
-        private readonly Exception _exception;
-
-        public ThrowingClient(Exception exception) => _exception = exception;
-
-        public ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-            => ValueTask.FromException<DomainMessage>(_exception);
-    }
-
-    private sealed class TokenObservingClient : IDomainClient
-    {
-        private readonly TimeSpan _delay;
-        public bool SawCancellation { get; private set; }
-
-        public TokenObservingClient(TimeSpan delay) => _delay = delay;
-
-        public async ValueTask<DomainMessage> SendAsync(DomainMessage message, CancellationToken cancellationToken)
-        {
-            try
+        var client = Substitute.For<IDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(async ci =>
             {
-                await Task.Delay(_delay, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                SawCancellation = cancellationToken.IsCancellationRequested;
-                throw;
-            }
+                await Task.Delay(delay, ci.Arg<CancellationToken>());
+                return response with { Id = ci.Arg<DomainMessage>().Id };
+            });
+        return client;
+    }
 
-            return DomainMessage.CreateResponse(message, DomainResourceRecords.Empty, DomainResponseCode.NoError);
-        }
+    private static IDomainClient FixedClient(DomainMessage response)
+    {
+        var client = Substitute.For<IDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => new ValueTask<DomainMessage>(response with { Id = ci.Arg<DomainMessage>().Id }));
+        return client;
+    }
+
+    private static IDomainClient ThrowingClient(Exception exception)
+    {
+        var client = Substitute.For<IDomainClient>();
+        client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ValueTask.FromException<DomainMessage>(exception));
+        return client;
     }
 }

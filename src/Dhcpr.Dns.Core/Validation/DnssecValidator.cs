@@ -49,7 +49,12 @@ public sealed partial class DnssecValidator : IDnssecValidator
                 _ => false
             };
         }
-        catch (Exception ex)
+        catch (CryptographicException ex)
+        {
+            LogSignatureVerificationFailed(_logger, ex, rrsig.Algorithm);
+            return false;
+        }
+        catch (ArgumentException ex)
         {
             LogSignatureVerificationFailed(_logger, ex, rrsig.Algorithm);
             return false;

@@ -17,7 +17,7 @@ public class ServFailRetryDecoratorTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(ok);
 
-        var decorator = new ServFailRetryDecorator(inner);
+        IDomainMessageMiddleware decorator = new ServFailRetryDecorator(inner);
         var context = new DomainMessageContext(null, null, request);
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);
@@ -36,7 +36,7 @@ public class ServFailRetryDecoratorTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(fail);
 
-        var decorator = new ServFailRetryDecorator(inner);
+        IDomainMessageMiddleware decorator = new ServFailRetryDecorator(inner);
         var context = new DomainMessageContext(null, null, request) { DnssecScope = new DnssecScope() };
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);
@@ -57,7 +57,7 @@ public class ServFailRetryDecoratorTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(fail, fail, ok);
 
-        var decorator = new ServFailRetryDecorator(inner);
+        IDomainMessageMiddleware decorator = new ServFailRetryDecorator(inner);
         var context = new DomainMessageContext(null, null, request);
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);
@@ -89,7 +89,7 @@ public class ServFailRetryDecoratorTests
                 return ok;
             });
 
-        var decorator = new ServFailRetryDecorator(inner);
+        IDomainMessageMiddleware decorator = new ServFailRetryDecorator(inner);
         var context = new DomainMessageContext(null, null, request) { DnssecScope = scope };
 
         await decorator.ProcessAsync(context, CancellationToken.None);

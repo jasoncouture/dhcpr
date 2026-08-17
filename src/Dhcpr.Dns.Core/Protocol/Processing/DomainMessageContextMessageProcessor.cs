@@ -167,13 +167,13 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             .ConfigureAwait(false);
     }
 
-    private static bool TryTruncateRecords(ref ImmutableArray<DomainResourceRecord> records)
+    private static ImmutableArray<DomainResourceRecord>? TryTruncateRecords(
+        ImmutableArray<DomainResourceRecord> records)
     {
         if (records.Length <= 0)
-            return false;
+            return null;
 
-        records = records[..^1];
-        return true;
+        return records[..^1];
     }
 
     public static int TruncateAndEncodeMessage(DomainMessage response, int sizeLimit, Span<byte> buffer)
@@ -184,32 +184,32 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             if (byteCount <= sizeLimit) return byteCount;
 
             var (answers, authority, additional) = response.Records;
-            if (TryTruncateRecords(ref additional))
+            if (TryTruncateRecords(additional) is { } truncatedAdditional)
             {
                 response = response with
                 {
                     Flags = response.Flags with { Truncated = true },
-                    Records = response.Records with { Additional = additional }
+                    Records = response.Records with { Additional = truncatedAdditional }
                 };
                 continue;
             }
 
-            if (TryTruncateRecords(ref authority))
+            if (TryTruncateRecords(authority) is { } truncatedAuthority)
             {
                 response = response with
                 {
                     Flags = response.Flags with { Truncated = true },
-                    Records = response.Records with { Authorities = authority }
+                    Records = response.Records with { Authorities = truncatedAuthority }
                 };
                 continue;
             }
 
-            if (answers.Length > 1 && TryTruncateRecords(ref answers))
+            if (answers.Length > 1 && TryTruncateRecords(answers) is { } truncatedAnswers)
             {
                 response = response with
                 {
                     Flags = response.Flags with { Truncated = true },
-                    Records = response.Records with { Answers = answers }
+                    Records = response.Records with { Answers = truncatedAnswers }
                 };
                 continue;
             }

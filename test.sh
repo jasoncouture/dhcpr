@@ -7,3 +7,4 @@ dig @$SERVER -p $PORT www.google.com
 dig @$SERVER -p $PORT www.facebook.com
 dig @$SERVER -p $PORT bag.itunes.apple.com
 dig @$SERVER -p $PORT nas.nebula
+dig @$SERVER -p $PORT NS instigaterevolution.com

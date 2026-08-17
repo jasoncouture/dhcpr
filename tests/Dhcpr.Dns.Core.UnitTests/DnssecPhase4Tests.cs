@@ -192,7 +192,7 @@ public class DnssecPhase4Tests
             });
 
         // Use real cache decorator path.
-        var cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache);
+        IDomainMessageMiddleware cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache);
         // Seed already done; second layer: dnssec around a hit-returning inner.
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
@@ -252,7 +252,7 @@ public class DnssecPhase4Tests
                     req, answers: [aRecord, aSig], responseCode: DomainResponseCode.NoError));
             });
 
-        var decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var request = DomainMessage.CreateRequest("www.example.com");
         var result = await decorator.ProcessAsync(
             new DomainMessageContext(null, null, request), CancellationToken.None);

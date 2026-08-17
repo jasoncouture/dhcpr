@@ -2,15 +2,15 @@ namespace Dhcpr.Dns.Core.RootZone;
 
 public sealed class RootZoneHttpClient : IRootZoneHttpClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public RootZoneHttpClient(HttpClient httpClient)
+    public RootZoneHttpClient(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<HttpResponseMessage> GetRootZoneAsync(CancellationToken cancellationToken)
-        => await _httpClient.GetAsync(
+        => await _httpClientFactory.CreateClient(nameof(RootZoneHttpClient)).GetAsync(
             RootZonePaths.RootZoneUrl,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);

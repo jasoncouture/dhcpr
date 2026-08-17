@@ -33,8 +33,10 @@ public static class DnsServiceProviderExtensions
         services.AddMessagePipe();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
-        services.AddHttpClient<INamedRootHttpClient, NamedRootHttpClient>(ConfigureInternicHttpClient);
-        services.AddHttpClient<IRootZoneHttpClient, RootZoneHttpClient>(ConfigureInternicHttpClient);
+        services.AddHttpClient(nameof(NamedRootHttpClient), ConfigureInternicHttpClient);
+        services.AddHttpClient(nameof(RootZoneHttpClient), ConfigureInternicHttpClient);
+        services.AddSingleton<INamedRootHttpClient, NamedRootHttpClient>();
+        services.AddSingleton<IRootZoneHttpClient, RootZoneHttpClient>();
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();

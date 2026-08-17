@@ -6,5 +6,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public interface IAwaitableDnsRequest
 {
+    /// <summary>
+    /// Completes with the pipeline response, <see langword="null"/> if abandoned, or a fault/cancel.
+    /// </summary>
     TaskCompletionSource<DomainMessage?> TaskCompletionSource { get; }
 }

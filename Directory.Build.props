@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1822;CA1859</NoWarn>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IDE0290</WarningsNotAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <EditorConfigFiles Include="$(MSBuildThisFileDirectory).editorconfig" />
+  </ItemGroup>
+</Project>

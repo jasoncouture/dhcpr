@@ -21,6 +21,11 @@ tab_width = 4
 end_of_line = crlf
 insert_final_newline = false
 
+# Analyzer / IDE suppressions (Obsidian style)
+dotnet_diagnostic.IDE0290.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1859.severity = none
+
 #### .NET Coding Conventions ####
 [*.{cs,vb}]
 

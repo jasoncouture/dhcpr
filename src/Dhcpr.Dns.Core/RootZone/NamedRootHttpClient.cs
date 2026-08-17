@@ -9,6 +9,6 @@ public sealed class NamedRootHttpClient : INamedRootHttpClient
         _httpClient = httpClient;
     }
 
-    public Task<HttpResponseMessage> GetAsync(string url, CancellationToken cancellationToken)
-        => _httpClient.GetAsync(url, cancellationToken);
+    public async Task<HttpResponseMessage> GetAsync(string url, CancellationToken cancellationToken)
+        => await _httpClient.GetAsync(url, cancellationToken);
 }

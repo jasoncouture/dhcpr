@@ -9,8 +9,8 @@ public sealed class RootZoneHttpClient : IRootZoneHttpClient
         _httpClient = httpClient;
     }
 
-    public Task<HttpResponseMessage> GetRootZoneAsync(CancellationToken cancellationToken)
-        => _httpClient.GetAsync(
+    public async Task<HttpResponseMessage> GetRootZoneAsync(CancellationToken cancellationToken)
+        => await _httpClient.GetAsync(
             RootZonePaths.RootZoneUrl,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);

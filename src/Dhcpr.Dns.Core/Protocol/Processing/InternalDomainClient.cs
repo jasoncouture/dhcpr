@@ -18,8 +18,8 @@ public class InternalDomainClient : IInternalDomainClient
 
     private static readonly IPEndPoint _internalEndPoint = new(IPAddress.Any, 53);
 
-    public ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
-        => EnqueueAsync(
+    public async ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
+        => await EnqueueAsync(
             new DomainMessageContext(_internalEndPoint, _internalEndPoint, domainMessage)
             {
                 IsInternal = true,
@@ -27,13 +27,13 @@ public class InternalDomainClient : IInternalDomainClient
             },
             cancellationToken);
 
-    public ValueTask<DomainMessage> SendAsync(
+    public async ValueTask<DomainMessage> SendAsync(
         DomainMessageContext parentContext,
         DomainMessage message,
         CancellationToken cancellationToken)
-        => SendAsync(parentContext, message, upstreamEndpoints: default, cancellationToken);
+        => await SendAsync(parentContext, message, upstreamEndpoints: default, cancellationToken);
 
-    public ValueTask<DomainMessage> SendAsync(
+    public async ValueTask<DomainMessage> SendAsync(
         DomainMessageContext parentContext,
         DomainMessage message,
         ImmutableArray<IPEndPoint> upstreamEndpoints,
@@ -45,10 +45,10 @@ public class InternalDomainClient : IInternalDomainClient
         if (!directed)
         {
             if (depth > MaxInternalHops)
-                return ServFailAsync(message);
+                return ServFail(message);
 
             if (parentContext.WorkBudget is { } budget && !budget.TryConsume())
-                return ServFailAsync(message);
+                return ServFail(message);
         }
 
         ImmutableArray<IPEndPoint>? endpoints = directed ? upstreamEndpoints : null;
@@ -69,15 +69,14 @@ public class InternalDomainClient : IInternalDomainClient
             BypassCache = parentContext.BypassCache || directed
         };
 
-        return EnqueueAsync(context, cancellationToken);
+        return await EnqueueAsync(context, cancellationToken);
     }
 
-    private static ValueTask<DomainMessage> ServFailAsync(DomainMessage message)
-        => ValueTask.FromResult(
-            DomainMessage.CreateResponse(
-                message,
-                DomainResourceRecords.Empty,
-                DomainResponseCode.ServerFailure));
+    private static DomainMessage ServFail(DomainMessage message)
+        => DomainMessage.CreateResponse(
+            message,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.ServerFailure);
 
     private async ValueTask<DomainMessage> EnqueueAsync(
         DomainMessageContext context,

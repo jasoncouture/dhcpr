@@ -55,24 +55,25 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
         return (channel.Reader, new Subscription(this, id, channel.Writer));
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _subscription = _subscriber.Subscribe(this);
-        return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _subscription?.Dispose();
         _subscription = null;
         foreach (var writer in _subscribers.Values)
             writer.TryComplete();
         _subscribers.Clear();
-        return Task.CompletedTask;
     }
 
-    public ValueTask HandleAsync(DnsQueryEvent message, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(DnsQueryEvent message, CancellationToken cancellationToken)
     {
+        await Task.Yield();
         lock (_ringLock)
         {
             _ring.AddFirst(message);
@@ -82,18 +83,16 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
 
         foreach (var writer in _subscribers.Values)
             writer.TryWrite(message);
-
-        return default;
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        await Task.Yield();
         _subscription?.Dispose();
         _subscription = null;
         foreach (var writer in _subscribers.Values)
             writer.TryComplete();
         _subscribers.Clear();
-        return default;
     }
 
     private void Unsubscribe(Guid id, ChannelWriter<DnsQueryEvent> writer)

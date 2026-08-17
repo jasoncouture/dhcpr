@@ -38,8 +38,9 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _observerInstance = new HubObserver(_publisher);
         _observer = _grainFactory.CreateObjectReference<ILiveQueryObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
@@ -48,7 +49,6 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         // be registered on a dying silo, and a blocking grain call stalls Kestrel/DNS startup.
         _resubscribeCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _resubscribeLoop = MaintainSubscriptionAsync(_resubscribeCancellationTokenSource.Token);
-        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -166,11 +166,11 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
             _publisher = publisher;
         }
 
-        public Task OnEventAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
+        public async Task OnEventAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
         {
+            await Task.Yield();
             // Sync Publish: OneWay observer must not block the Orleans callback path.
             _publisher.Publish(evt.ToDnsQueryEvent(), cancellationToken);
-            return Task.CompletedTask;
         }
     }
 }

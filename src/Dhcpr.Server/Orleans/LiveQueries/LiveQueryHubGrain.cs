@@ -15,18 +15,18 @@ public sealed class LiveQueryHubGrain : Grain, ILiveQueryHubGrain
         _observers = new ObserverManager<ILiveQueryObserver>(_observerExpiration, logger);
     }
 
-    public Task SubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
+    public async Task SubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
+        await Task.Yield();
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Subscribe(observer, observer);
-        return Task.CompletedTask;
     }
 
-    public Task UnsubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
+    public async Task UnsubscribeAsync(ILiveQueryObserver observer, CancellationToken cancellationToken)
     {
+        await Task.Yield();
         cancellationToken.ThrowIfCancellationRequested();
         _observers.Unsubscribe(observer);
-        return Task.CompletedTask;
     }
 
     public async Task PublishAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)

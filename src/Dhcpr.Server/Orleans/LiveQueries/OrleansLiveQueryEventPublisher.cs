@@ -31,18 +31,18 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, I
         _grainFactory = grainFactory;
     }
 
-    public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken)
+    public async ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken)
     {
+        await Task.Yield();
         cancellationToken.ThrowIfCancellationRequested();
         _channel.Writer.TryWrite(DnsQueryEventMessage.From(evt));
-        return ValueTask.CompletedTask;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _runCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _runLoop = RunAsync(_runCancellationTokenSource.Token);
-        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

@@ -52,10 +52,10 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
         var rentedCancellationTokenSource = GetCancellationTokenSource(cancellationToken, stoppingToken);
         try
         {
-            var token = rentedCancellationTokenSource.cancellationTokenSource.Token;
+            var linkedCancellationToken = rentedCancellationTokenSource.cancellationTokenSource.Token;
             await using var scope = _serviceProvider.CreateAsyncScope();
             var messageProcessors = scope.ServiceProvider.GetServices<IQueueMessageProcessor<T>>();
-            await RunMessageProcessorsAsync(message, messageProcessors, token);
+            await RunMessageProcessorsAsync(message, messageProcessors, linkedCancellationToken);
         }
         finally
         {
@@ -65,11 +65,11 @@ public sealed class QueueProcessorService<T> : BackgroundService where T : class
 
     private static async Task RunMessageProcessorsAsync(T message,
         IEnumerable<IQueueMessageProcessor<T>> messageProcessors,
-        CancellationToken token
+        CancellationToken cancellationToken
     )
     {
         using var disposable = message as IDisposable;
-        await Task.WhenAll(messageProcessors.Select(i => i.ProcessMessageAsync(message, token)));
+        await Task.WhenAll(messageProcessors.Select(i => i.ProcessMessageAsync(message, cancellationToken)));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -10,6 +10,7 @@ using Dhcpr.Server.Orleans.LiveQueries;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -56,13 +57,11 @@ builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 builder.AddDhcprOrleans();
 
-builder.Services.AddSingleton<OrleansLiveQueryEventPublisher>();
-builder.Services.AddSingleton<ILiveQueryEventPublisher>(static sp =>
-    sp.GetRequiredService<OrleansLiveQueryEventPublisher>());
-builder.Services.AddHostedService(static sp => sp.GetRequiredService<OrleansLiveQueryEventPublisher>());
+builder.Services.Replace(ServiceDescriptor.Singleton<ILiveQueryEventPublisher, OrleansLiveQueryEventPublisher>());
+builder.Services.AddHostedService(static sp => (IHostedService)sp.GetRequiredService<ILiveQueryEventPublisher>());
 builder.Services.AddHostedService<LiveQueryOrleansBridge>();
-builder.Services.AddSingleton<LiveQueryStore>();
-builder.Services.AddHostedService(static sp => sp.GetRequiredService<LiveQueryStore>());
+builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();
+builder.Services.AddHostedService(static sp => (IHostedService)sp.GetRequiredService<ILiveQueryStore>());
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

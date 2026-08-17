@@ -14,7 +14,7 @@ namespace Dhcpr.Server.LiveQueries;
 /// Retains a ring of recent <see cref="DnsQueryEvent"/>s and fans them out per Blazor circuit
 /// via DropOldest channels so slow UI never back-pressures DNS.
 /// </summary>
-public sealed class LiveQueryStore : IHostedService, IAsyncMessageHandler<DnsQueryEvent>, IAsyncDisposable
+public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMessageHandler<DnsQueryEvent>, IAsyncDisposable
 {
     public const int SnapshotCapacity = 250;
     public const int FanOutCapacity = 1000;

@@ -64,14 +64,15 @@ public class StaticPeeringMethod : IPeeringMethod, IDisposable
     public bool Enabled { get; private set; }
     public event EventHandler<PeerChangedEventArgs>? PeerStateChanged;
 
-    public ValueTask<IEnumerable<Uri>> GetPeersAsync(CancellationToken cancellationToken)
+    public async ValueTask<IEnumerable<Uri>> GetPeersAsync(CancellationToken cancellationToken)
     {
+        await Task.Yield();
         IEnumerable<Uri> peers;
         lock (_currentPeers)
         {
             peers = _currentPeers.ToImmutableArray();
         }
-        return ValueTask.FromResult(peers);
+        return peers;
     }
 
     public void Dispose()

@@ -13,7 +13,7 @@ namespace Dhcpr.Dns.Core.Validation;
 /// Validates upstream DNS responses into <see cref="DnssecScope"/>:
 /// trust-anchor → DS → DNSKEY → RRSIG, plus NSEC for NXDOMAIN/NODATA.
 /// </summary>
-public sealed class DnssecMessageValidator
+public sealed class DnssecMessageValidator : IDnssecMessageValidator
 {
     private readonly IDnssecValidator _crypto;
     private readonly IInternalDomainClient _internalClient;

@@ -11,14 +11,14 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 public sealed class DnssecValidationMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _innerMiddleware;
-    private readonly DnssecMessageValidator _validator;
+    private readonly IDnssecMessageValidator _validator;
     private readonly IDnsResponseCache _cache;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly ILogger<DnssecValidationMiddleware> _logger;
 
     public DnssecValidationMiddleware(
         IDomainMessageMiddleware innerMiddleware,
-        DnssecMessageValidator validator,
+        IDnssecMessageValidator validator,
         IDnsResponseCache cache,
         IOptionsMonitor<DnsConfiguration> options,
         ILogger<DnssecValidationMiddleware> logger)

@@ -214,7 +214,7 @@ public static class DomainMessageEncoder
         return questionPooledList;
     }
 
-    public static readonly int[] BitMaskLookup = new[]
+    private static int[] BitMaskLookup { get; } = new[]
     {
         0b0000000000000000, 0b0000000000000001, 0b0000000000000011, 0b0000000000000111, 0b0000000000001111,
         0b0000000000011111, 0b0000000000111111, 0b0000000001111111, 0b0000000011111111, 0b0000000111111111,

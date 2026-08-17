@@ -23,7 +23,7 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, I
     private readonly Channel<DnsQueryEventMessage> _channel =
         Channel.CreateBounded<DnsQueryEventMessage>(_channelOptions);
 
-    private CancellationTokenSource? _runCancellation;
+    private CancellationTokenSource? _runCancellationTokenSource;
     private Task? _runLoop;
 
     public OrleansLiveQueryEventPublisher(IGrainFactory grainFactory)
@@ -40,8 +40,8 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, I
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _runLoop = RunAsync(_runCancellation.Token);
+        _runCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _runLoop = RunAsync(_runCancellationTokenSource.Token);
         return Task.CompletedTask;
     }
 
@@ -49,11 +49,11 @@ public sealed class OrleansLiveQueryEventPublisher : ILiveQueryEventPublisher, I
     {
         _channel.Writer.TryComplete();
 
-        if (_runCancellation is not null)
+        if (_runCancellationTokenSource is not null)
         {
-            await _runCancellation.CancelAsync();
-            _runCancellation.Dispose();
-            _runCancellation = null;
+            await _runCancellationTokenSource.CancelAsync();
+            _runCancellationTokenSource.Dispose();
+            _runCancellationTokenSource = null;
         }
 
         if (_runLoop is not null)

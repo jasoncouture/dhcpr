@@ -1,6 +1,6 @@
 namespace Dhcpr.Dns.Core.RootZone;
 
-public sealed class RootZoneHttpClient
+public sealed class RootZoneHttpClient : IRootZoneHttpClient
 {
     private readonly HttpClient _httpClient;
 

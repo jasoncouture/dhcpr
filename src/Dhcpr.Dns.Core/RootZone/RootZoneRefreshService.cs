@@ -10,14 +10,14 @@ namespace Dhcpr.Dns.Core.RootZone;
 
 public sealed class RootZoneRefreshService : BackgroundService
 {
-    private readonly RootZoneStore _store;
+    private readonly IRootZoneStore _store;
     private readonly IRootServerTips _tips;
     private readonly IOptionsMonitor<ApplicationConfiguration> _application;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootZoneRefreshService> _logger;
 
     public RootZoneRefreshService(
-        RootZoneStore store,
+        IRootZoneStore store,
         IRootServerTips tips,
         IOptionsMonitor<ApplicationConfiguration> application,
         IServiceScopeFactory scopeFactory,
@@ -75,7 +75,7 @@ public sealed class RootZoneRefreshService : BackgroundService
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var http = scope.ServiceProvider.GetRequiredService<RootZoneHttpClient>();
+            var http = scope.ServiceProvider.GetRequiredService<IRootZoneHttpClient>();
             using var response = await http.GetRootZoneAsync(cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);

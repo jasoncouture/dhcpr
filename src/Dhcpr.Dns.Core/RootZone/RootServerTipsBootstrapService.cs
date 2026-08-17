@@ -16,14 +16,14 @@ namespace Dhcpr.Dns.Core.RootZone;
 /// </summary>
 public sealed class RootServerTipsBootstrapService : IHostedService
 {
-    private readonly RootServerTips _tips;
+    private readonly IRootServerTips _tips;
     private readonly IOptionsMonitor<RootServerConfiguration> _options;
     private readonly IOptionsMonitor<ApplicationConfiguration> _application;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RootServerTipsBootstrapService> _logger;
 
     public RootServerTipsBootstrapService(
-        RootServerTips tips,
+        IRootServerTips tips,
         IOptionsMonitor<RootServerConfiguration> options,
         IOptionsMonitor<ApplicationConfiguration> application,
         IServiceScopeFactory scopeFactory,
@@ -70,7 +70,7 @@ public sealed class RootServerTipsBootstrapService : IHostedService
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
-                var http = scope.ServiceProvider.GetRequiredService<NamedRootHttpClient>();
+                var http = scope.ServiceProvider.GetRequiredService<INamedRootHttpClient>();
                 using var response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

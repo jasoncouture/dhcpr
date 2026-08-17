@@ -33,12 +33,10 @@ public static class DnsServiceProviderExtensions
         services.AddMessagePipe();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
-        services.AddHttpClient<NamedRootHttpClient>(ConfigureInternicHttpClient);
-        services.AddHttpClient<RootZoneHttpClient>(ConfigureInternicHttpClient);
-        services.AddSingleton<RootServerTips>();
-        services.AddSingleton<IRootServerTips>(static sp => sp.GetRequiredService<RootServerTips>());
-        services.AddSingleton<RootZoneStore>();
-        services.AddSingleton<IRootZoneStore>(static sp => sp.GetRequiredService<RootZoneStore>());
+        services.AddHttpClient<INamedRootHttpClient, NamedRootHttpClient>(ConfigureInternicHttpClient);
+        services.AddHttpClient<IRootZoneHttpClient, RootZoneHttpClient>(ConfigureInternicHttpClient);
+        services.AddSingleton<IRootServerTips, RootServerTips>();
+        services.AddSingleton<IRootZoneStore, RootZoneStore>();
         services.AddSingleton<AuthoritativeZoneStore>();
         services.AddSingleton<DynamicDnsStore>();
         // Tips bootstrap before root.zone refresh (registration order = start order).

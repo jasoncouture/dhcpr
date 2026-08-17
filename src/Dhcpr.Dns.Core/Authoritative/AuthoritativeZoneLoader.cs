@@ -13,7 +13,7 @@ namespace Dhcpr.Dns.Core.Authoritative;
 /// Loads <c>{DataPath}/zones/**/*.bind</c>. The file watcher only signals a channel;
 /// a single hosted loop owns debounce + reload (no fire-and-forget tasks).
 /// </summary>
-public sealed class AuthoritativeZoneLoader : BackgroundService
+public sealed partial class AuthoritativeZoneLoader : BackgroundService
 {
     private static readonly TimeSpan _debounce = TimeSpan.FromMilliseconds(500);
 
@@ -93,7 +93,7 @@ public sealed class AuthoritativeZoneLoader : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to reload authoritative zones");
+                LogReloadFailed(_logger, ex);
             }
         }
     }
@@ -121,24 +121,36 @@ public sealed class AuthoritativeZoneLoader : BackgroundService
                 var zone = AuthoritativeZoneBuilder.ParseFile(file);
                 if (!seenApex.Add(zone.Apex))
                 {
-                    _logger.LogWarning(
-                        "Duplicate zone apex {Apex} in {Path}; keeping first loaded zone",
-                        zone.Apex,
-                        file);
+                    LogDuplicateZoneApex(_logger, zone.Apex, file);
                     continue;
                 }
 
                 zones.Add(zone);
-                _logger.LogInformation("Loaded authoritative zone {Apex} from {Path}", zone.Apex, file);
+                LogLoadedZone(_logger, zone.Apex, file);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Skipping authoritative zone file {Path}", file);
+                LogSkippingZoneFile(_logger, ex, file);
             }
         }
 
         _store.Publish(zones);
         _cache.Clear();
-        _logger.LogDebug("Published {Count} authoritative zone(s)", zones.Count);
+        LogPublishedZones(_logger, zones.Count);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to reload authoritative zones")]
+    private static partial void LogReloadFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Duplicate zone apex {Apex} in {Path}; keeping first loaded zone")]
+    private static partial void LogDuplicateZoneApex(ILogger logger, string apex, string path);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Loaded authoritative zone {Apex} from {Path}")]
+    private static partial void LogLoadedZone(ILogger logger, string apex, string path);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping authoritative zone file {Path}")]
+    private static partial void LogSkippingZoneFile(ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Published {Count} authoritative zone(s)")]
+    private static partial void LogPublishedZones(ILogger logger, int count);
 }

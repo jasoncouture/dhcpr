@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -31,7 +32,7 @@ public class DnssecPhase3Tests
             new IPAddressData(IPAddress.Parse("192.0.2.10")));
 
         var rrsig = SignRrset(privateKey, dnsKeyRecord, [aRecord], DomainRecordType.A);
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
 
         Assert.True(DnssecRrsetVerifier.TryVerifyRrset(
             crypto,
@@ -57,7 +58,7 @@ public class DnssecPhase3Tests
         {
             Data = new IPAddressData(IPAddress.Parse("192.0.2.99"))
         };
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
 
         Assert.False(DnssecRrsetVerifier.TryVerifyRrset(
             crypto,
@@ -242,7 +243,7 @@ public class DnssecPhase3Tests
 
     private static DnssecValidationMiddleware CreateMiddleware(DomainMessage response)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
@@ -294,7 +295,7 @@ public class DnssecPhase3Tests
         IReadOnlyList<DomainResourceRecord> rrset,
         DomainRecordType typeCovered)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var keyTag = crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
         var now = DateTimeOffset.UtcNow;
         var rrsigData = new ResourceRecordSignatureData(
@@ -330,13 +331,13 @@ public class DnssecPhase3Tests
 
     private static ushort CalculateKeyTag(DomainResourceRecord dnsKeyRecord)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         return crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
     }
 
     private static string ComputeDsDigestHex(DomainResourceRecord dnsKeyRecord, DelegationSignerDigestType digestType)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         // Brute: try VerifyDelegationSigner against a constructed DS by computing via validator path.
         // Use the same encoding as DnssecValidator.VerifyDelegationSigner.
         var size = dnsKeyRecord.EstimatedSize;

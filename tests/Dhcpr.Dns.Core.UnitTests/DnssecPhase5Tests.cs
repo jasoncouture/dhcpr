@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -551,7 +552,7 @@ public class DnssecPhase5Tests
         IReadOnlyList<DomainResourceRecord> rrset,
         DomainRecordType typeCovered)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Options(new DnsConfiguration()));
         var keyTag = crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
         var now = DateTimeOffset.UtcNow;
         var rrsigData = new ResourceRecordSignatureData(
@@ -587,7 +588,7 @@ public class DnssecPhase5Tests
 
     private static ushort CalculateKeyTag(DomainResourceRecord dnsKeyRecord)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Options(new DnsConfiguration()));
         return crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
     }
 

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -51,7 +52,7 @@ public class DnssecInsecureCnameAdTests
         scope.SetKeys(new AuthenticatedDnsKeySet { Zone = "cloudflare.net", Keys = [dnsKey] });
 
         var validator = new DnssecMessageValidator(
-            new DnssecValidator(NullLogger<DnssecValidator>.Instance),
+            new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration())),
             NoopInternalClient(),
             Monitor(new DnsConfiguration()),
             NullLogger<DnssecMessageValidator>.Instance);
@@ -87,7 +88,7 @@ public class DnssecInsecureCnameAdTests
         IReadOnlyList<DomainResourceRecord> rrset,
         DomainRecordType typeCovered)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var keyData = (DomainNameSystemKeyData)dnsKey.Data;
         var keyTag = crypto.CalculateKeyTag(keyData, dnsKey);
         var now = DateTimeOffset.UtcNow;

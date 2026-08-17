@@ -14,9 +14,9 @@ namespace Dhcpr.Dns.Core.Validation;
 public sealed partial class DnssecValidator : IDnssecValidator
 {
     private readonly ILogger<DnssecValidator> _logger;
-    private readonly IOptionsMonitor<DnsConfiguration>? _options;
+    private readonly IOptionsMonitor<DnsConfiguration> _options;
 
-    public DnssecValidator(ILogger<DnssecValidator> logger, IOptionsMonitor<DnsConfiguration>? options = null)
+    public DnssecValidator(ILogger<DnssecValidator> logger, IOptionsMonitor<DnsConfiguration> options)
     {
         _logger = logger;
         _options = options;
@@ -27,7 +27,7 @@ public sealed partial class DnssecValidator : IDnssecValidator
         if (rrsig.Algorithm != dnsKey.Algorithm)
             return false;
 
-        var policy = _options?.CurrentValue.Dnssec ?? new DnssecConfiguration();
+        var policy = _options.CurrentValue.Dnssec;
         if (!policy.IsAlgorithmAllowed((byte)rrsig.Algorithm))
         {
             LogSkippingDisallowedAlgorithm(_logger, rrsig.Algorithm);

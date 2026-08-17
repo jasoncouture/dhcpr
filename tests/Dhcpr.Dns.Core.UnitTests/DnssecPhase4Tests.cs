@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -193,7 +194,7 @@ public class DnssecPhase4Tests
         // Use real cache decorator path.
         var cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache);
         // Seed already done; second layer: dnssec around a hit-returning inner.
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
@@ -316,7 +317,7 @@ public class DnssecPhase4Tests
 
         var cnameDecorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var cache = CreateCache();
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
         {
             TrustAnchors =
@@ -392,7 +393,7 @@ public class DnssecPhase4Tests
 
         var cnameDecorator = new CanonicalNameResolverDecorator(inner, internalClient);
         var cache = CreateCache();
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
         {
             TrustAnchors =
@@ -456,7 +457,7 @@ public class DnssecPhase4Tests
         IReadOnlyList<DomainResourceRecord> rrset,
         DomainRecordType typeCovered)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var keyTag = crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
         var now = DateTimeOffset.UtcNow;
         var rrsigData = new ResourceRecordSignatureData(
@@ -492,7 +493,7 @@ public class DnssecPhase4Tests
 
     private static ushort CalculateKeyTag(DomainResourceRecord dnsKeyRecord)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         return crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
     }
 

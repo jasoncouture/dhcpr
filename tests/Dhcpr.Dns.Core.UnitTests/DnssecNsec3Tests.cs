@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -49,7 +50,7 @@ public class DnssecNsec3Tests
             ImmutableArray<byte>.Empty,
             ImmutableArray<byte>.Empty);
 
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var hash = crypto.CalculateNsec3Hash(new DomainLabels("example"), parameters);
         var encoded = DnssecBase32Hex.Encode(hash);
         Assert.Equal("0P9MHAVEQVM6T7VBL5LOP2U3T2RP3TOM", encoded);
@@ -59,7 +60,7 @@ public class DnssecNsec3Tests
     public async Task Nsec3_NodataProof_IsSecure()
     {
         var (dnsKey, privateKey) = CreateEcdsaDnsKey("example.com");
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var parameters = CreateParams(flags: 0);
 
         var qname = new DomainLabels("www.example.com");
@@ -96,7 +97,7 @@ public class DnssecNsec3Tests
     public async Task Nsec3_NxdomainProof_IsSecure()
     {
         var (dnsKey, privateKey) = CreateEcdsaDnsKey("example.com");
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var parameters = CreateParams(flags: 0);
 
         var closest = new DomainLabels("example.com");
@@ -163,7 +164,7 @@ public class DnssecNsec3Tests
     public async Task Nsec3_OptOutCover_IsInsecure()
     {
         var (dnsKey, privateKey) = CreateEcdsaDnsKey("example.com");
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var parameters = CreateParams(flags: DnssecNsec3Proof.OptOutFlag);
 
         var closest = new DomainLabels("example.com");
@@ -298,7 +299,7 @@ public class DnssecNsec3Tests
 
     private static DnssecMessageValidator CreateValidator()
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
         {
             TrustAnchors = [new TrustAnchorConfiguration()]
@@ -340,7 +341,7 @@ public class DnssecNsec3Tests
         IReadOnlyList<DomainResourceRecord> rrset,
         DomainRecordType typeCovered)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var keyTag = crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
         var now = DateTimeOffset.UtcNow;
         var rrsigData = new ResourceRecordSignatureData(
@@ -376,7 +377,7 @@ public class DnssecNsec3Tests
 
     private static ushort CalculateKeyTag(DomainResourceRecord dnsKeyRecord)
     {
-        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         return crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
     }
 

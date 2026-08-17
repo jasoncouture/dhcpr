@@ -2,10 +2,15 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Validation;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+
+using NSubstitute;
+
 using Xunit;
 
 namespace Dhcpr.Dns.Core.UnitTests;
@@ -16,7 +21,7 @@ public class DnssecValidatorTests
 
     public DnssecValidatorTests()
     {
-        _validator = new DnssecValidator(NullLogger<DnssecValidator>.Instance);
+        _validator = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
     }
 
     [Fact]
@@ -148,5 +153,13 @@ public class DnssecValidatorTests
             hyphenNsec,
             new DomainLabels("a.example"),
             new DomainLabels("a-b.example")));
+    }
+
+    private static IOptionsMonitor<T> Monitor<T>(T value)
+    {
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 }

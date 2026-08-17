@@ -15,8 +15,8 @@ public class DomainClientParallelWrapperTests
         var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(failure, TimeSpan.Zero),
-            DelayedClient(failure, TimeSpan.Zero)
+            GatedClient(failure, Task.CompletedTask),
+            GatedClient(failure, Task.CompletedTask)
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -30,13 +30,16 @@ public class DomainClientParallelWrapperTests
         var success = CreateResponse(DomainResponseCode.NoError, truncated: false);
 
         // Slow success, fast failure — wrapper must wait for an acceptable response.
+        var successGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(failure, TimeSpan.FromMilliseconds(10)),
-            DelayedClient(success, TimeSpan.FromMilliseconds(50))
+            GatedClient(failure, Task.CompletedTask),
+            GatedClient(success, successGate.Task)
         });
 
-        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        var send = wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        successGate.SetResult();
+        var result = await send;
         Assert.Equal(DomainResponseCode.NoError, result.Flags.ResponseCode);
     }
 
@@ -46,13 +49,16 @@ public class DomainClientParallelWrapperTests
         var nameError = CreateResponse(DomainResponseCode.NameError, truncated: false);
         var success = CreateResponse(DomainResponseCode.NoError, truncated: false);
 
+        var successGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
-            DelayedClient(success, TimeSpan.FromMilliseconds(50))
+            GatedClient(nameError, Task.CompletedTask),
+            GatedClient(success, successGate.Task)
         });
 
-        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        var send = wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        successGate.SetResult();
+        var result = await send;
         Assert.Equal(DomainResponseCode.NoError, result.Flags.ResponseCode);
     }
 
@@ -63,7 +69,7 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(nameError, TimeSpan.FromMilliseconds(10)),
+            GatedClient(nameError, Task.CompletedTask),
             ThrowingClient(new IOException("timed out"))
         });
 
@@ -78,8 +84,8 @@ public class DomainClientParallelWrapperTests
 
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(nameError, TimeSpan.Zero),
-            DelayedClient(nameError, TimeSpan.Zero)
+            GatedClient(nameError, Task.CompletedTask),
+            GatedClient(nameError, Task.CompletedTask)
         });
 
         var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
@@ -92,13 +98,16 @@ public class DomainClientParallelWrapperTests
         var truncated = CreateResponse(DomainResponseCode.NoError, truncated: true);
         var complete = CreateResponse(DomainResponseCode.NoError, truncated: false);
 
+        var completeGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
         {
-            DelayedClient(truncated, TimeSpan.FromMilliseconds(10)),
-            DelayedClient(complete, TimeSpan.FromMilliseconds(40))
+            GatedClient(truncated, Task.CompletedTask),
+            GatedClient(complete, completeGate.Task)
         });
 
-        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        var send = wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        completeGate.SetResult();
+        var result = await send;
         Assert.False(result.Flags.Truncated);
     }
 
@@ -144,21 +153,21 @@ public class DomainClientParallelWrapperTests
             DomainResourceRecords.Empty);
     }
 
-    private static IDomainClient DelayedClient(DomainMessage response, TimeSpan delay)
+    private static IDomainClient GatedClient(DomainMessage response, Task gate)
     {
         var client = Substitute.For<IDomainClient>();
         client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
-            .Returns(ci => DelayedSend(response, delay, ci.Arg<DomainMessage>(), ci.Arg<CancellationToken>()));
+            .Returns(ci => GatedSend(response, gate, ci.Arg<DomainMessage>(), ci.Arg<CancellationToken>()));
         return client;
     }
 
-    private static async ValueTask<DomainMessage> DelayedSend(
+    private static async ValueTask<DomainMessage> GatedSend(
         DomainMessage response,
-        TimeSpan delay,
+        Task gate,
         DomainMessage message,
         CancellationToken cancellationToken)
     {
-        await Task.Delay(delay, cancellationToken);
+        await gate.WaitAsync(cancellationToken);
         return response with { Id = message.Id };
     }
 
@@ -167,9 +176,12 @@ public class DomainClientParallelWrapperTests
         CancellationToken cancellationToken,
         Action<bool> onCancelled)
     {
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var registration = cancellationToken.Register(static state =>
+            ((TaskCompletionSource)state!).TrySetCanceled(), canceled);
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            await canceled.Task;
         }
         catch (OperationCanceledException)
         {

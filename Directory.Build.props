@@ -3,7 +3,6 @@
     <NoWarn>$(NoWarn);CA1822;CA1859</NoWarn>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);IDE0290</WarningsNotAsErrors>
   </PropertyGroup>
-  <ItemGroup>
-    <EditorConfigFiles Include="$(MSBuildThisFileDirectory).editorconfig" />
-  </ItemGroup>
+  <!-- Do not add EditorConfigFiles for the root .editorconfig: CSC already
+       discovers it and CS8700 forbids two analyzer configs in one directory. -->
 </Project>

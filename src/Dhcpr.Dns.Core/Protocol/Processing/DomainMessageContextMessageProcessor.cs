@@ -171,7 +171,7 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
         return true;
     }
 
-    private static int TruncateAndEncodeMessage(DomainMessage response, int sizeLimit, Span<byte> buffer)
+    internal static int TruncateAndEncodeMessage(DomainMessage response, int sizeLimit, Span<byte> buffer)
     {
         while (true)
         {
@@ -181,23 +181,36 @@ public sealed class DomainMessageContextMessageProcessor : IQueueMessageProcesso
             var (answers, authority, additional) = response.Records;
             if (TryTruncateRecords(ref additional))
             {
-                response = response with { Records = response.Records with { Additional = additional } };
+                response = response with
+                {
+                    Flags = response.Flags with { Truncated = true },
+                    Records = response.Records with { Additional = additional }
+                };
                 continue;
             }
 
             if (TryTruncateRecords(ref authority))
             {
-                response = response with { Records = response.Records with { Authorities = authority } };
+                response = response with
+                {
+                    Flags = response.Flags with { Truncated = true },
+                    Records = response.Records with { Authorities = authority }
+                };
                 continue;
             }
 
             if (answers.Length > 1 && TryTruncateRecords(ref answers))
             {
-                response = response with { Records = response.Records with { Answers = answers } };
+                response = response with
+                {
+                    Flags = response.Flags with { Truncated = true },
+                    Records = response.Records with { Answers = answers }
+                };
                 continue;
             }
 
             // We can't truncate it further, did the client send 100 questions or something? :sus:
+            response = response with { Flags = response.Flags with { Truncated = true } };
             return DomainMessageEncoder.Encode(buffer, response);
         }
     }

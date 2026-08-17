@@ -16,17 +16,7 @@ public static class BindZoneUnsupportedFilter
     public static string Filter(string text)
     {
         var expanded = ExpandParentheses(text);
-        var sb = new StringBuilder();
-        foreach (var rawLine in expanded.Split('\n'))
-        {
-            if (ShouldKeepLine(rawLine))
-            {
-                sb.Append(rawLine);
-                sb.Append('\n');
-            }
-        }
-
-        return sb.ToString();
+        return string.Join('\n', expanded.Split('\n').Where(ShouldKeepLine));
     }
 
     private static bool ShouldKeepLine(string rawLine)

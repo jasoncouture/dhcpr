@@ -27,7 +27,8 @@ public class DnsQueryEventFactoryTests
             },
             responseCode: DomainResponseCode.NoError);
 
-        var publisher = new RecordingPublisher();
+        var published = new List<DnsQueryEvent>();
+        var publisher = RecordingPublisher(published);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -39,8 +40,8 @@ public class DnsQueryEventFactoryTests
         await DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, response, "TestResolver", CancellationToken.None);
 
-        Assert.Single(publisher.Published);
-        var evt = publisher.Published[0];
+        Assert.Single(published);
+        var evt = published[0];
         Assert.Equal("example.com", evt.Name);
         Assert.Equal(DomainRecordType.A, evt.Type);
         Assert.Equal(DomainResponseCode.NoError, evt.ResponseCode);
@@ -56,7 +57,8 @@ public class DnsQueryEventFactoryTests
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
-        var publisher = new RecordingPublisher();
+        var published = new List<DnsQueryEvent>();
+        var publisher = RecordingPublisher(published);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -68,7 +70,7 @@ public class DnsQueryEventFactoryTests
         await DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, response, "TestResolver", CancellationToken.None);
 
-        Assert.Empty(publisher.Published);
+        Assert.Empty(published);
     }
 
     [Fact]
@@ -79,7 +81,8 @@ public class DnsQueryEventFactoryTests
         var monitor = Substitute.For<Microsoft.Extensions.Options.IOptionsMonitor<DnsConfiguration>>();
         monitor.CurrentValue.Returns(new DnsConfiguration { BlackholeDomains = ["dhitc.com"] });
         var blackhole = new BlackholeDomainMiddleware(leaf, monitor);
-        var publisher = new RecordingPublisher();
+        var published = new List<DnsQueryEvent>();
+        var publisher = RecordingPublisher(published);
         var request = DomainMessage.CreateRequest("www.dhitc.com", DomainRecordType.A);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
@@ -95,22 +98,23 @@ public class DnsQueryEventFactoryTests
         await DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
 
-        Assert.Single(publisher.Published);
-        Assert.Equal("www.dhitc.com", publisher.Published[0].Name);
-        Assert.Equal(DomainResponseCode.NameError, publisher.Published[0].ResponseCode);
-        Assert.Equal("Blackhole", publisher.Published[0].Middleware);
+        Assert.Single(published);
+        Assert.Equal("www.dhitc.com", published[0].Name);
+        Assert.Equal(DomainResponseCode.NameError, published[0].ResponseCode);
+        Assert.Equal("Blackhole", published[0].Middleware);
         await leaf.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    private sealed class RecordingPublisher : ILiveQueryEventPublisher
+    private static ILiveQueryEventPublisher RecordingPublisher(List<DnsQueryEvent> published)
     {
-        public List<DnsQueryEvent> Published { get; } = new();
-
-        public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken)
-        {
-            Published.Add(evt);
-            return default;
-        }
+        var publisher = Substitute.For<ILiveQueryEventPublisher>();
+        publisher.PublishAsync(Arg.Any<DnsQueryEvent>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                published.Add(ci.Arg<DnsQueryEvent>());
+                return ValueTask.CompletedTask;
+            });
+        return publisher;
     }
 }

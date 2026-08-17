@@ -59,7 +59,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage?>(response));
 
-        var logger = new CountingLogger();
+        var logger = CreateLogger();
         var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
 
         var context = new DomainMessageContext(
@@ -72,7 +72,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Equal(0, logger.InformationCount);
+        Assert.Equal(0, CountLogs(logger, LogLevel.Information));
         await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
     }
 
@@ -86,7 +86,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage?>(response));
 
-        var logger = new CountingLogger();
+        var logger = CreateLogger();
         var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
 
         var context = new DomainMessageContext(
@@ -96,7 +96,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Equal(1, logger.InformationCount);
+        Assert.Equal(1, CountLogs(logger, LogLevel.Information));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
                 return new ValueTask<DomainMessage?>(response);
             });
 
-        var logger = new CountingLogger();
+        var logger = CreateLogger();
         var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
@@ -122,29 +122,19 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Equal(0, logger.InformationCount);
-        Assert.Equal(1, logger.ErrorCount);
+        Assert.Equal(0, CountLogs(logger, LogLevel.Information));
+        Assert.Equal(1, CountLogs(logger, LogLevel.Error));
     }
 
-    private sealed class CountingLogger : ILogger<QueryLoggingDomainMessageMiddleware>
+    private static ILogger<QueryLoggingDomainMessageMiddleware> CreateLogger()
     {
-        public int InformationCount { get; private set; }
-        public int ErrorCount { get; private set; }
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            if (logLevel == LogLevel.Information)
-                InformationCount++;
-            if (logLevel == LogLevel.Error)
-                ErrorCount++;
-        }
+        var logger = Substitute.For<ILogger<QueryLoggingDomainMessageMiddleware>>();
+        logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+        return logger;
     }
+
+    private static int CountLogs(ILogger logger, LogLevel level) =>
+        logger.ReceivedCalls().Count(call =>
+            call.GetMethodInfo().Name == nameof(ILogger.Log) &&
+            Equals(call.GetArguments()[0], level));
 }

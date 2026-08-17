@@ -50,6 +50,7 @@ public class InternalDomainClientTests
         Assert.NotNull(queue.LastMessage);
         Assert.Equal(3, queue.LastMessage!.Context.InternalHopDepth);
         Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
+        Assert.True(queue.LastMessage.Context.BypassCache);
         Assert.True(budget.TryConsume());
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(
@@ -80,6 +81,7 @@ public class InternalDomainClientTests
 
         Assert.Equal(1, queue.EnqueueCount);
         Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
+        Assert.False(queue.LastMessage.Context.BypassCache);
         Assert.False(budget.TryConsume());
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(

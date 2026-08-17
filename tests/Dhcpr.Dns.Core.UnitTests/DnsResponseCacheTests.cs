@@ -93,7 +93,7 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
-    public void CachesNsDelegationAndGlue()
+    public void DoesNotCacheNsReferral()
     {
         var cache = CreateCache();
         var request = DomainMessage.CreateRequest("com", DomainRecordType.NS);
@@ -122,11 +122,45 @@ public class DnsResponseCacheTests
 
         cache.Set(request, response);
 
+        Assert.False(cache.TryGet(request, out _));
+        Assert.False(cache.TryGet(DomainMessage.CreateRequest("a.gtld-servers.net", DomainRecordType.A), out _));
+    }
+
+    [Fact]
+    public void CachesAuthoritativeNsAnswerAndGlue()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.NS);
+        var glueAddress = IPAddress.Parse("192.0.2.53");
+        var response = new DomainMessage(
+            request.Id,
+            new DomainMessageFlags(true, DomainOperationCode.Query, true, false, false, false, false, false,
+                DomainResponseCode.NoError),
+            request.Questions,
+            new DomainResourceRecords(
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("example.com"),
+                        DomainRecordType.NS,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(300),
+                        new NameData(new DomainLabels("ns.example.com")))),
+                System.Collections.Immutable.ImmutableArray<DomainResourceRecord>.Empty,
+                System.Collections.Immutable.ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        new DomainLabels("ns.example.com"),
+                        DomainRecordType.A,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(300),
+                        new IPAddressData(glueAddress)))));
+
+        cache.Set(request, response);
+
         Assert.True(cache.TryGet(request, out var cachedNs));
         Assert.NotNull(cachedNs);
-        Assert.Contains(cachedNs!.Records, r => r.Type == DomainRecordType.NS);
+        Assert.Contains(cachedNs!.Records.Answers, r => r.Type == DomainRecordType.NS);
 
-        var glueLookup = DomainMessage.CreateRequest("a.gtld-servers.net", DomainRecordType.A);
+        var glueLookup = DomainMessage.CreateRequest("ns.example.com", DomainRecordType.A);
         Assert.True(cache.TryGet(glueLookup, out var cachedGlue));
         Assert.NotNull(cachedGlue);
         Assert.Equal(glueAddress, ((IPAddressData)cachedGlue!.Records.Answers[0].Data).Address);

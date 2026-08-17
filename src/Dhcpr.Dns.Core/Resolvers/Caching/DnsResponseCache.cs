@@ -103,10 +103,9 @@ public sealed class DnsResponseCache : IDnsResponseCache
 
         var questionType = request.Questions[0].Type;
 
-        // Bare NS referrals must not be cached as answers for A/AAAA/etc.
-        // NS questions may cache delegations — that is the layer answer.
-        if (questionType is not DomainRecordType.NS &&
-            response.Records.Answers.Length == 0 &&
+        // Referrals (empty ANSWER + NS in AUTHORITY) are not answers. Caching them
+        // under QNAME/NS made the later child query replay the TLD referral.
+        if (response.Records.Answers.Length == 0 &&
             response.Records.Any(r => r.Type == DomainRecordType.NS) &&
             response.Flags.ResponseCode is DomainResponseCode.NoError)
             return;

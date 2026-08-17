@@ -46,8 +46,9 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
-            // Descend label by label looking for zone cuts. For A/AAAA/CNAME we do not NS-probe
-            // the leaf itself — parent nameservers are enough to answer the final QTYPE.
+            // Descend label by label looking for zone cuts. Do not probe the leaf —
+            // parent nameservers refer, then QueryFollowingReferralsAsync asks the
+            // child for the real QTYPE (NS/SOA/DNSKEY must not stop at the TLD).
             while (remainingLabels.Length > 0)
             {
                 addressRecords.Clear();
@@ -55,11 +56,8 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
                 remainingLabels = remainingLabels[..^1];
                 zoneLabels.Insert(0, next);
 
-                if (remainingLabels.Length == 0 &&
-                    question.Type is not DomainRecordType.NS)
-                {
+                if (remainingLabels.Length == 0)
                     break;
-                }
 
                 var message = DomainMessage.CreateRequest(
                     new DomainLabels(zoneLabels.ToImmutableArray()),
@@ -166,11 +164,13 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
         {
             last = await QueryUpstreamAsync(parentContext, request, endPoints, cancellationToken);
 
-            if (TryPromoteExactNsAnswer(request, last) is { } promoted)
-                return promoted;
-
             if (last.Records.Answers.Length > 0)
                 return last;
+
+            // Child AA sometimes puts the QTYPE RRset in AUTHORITY. Promote that,
+            // not a parent (AA=0) TLD referral.
+            if (TryPromoteAuthoritativeAnswer(request, last) is { } promoted)
+                return promoted;
 
             using var nsNames = GetNameserverNames(last.Records, request.Questions[0].Name).ToPooledList();
             if (nsNames.Count == 0)
@@ -201,32 +201,33 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
 
     private static DomainMessage FinalizeRecursiveResponse(DomainMessage request, DomainMessage response)
     {
-        if (TryPromoteExactNsAnswer(request, response) is { } promoted)
+        if (TryPromoteAuthoritativeAnswer(request, response) is { } promoted)
             response = promoted;
-        return IsUnresolvedReferral(response) ? ServFail(request) : response with { Id = request.Id };
+        if (IsUnresolvedReferral(response))
+            return ServFail(request);
+        return StripParentDelegationProof(request, response);
     }
 
     /// <summary>
-    /// Parent/TLD referrals put apex NS in AUTHORITY, not ANSWER. Recursive clients
-    /// (Go LookupNS, cert-manager DNS-01) only read ANSWER. The delegation NS RRset
-    /// is a valid answer for QTYPE NS — promote it rather than SERVFAILing as an
-    /// unresolved referral.
+    /// Move an AA child's QTYPE RRset (plus covering RRSIGs) from AUTHORITY to
+    /// ANSWER. Parent referrals are AA=0 and must be followed, not copied.
     /// </summary>
-    private static DomainMessage? TryPromoteExactNsAnswer(DomainMessage request, DomainMessage response)
+    private static DomainMessage? TryPromoteAuthoritativeAnswer(DomainMessage request, DomainMessage response)
     {
-        if (request.Questions.Length == 0 ||
-            request.Questions[0].Type is not DomainRecordType.NS)
+        if (!response.Flags.Authoritative)
+            return null;
+        if (request.Questions.Length == 0)
             return null;
         if (response.Flags.ResponseCode is not DomainResponseCode.NoError)
             return null;
         if (response.Records.Answers.Length > 0)
             return null;
 
-        var qname = request.Questions[0].Name;
-        var promoted = response.Records
-            .Where(r => RecordIsExactNsOrCoveringSig(r, qname))
+        var question = request.Questions[0];
+        var promoted = response.Records.Authorities
+            .Where(r => RecordIsExactTypeOrCoveringSig(r, question.Name, question.Type))
             .ToImmutableArray();
-        if (!promoted.Any(static r => r.Type is DomainRecordType.NS))
+        if (!promoted.Any(r => r.Type == question.Type))
             return null;
 
         return response with
@@ -235,24 +236,64 @@ public sealed class RecursiveRootResolver : IDomainMessageMiddleware
             {
                 Answers = promoted,
                 Authorities = response.Records.Authorities
-                    .Where(r => !RecordIsExactNsOrCoveringSig(r, qname))
-                    .ToImmutableArray(),
-                Additional = response.Records.Additional
-                    .Where(r => !RecordIsExactNsOrCoveringSig(r, qname))
+                    .Where(r => !RecordIsExactTypeOrCoveringSig(r, question.Name, question.Type))
                     .ToImmutableArray()
             }
         };
     }
 
-    private static bool RecordIsExactNsOrCoveringSig(DomainResourceRecord record, DomainLabels qname)
+    private static bool RecordIsExactTypeOrCoveringSig(
+        DomainResourceRecord record,
+        DomainLabels qname,
+        DomainRecordType type)
     {
         if (!record.Name.Equals(qname))
             return false;
-        if (record.Type is DomainRecordType.NS)
+        if (record.Type == type)
             return true;
         return record.Type is DomainRecordType.RRSIG &&
                record.Data is ResourceRecordSignatureData sig &&
-               sig.TypeCovered is DomainRecordType.NS;
+               sig.TypeCovered == type;
+    }
+
+    /// <summary>
+    /// Completed recursive answers are not TLD referrals: drop parent NS/NSEC(3)
+    /// from AUTHORITY, keep same-owner SOA, keep NS glue, clear AA.
+    /// </summary>
+    private static DomainMessage StripParentDelegationProof(DomainMessage request, DomainMessage response)
+    {
+        var flags = response.Flags with { Authoritative = false };
+        if (response.Records.Answers.Length == 0)
+            return response with { Id = request.Id, Flags = flags };
+
+        var qname = request.Questions[0].Name;
+        var nsTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in response.Records.Answers)
+        {
+            if (record.Type is DomainRecordType.NS && record.Data is NameData nameData)
+                nsTargets.Add(nameData.Name.ToString());
+        }
+
+        var authorities = response.Records.Authorities
+            .Where(r => r.Type is DomainRecordType.SOA && r.Name.Equals(qname))
+            .ToImmutableArray();
+        var additional = response.Records.Additional
+            .Where(r =>
+                r.Type is DomainRecordType.OPT ||
+                (r.Type is DomainRecordType.A or DomainRecordType.AAAA &&
+                 nsTargets.Contains(r.Name.ToString())))
+            .ToImmutableArray();
+
+        return response with
+        {
+            Id = request.Id,
+            Flags = flags,
+            Records = response.Records with
+            {
+                Authorities = authorities,
+                Additional = additional
+            }
+        };
     }
 
     private static DomainMessage ServFail(DomainMessage request)

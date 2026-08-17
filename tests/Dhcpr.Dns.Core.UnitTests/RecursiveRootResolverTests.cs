@@ -389,11 +389,12 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
-    public async Task NsQueryPromotesParentReferralIntoAnswers()
+    public async Task NsQueryFollowsToChildAndPutsNsInAnswers()
     {
-        // TLD (and often the child) put apex NS in AUTHORITY. Go LookupNS / cert-manager
-        // DNS-01 only read ANSWER; treating that referral as unresolved SERVFAILs.
+        // TLD referral has parent NS + NSEC3. Child returns the apex NS in ANSWER.
+        // Do not copy the parent referral into ANSWER.
         var vultrNs = IPAddress.Parse("108.61.10.10");
+        var queried = new List<IPEndPoint>();
         var internalClient = new ScriptedInternalDomainClient(request =>
         {
             var name = request.Questions[0].Name.ToString();
@@ -404,10 +405,20 @@ public class RecursiveRootResolverTests
 
             if (type == DomainRecordType.NS &&
                 name.Equals("instigaterevolution.com", StringComparison.OrdinalIgnoreCase))
-                return Referral("instigaterevolution.com", "ns1.vultr.com", vultrNs);
+            {
+                if (queried.Any(ep => ep.Address.Equals(vultrNs)))
+                {
+                    return Answer(
+                        request,
+                        NsRecord("instigaterevolution.com", "ns1.vultr.com"),
+                        NsRecord("instigaterevolution.com", "ns2.vultr.com"));
+                }
+
+                return ParentNsReferralWithNsec3("instigaterevolution.com", "ns1.vultr.com", vultrNs);
+            }
 
             return EmptyNoError(request);
-        });
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
 
         var resolver = CreateResolver(internalClient);
         var result = await resolver.ProcessAsync(
@@ -419,11 +430,98 @@ public class RecursiveRootResolverTests
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
-        Assert.Contains(result.Records.Answers, r =>
-            r.Type == DomainRecordType.NS &&
-            ((NameData)r.Data).Name.ToString()
-                .Equals("ns1.vultr.com", StringComparison.OrdinalIgnoreCase));
+        Assert.False(result.Flags.Authoritative);
+        Assert.Equal(2, result.Records.Answers.Count(r => r.Type == DomainRecordType.NS));
         Assert.DoesNotContain(result.Records.Authorities, r => r.Type == DomainRecordType.NS);
+        Assert.DoesNotContain(result.Records.Authorities, r => r.Type is DomainRecordType.NSEC3);
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(vultrNs));
+    }
+
+    [Fact]
+    public async Task SignedNsQueryUsesChildRrsetNotParentReferral()
+    {
+        var googleNs = IPAddress.Parse("216.239.32.10");
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(googleNs)))
+                {
+                    return Answer(
+                        request,
+                        NsRecord("google.com", "ns1.google.com"),
+                        NsRecord("google.com", "ns2.google.com"),
+                        FakeNsRrsig("google.com"));
+                }
+
+                return Referral("google.com", "ns1.google.com", googleNs);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(internalClient);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("google.com", DomainRecordType.NS)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.False(result.Flags.Authoritative);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.NS);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.RRSIG);
+        Assert.DoesNotContain(result.Records.Authorities, r => r.Type == DomainRecordType.NS);
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(googleNs));
+    }
+
+    [Fact]
+    public async Task SoaQueryFollowsToChildAnswer()
+    {
+        var exampleNs = IPAddress.Parse("192.0.2.53");
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", ComServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("example.com", "ns1.example.com", exampleNs);
+
+            if (type == DomainRecordType.SOA && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(exampleNs)))
+                    return Answer(request, SoaRecord("example.com"));
+                return Referral("example.com", "ns1.example.com", exampleNs);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(internalClient);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("example.com", DomainRecordType.SOA)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.SOA);
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(exampleNs));
     }
 
     [Fact]
@@ -551,6 +649,50 @@ public class RecursiveRootResolverTests
     private static DomainResourceRecord CnameRecord(string owner, string target)
         => new(new DomainLabels(owner), DomainRecordType.CNAME, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new NameData(new DomainLabels(target)));
+
+    private static DomainResourceRecord SoaRecord(string owner)
+        => new(new DomainLabels(owner), DomainRecordType.SOA, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
+            new StartOfAuthorityData(
+                new DomainLabels("ns1.example.com"),
+                new DomainLabels("hostmaster.example.com"),
+                1, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60),
+                TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60)));
+
+    private static DomainResourceRecord FakeNsRrsig(string owner)
+        => new(new DomainLabels(owner), DomainRecordType.RRSIG, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
+            new ResourceRecordSignatureData(
+                DomainRecordType.NS,
+                DnssecAlgorithmType.EcdsaP256Sha256,
+                2,
+                60,
+                1,
+                0,
+                12345,
+                new DomainLabels(owner),
+                ImmutableArray.Create<byte>(1, 2, 3, 4)));
+
+    private static DomainMessage ParentNsReferralWithNsec3(string zone, string nsName, IPAddress glue)
+        => new(
+            1,
+            ResponseFlags(),
+            ImmutableArray.Create(new DomainQuestion(new DomainLabels(zone), DomainRecordType.NS, DomainRecordClass.IN)),
+            new DomainResourceRecords(
+                ImmutableArray<DomainResourceRecord>.Empty,
+                ImmutableArray.Create(
+                    NsRecord(zone, nsName),
+                    new DomainResourceRecord(
+                        new DomainLabels("CK0POJMG874LJREF7EFN8430QVIT8BSM.com"),
+                        DomainRecordType.NSEC3,
+                        DomainRecordClass.IN,
+                        TimeSpan.FromSeconds(900),
+                        new NextSecure3Data(
+                            Nsec3HashAlgorithm.Sha1,
+                            1,
+                            0,
+                            ImmutableArray<byte>.Empty,
+                            ImmutableArray.Create<byte>(1, 2, 3),
+                            ImmutableArray<byte>.Empty))),
+                ImmutableArray.Create(ARecord(nsName, glue))));
 
     private static DomainResourceRecord ARecord(string owner, IPAddress address)
         => new(new DomainLabels(owner), DomainRecordType.A, DomainRecordClass.IN, TimeSpan.FromSeconds(60),

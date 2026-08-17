@@ -34,7 +34,10 @@ public sealed class TcpDomainClient : IDomainClient
                 throw new InvalidOperationException($"Invalid DNS TCP response length: {responseLength}");
 
             await ReadExactAsync(tcpClient.Client, buffer.AsMemory(0, responseLength), cancellationToken);
-            return DomainMessageEncoder.Decode(buffer.AsSpan(0, responseLength));
+            var response = DomainMessageEncoder.Decode(buffer.AsSpan(0, responseLength));
+            if (response.Id != message.Id)
+                throw new InvalidOperationException("DNS TCP response ID did not match the request.");
+            return response;
         }
         finally
         {

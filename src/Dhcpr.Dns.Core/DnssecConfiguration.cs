@@ -23,7 +23,7 @@ public sealed class DnssecConfiguration : IValidateSelf
     /// <summary>Algorithms that must never be used, even if listed in AllowedAlgorithms.</summary>
     public byte[] DeniedAlgorithms { get; set; } = [];
 
-    public static readonly byte[] DefaultAllowedAlgorithms =
+    public static byte[] DefaultAllowedAlgorithms { get; } =
     [
         (byte)DnssecAlgorithmType.RsaSha256,
         (byte)DnssecAlgorithmType.EcdsaP256Sha256

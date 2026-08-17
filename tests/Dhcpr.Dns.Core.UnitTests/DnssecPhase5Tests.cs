@@ -620,7 +620,7 @@ public class DnssecPhase5Tests
     }
 
     private static IInternalDomainClient ScriptedInternalClient(Func<DomainMessage, DomainMessage> handler)
-        => ScriptedInternalClient((_, request) => handler(request));
+        => ScriptedInternalClient((_, request) => handler.Invoke(request));
 
     private static IInternalDomainClient ScriptedInternalClient(
         Func<DomainMessageContext, DomainMessage, DomainMessage> handler)
@@ -630,12 +630,12 @@ public class DnssecPhase5Tests
             .Returns(ci =>
             {
                 var message = ci.Arg<DomainMessage>();
-                return new ValueTask<DomainMessage>(handler(
+                return new ValueTask<DomainMessage>(handler.Invoke(
                     new DomainMessageContext(null, null, message) { IsInternal = true },
                     message));
             });
         client.SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
-            .Returns(ci => new ValueTask<DomainMessage>(handler(
+            .Returns(ci => new ValueTask<DomainMessage>(handler.Invoke(
                 ci.ArgAt<DomainMessageContext>(0) with { UpstreamEndpoints = null },
                 ci.ArgAt<DomainMessage>(1))));
         client.SendAsync(
@@ -643,7 +643,7 @@ public class DnssecPhase5Tests
                 Arg.Any<DomainMessage>(),
                 Arg.Any<ImmutableArray<IPEndPoint>>(),
                 Arg.Any<CancellationToken>())
-            .Returns(ci => new ValueTask<DomainMessage>(handler(
+            .Returns(ci => new ValueTask<DomainMessage>(handler.Invoke(
                 ci.ArgAt<DomainMessageContext>(0) with { UpstreamEndpoints = ci.ArgAt<ImmutableArray<IPEndPoint>>(2) },
                 ci.ArgAt<DomainMessage>(1))));
         return client;

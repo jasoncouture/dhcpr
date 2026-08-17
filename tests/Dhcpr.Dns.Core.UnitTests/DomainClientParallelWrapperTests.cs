@@ -173,7 +173,7 @@ public class DomainClientParallelWrapperTests
         }
         catch (OperationCanceledException)
         {
-            onCancelled(cancellationToken.IsCancellationRequested);
+            onCancelled.Invoke(cancellationToken.IsCancellationRequested);
             throw;
         }
 

@@ -127,7 +127,7 @@ public class MetricsDomainMessageMiddlewareTests
                 meterListener.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<long>((_, measurement, _, _) => onMeasurement(measurement));
+        listener.SetMeasurementEventCallback<long>((_, measurement, _, _) => onMeasurement.Invoke(measurement));
         listener.Start();
         return listener;
     }

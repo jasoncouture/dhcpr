@@ -410,7 +410,7 @@ public class AuthoritativeZoneTests
         public List<IPEndPoint> UpstreamEndPoints { get; } = [];
 
         public CountingInternalClient(Func<DomainMessage, DomainMessage> handler)
-            : this((m, _) => handler(m))
+            : this((m, _) => handler.Invoke(m))
         {
         }
 
@@ -423,7 +423,7 @@ public class AuthoritativeZoneTests
                 Queries.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
                 if (!upstreamEndpoints.IsDefaultOrEmpty)
                     UpstreamEndPoints.AddRange(upstreamEndpoints);
-                return ValueTask.FromResult(handler(message, upstreamEndpoints));
+                return ValueTask.FromResult(handler.Invoke(message, upstreamEndpoints));
             }
 
             client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())

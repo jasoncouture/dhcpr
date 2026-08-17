@@ -285,15 +285,15 @@ public class CanonicalNameResolverDecoratorTests
                 Arg.Any<DomainMessageContext>(),
                 Arg.Any<DomainMessage>(),
                 Arg.Any<CancellationToken>())
-            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(1))));
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler.Invoke(callInfo.ArgAt<DomainMessage>(1))));
         client.SendAsync(
                 Arg.Any<DomainMessageContext>(),
                 Arg.Any<DomainMessage>(),
                 Arg.Any<ImmutableArray<IPEndPoint>>(),
                 Arg.Any<CancellationToken>())
-            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(1))));
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler.Invoke(callInfo.ArgAt<DomainMessage>(1))));
         client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo => new ValueTask<DomainMessage>(handler(callInfo.ArgAt<DomainMessage>(0))));
+            .Returns(callInfo => new ValueTask<DomainMessage>(handler.Invoke(callInfo.ArgAt<DomainMessage>(0))));
         return client;
     }
 }

@@ -896,7 +896,7 @@ public class RecursiveRootResolverTests
                 return ValueTask.FromResult(Handle(message));
             }
 
-            DomainMessage Handle(DomainMessage request) => script(request) with { Id = request.Id };
+            DomainMessage Handle(DomainMessage request) => script.Invoke(request) with { Id = request.Id };
 
             client.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
                 .Returns(ci => Send(ci.Arg<DomainMessage>(), default));

@@ -313,7 +313,7 @@ public class ForwardResolverTests
                 {
                     var message = ci.ArgAt<DomainMessage>(1);
                     Calls.Add($"{message.Questions[0].Name}/{message.Questions[0].Type}");
-                    return new ValueTask<DomainMessage>(handler(message, ci.ArgAt<ImmutableArray<IPEndPoint>>(2)));
+                    return new ValueTask<DomainMessage>(handler.Invoke(message, ci.ArgAt<ImmutableArray<IPEndPoint>>(2)));
                 });
             Client = client;
         }

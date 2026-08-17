@@ -5,15 +5,18 @@ using MessagePipe;
 
 using Microsoft.Extensions.Hosting;
 
+using Orleans.Runtime;
+
 namespace Dhcpr.Server.LiveQueries;
 
 public sealed partial class LiveQueryOrleansBridge : IHostedService
 {
-    // Shorter than hub ObserverManager expiration so this silo's subscription is not dropped.
-    private static readonly TimeSpan ResubscribeInterval = TimeSpan.FromMinutes(2);
+    // Backup if a membership notification is missed. Must stay well under ObserverManager expiration.
+    private static readonly TimeSpan ResubscribeInterval = TimeSpan.FromSeconds(5);
 
     private readonly IGrainFactory _grainFactory;
     private readonly IAsyncPublisher<DnsQueryEvent> _publisher;
+    private readonly IClusterMembershipService _membership;
     private readonly ILogger<LiveQueryOrleansBridge> _logger;
 
     // Orleans CreateObjectReference keeps only a WeakReference to the target — must root it.
@@ -26,22 +29,26 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
     public LiveQueryOrleansBridge(
         IGrainFactory grainFactory,
         IAsyncPublisher<DnsQueryEvent> publisher,
+        IClusterMembershipService membership,
         ILogger<LiveQueryOrleansBridge> logger)
     {
         _grainFactory = grainFactory;
         _publisher = publisher;
+        _membership = membership;
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         _observerInstance = new HubObserver(_publisher);
         _observer = _grainFactory.CreateObjectReference<ILiveQueryObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
-        await _hub.SubscribeAsync(_observer, cancellationToken);
 
+        // Do not await the first Subscribe here: after a rolling deploy the hub may still
+        // be registered on a dying silo, and a blocking grain call stalls Kestrel/DNS startup.
         _resubscribeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _resubscribeLoop = ResubscribeLoopAsync(_resubscribeCancellation.Token);
+        _resubscribeLoop = MaintainSubscriptionAsync(_resubscribeCancellation.Token);
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -99,24 +106,45 @@ public sealed partial class LiveQueryOrleansBridge : IHostedService
         _hub = null;
     }
 
-    private async Task ResubscribeLoopAsync(CancellationToken cancellationToken)
+    private async Task MaintainSubscriptionAsync(CancellationToken cancellationToken)
+    {
+        await TrySubscribeAsync(cancellationToken);
+
+        var membershipWatch = WatchMembershipAsync(cancellationToken);
+        var periodic = PeriodicSubscribeAsync(cancellationToken);
+        await Task.WhenAll(membershipWatch, periodic);
+    }
+
+    private async Task WatchMembershipAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var _ in _membership.MembershipUpdates.WithCancellation(cancellationToken))
+        {
+            // Hub grain reactivates empty when its silo dies; re-attach this observer immediately.
+            await TrySubscribeAsync(cancellationToken);
+        }
+    }
+
+    private async Task PeriodicSubscribeAsync(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(ResubscribeInterval);
         while (await timer.WaitForNextTickAsync(cancellationToken))
+            await TrySubscribeAsync(cancellationToken);
+    }
+
+    private async Task TrySubscribeAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            try
-            {
-                await _hub!.SubscribeAsync(_observer!, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // Boundary: one failed refresh must not kill the loop / host.
-                LogRefreshSubscriptionFailed(_logger, ex);
-            }
+            await _hub!.SubscribeAsync(_observer!, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Boundary: one failed refresh must not kill the loop / host.
+            LogRefreshSubscriptionFailed(_logger, ex);
         }
     }
 

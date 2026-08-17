@@ -38,10 +38,10 @@ public class SimpleMessenger : ISimpleMessenger
         using var broadcastSubscribers = GetSubscribers();
         var subscriptionsToRemove = new ConcurrentBag<WeakSubscription>();
         if (broadcastSubscribers.Count == 0) return;
-        await Parallel.ForEachAsync(broadcastSubscribers, cancellationToken, async (subscription, token) =>
+        await Parallel.ForEachAsync(broadcastSubscribers, cancellationToken, async (subscription, cancellationToken) =>
         {
             if (DestroyIfDead(subscription)) return;
-            if (!await subscription.SendAsync(sender, data, token))
+            if (!await subscription.SendAsync(sender, data, cancellationToken))
             {
                 lock (_subscribers)
                     _subscribers.Remove(subscription);

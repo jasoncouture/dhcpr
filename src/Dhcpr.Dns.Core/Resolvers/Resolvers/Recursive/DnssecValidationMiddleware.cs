@@ -55,7 +55,7 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
         var question = context.DomainMessage.Questions.Length > 0
             ? context.DomainMessage.Questions[0]
             : null;
-        var name = question?.Name.ToString();
+        var name = question?.Name;
 
         // DNSKEY/DS fetches set SuppressKeyFetch and share this scope. Nested hop
         // validation would call EnsureZoneKeysAvailable → false → Bogus and poison
@@ -129,12 +129,12 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
     }
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC skip hop validation during key/DS fetch for {Name}/{Type}")]
-    private static partial void LogSkipHopValidation(ILogger logger, string? name, DomainRecordType? type);
+    private static partial void LogSkipHopValidation(ILogger logger, DomainLabels? name, DomainRecordType? type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC hop {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth}, cache={Cache})")]
     private static partial void LogHopStatus(
         ILogger logger,
-        string? name,
+        DomainLabels? name,
         DomainRecordType? type,
         DomainResponseCode rcode,
         DnssecValidationStatus before,
@@ -145,7 +145,7 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC client {Name}/{Type} rcode={Rcode} status {Before} -> {After} (cache={Cache})")]
     private static partial void LogClientStatus(
         ILogger logger,
-        string? name,
+        DomainLabels? name,
         DomainRecordType? type,
         DomainResponseCode rcode,
         DnssecValidationStatus before,
@@ -153,11 +153,11 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
         bool cache);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "DNSSEC SERVFAIL {Name}/{Type}: validation bogus (CD=0)")]
-    private static partial void LogServFailBogus(ILogger logger, string? name, DomainRecordType? type);
+    private static partial void LogServFailBogus(ILogger logger, DomainLabels? name, DomainRecordType? type);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "DNSSEC returning bogus answer for {Name}/{Type} (CD=1)")]
-    private static partial void LogReturningBogusAnswer(ILogger logger, string? name, DomainRecordType? type);
+    private static partial void LogReturningBogusAnswer(ILogger logger, DomainLabels? name, DomainRecordType? type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC setting AD for {Name}/{Type}")]
-    private static partial void LogSettingAuthenticData(ILogger logger, string? name, DomainRecordType? type);
+    private static partial void LogSettingAuthenticData(ILogger logger, DomainLabels? name, DomainRecordType? type);
 }

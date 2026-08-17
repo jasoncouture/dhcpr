@@ -74,11 +74,11 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             // answers. Client-facing and undirected re-entry (CNAME chase) still count.
             if (context.IsInternal && context.UpstreamEndpoints is { Length: > 0 })
             {
-                LogUnsignedDirectedHopIgnored(_logger, question.Name.ToString(), question.Type);
+                LogUnsignedDirectedHopIgnored(_logger, question.Name, question.Type);
                 return;
             }
 
-            LogInsecureNoRrsig(_logger, question.Name.ToString(), question.Type);
+            LogInsecureNoRrsig(_logger, question.Name, question.Type);
             scope.Observe(DnssecValidationStatus.Insecure);
             return;
         }
@@ -90,17 +90,17 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
 
             var outcome = await ValidateSignedMessageAsync(context, response, allRecords, cancellationToken)
                 .ConfigureAwait(false);
-            LogSignedMessageOutcome(_logger, outcome, question.Name.ToString(), question.Type);
+            LogSignedMessageOutcome(_logger, outcome, question.Name, question.Type);
             if (outcome is DnssecValidationStatus.Bogus)
             {
-                LogObservingBogus(_logger, question.Name.ToString(), question.Type, scope.Status);
+                LogObservingBogus(_logger, question.Name, question.Type, scope.Status);
             }
 
             scope.Observe(outcome);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogValidationFailedUnexpectedly(_logger, ex, question.Name.ToString(), question.Type);
+            LogValidationFailedUnexpectedly(_logger, ex, question.Name, question.Type);
             scope.Observe(DnssecValidationStatus.Bogus);
         }
     }
@@ -226,14 +226,14 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
 
         if (needsNegativeProof)
         {
-            LogCheckingNegativeProof(_logger, question.Name.ToString(), question.Type, response.Flags.ResponseCode);
+            LogCheckingNegativeProof(_logger, question.Name, question.Type, response.Flags.ResponseCode);
 
             await EnsureNegativeProofKeysAsync(context, allRecords, cancellationToken).ConfigureAwait(false);
 
             var nsecOutcome = ValidateNegativeProof(scope, question, response, allRecords, now);
             if (nsecOutcome is DnssecValidationStatus.Bogus)
             {
-                LogNegativeProofFailed(_logger, question.Name.ToString());
+                LogNegativeProofFailed(_logger, question.Name);
                 return DnssecValidationStatus.Bogus;
             }
 
@@ -284,7 +284,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         if (allRecords.Any(static r => r.Type is DomainRecordType.NSEC3))
             return ValidateNsec3Proof(scope, question, response, allRecords, now);
 
-        LogNoNegativeProofRecords(_logger, question.Name.ToString());
+        LogNoNegativeProofRecords(_logger, question.Name);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -311,13 +311,13 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 // Zone-walk NS probes often see NSEC before the signer’s DNSKEY is cached
                 // in this scope. Missing keys must not sticky-Bogus the client query.
                 sawSignedNsecWithoutKeys = true;
-                LogNsecSignerKeysMissing(_logger, signer, nsecRecord.Name.ToString());
+                LogNsecSignerKeysMissing(_logger, signer, nsecRecord.Name);
                 continue;
             }
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, [nsecRecord], rrsigs, keys.Keys, now))
             {
-                LogNsecRrsigFailed(_logger, nsecRecord.Name.ToString());
+                LogNsecRrsigFailed(_logger, nsecRecord.Name);
                 return DnssecValidationStatus.Bogus;
             }
 
@@ -327,28 +327,28 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 if (DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, question.Type) ||
                     DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, DomainRecordType.CNAME))
                 {
-                    LogNsecNodataTypePresent(_logger, nsecRecord.Name.ToString());
+                    LogNsecNodataTypePresent(_logger, nsecRecord.Name);
                     return DnssecValidationStatus.Bogus;
                 }
 
-                LogNsecNodataProof(_logger, question.Name.ToString(), question.Type);
+                LogNsecNodataProof(_logger, question.Name, question.Type);
                 return DnssecValidationStatus.Secure;
             }
 
             if (_crypto.CoversName(nsec, nsecRecord.Name, question.Name))
             {
-                LogNsecCoversName(_logger, nsecRecord.Name.ToString(), question.Name.ToString(), nsec.NextDomainName.ToString());
+                LogNsecCoversName(_logger, nsecRecord.Name, question.Name, nsec.NextDomainName);
                 return DnssecValidationStatus.Secure;
             }
         }
 
         if (sawSignedNsecWithoutKeys)
         {
-            LogSignedNsecWithoutKeys(_logger, question.Name.ToString());
+            LogSignedNsecWithoutKeys(_logger, question.Name);
             return DnssecValidationStatus.Indeterminate;
         }
 
-        LogNoCoveringNsec(_logger, question.Name.ToString());
+        LogNoCoveringNsec(_logger, question.Name);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -362,7 +362,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         var nsec3s = DnssecNsec3Proof.Collect(allRecords);
         if (nsec3s.Count == 0)
         {
-            LogNsec3OwnersUndecodable(_logger, question.Name.ToString());
+            LogNsec3OwnersUndecodable(_logger, question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -374,7 +374,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             var rrsigs = DnssecRrsetVerifier.FindCoveringRrsigs(allRecords, owner, DomainRecordType.NSEC3);
             if (rrsigs.Count == 0)
             {
-                LogNsec3HasNoRrsig(_logger, owner.ToString());
+                LogNsec3HasNoRrsig(_logger, owner);
                 return DnssecValidationStatus.Bogus;
             }
 
@@ -387,7 +387,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(_crypto, records, rrsigs, keys.Keys, now))
             {
-                LogNsec3RrsigFailed(_logger, owner.ToString());
+                LogNsec3RrsigFailed(_logger, owner);
                 return DnssecValidationStatus.Bogus;
             }
         }
@@ -405,11 +405,11 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             if (DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, question.Type) ||
                 DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, DomainRecordType.CNAME))
             {
-                LogNsec3NodataTypePresent(_logger, question.Name.ToString());
+                LogNsec3NodataTypePresent(_logger, question.Name);
                 return DnssecValidationStatus.Bogus;
             }
 
-            LogNsec3NodataProof(_logger, question.Name.ToString(), question.Type);
+            LogNsec3NodataProof(_logger, question.Name, question.Type);
             return DnssecValidationStatus.Secure;
         }
 
@@ -418,7 +418,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 _crypto, nsec3s, question.Name, parameters,
                 out var closest, out _))
         {
-            LogNsec3ClosestEncloserNotFound(_logger, question.Name.ToString());
+            LogNsec3ClosestEncloserNotFound(_logger, question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -426,14 +426,14 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         // that is inconsistent (name exists).
         if (exact is not null && response.Flags.ResponseCode is DomainResponseCode.NameError)
         {
-            LogNsec3NxdomainQnameMatches(_logger, question.Name.ToString());
+            LogNsec3NxdomainQnameMatches(_logger, question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
         if (closest.Equals(question.Name))
         {
             // Empty non-terminal / NODATA without falling into exact above — treat as NODATA failure.
-            LogNsec3QnameIsClosestEncloser(_logger, question.Name.ToString());
+            LogNsec3QnameIsClosestEncloser(_logger, question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -445,14 +445,14 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         var nextCloserCover = DnssecNsec3Proof.FindCover(_crypto, nsec3s, nextCloserHash);
         if (nextCloserCover is null)
         {
-            LogNsec3NoNextCloserCover(_logger, nextCloser.ToString(), question.Name.ToString());
+            LogNsec3NoNextCloserCover(_logger, nextCloser, question.Name);
             return DnssecValidationStatus.Bogus;
         }
 
         // Opt-Out: insecure delegations may exist in the span — cannot prove Secure NXDOMAIN.
         if ((nextCloserCover.Value.Data.Flags & DnssecNsec3Proof.OptOutFlag) != 0)
         {
-            LogNsec3OptOutCover(_logger, nextCloser.ToString(), question.Name.ToString());
+            LogNsec3OptOutCover(_logger, nextCloser, question.Name);
             return DnssecValidationStatus.Insecure;
         }
 
@@ -464,12 +464,12 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             if (DnssecNsec3Proof.FindExact(nsec3s, wildcardHash) is null &&
                 DnssecNsec3Proof.FindCover(_crypto, nsec3s, wildcardHash) is null)
             {
-                LogNsec3NoWildcardProof(_logger, closest.ToString(), question.Name.ToString());
+                LogNsec3NoWildcardProof(_logger, closest, question.Name);
                 return DnssecValidationStatus.Bogus;
             }
         }
 
-        LogNsec3ProofOk(_logger, question.Name.ToString(), closest.ToString(), nextCloser.ToString());
+        LogNsec3ProofOk(_logger, question.Name, closest, nextCloser);
         return DnssecValidationStatus.Secure;
     }
 
@@ -728,19 +728,19 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     private static partial void LogEmptyQuestionSection(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC unsigned directed hop ignored for status ({Name}/{Type})")]
-    private static partial void LogUnsignedDirectedHopIgnored(ILogger logger, string name, DomainRecordType type);
+    private static partial void LogUnsignedDirectedHopIgnored(ILogger logger, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC insecure: no RRSIG in response for {Name}/{Type}")]
-    private static partial void LogInsecureNoRrsig(ILogger logger, string name, DomainRecordType type);
+    private static partial void LogInsecureNoRrsig(ILogger logger, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC signed-message outcome {Outcome} for {Name}/{Type}")]
-    private static partial void LogSignedMessageOutcome(ILogger logger, DnssecValidationStatus outcome, string name, DomainRecordType type);
+    private static partial void LogSignedMessageOutcome(ILogger logger, DnssecValidationStatus outcome, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC observing Bogus for {Name}/{Type} (prior status {Prior})")]
-    private static partial void LogObservingBogus(ILogger logger, string name, DomainRecordType type, DnssecValidationStatus prior);
+    private static partial void LogObservingBogus(ILogger logger, DomainLabels name, DomainRecordType type, DnssecValidationStatus prior);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "DNSSEC validation failed unexpectedly for {Name}/{Type}")]
-    private static partial void LogValidationFailedUnexpectedly(ILogger logger, Exception exception, string name, DomainRecordType type);
+    private static partial void LogValidationFailedUnexpectedly(ILogger logger, Exception exception, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC verifying {Name}/{Type} ({Count} RR(s), signer={Signer})")]
     private static partial void LogVerifyingRrset(ILogger logger, string name, DomainRecordType type, int count, string signer);
@@ -764,73 +764,73 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     private static partial void LogInsecureUnsignedAnswer(ILogger logger, string name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC checking negative proof for {Name}/{Type} rcode={Rcode}")]
-    private static partial void LogCheckingNegativeProof(ILogger logger, string name, DomainRecordType type, DomainResponseCode rcode);
+    private static partial void LogCheckingNegativeProof(ILogger logger, DomainLabels name, DomainRecordType type, DomainResponseCode rcode);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC bogus: negative proof failed for {Name}")]
-    private static partial void LogNegativeProofFailed(ILogger logger, string name);
+    private static partial void LogNegativeProofFailed(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC no NSEC/NSEC3 records for negative proof of {Name}")]
-    private static partial void LogNoNegativeProofRecords(ILogger logger, string name);
+    private static partial void LogNoNegativeProofRecords(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC signer keys missing for {Signer} (owner={Owner})")]
-    private static partial void LogNsecSignerKeysMissing(ILogger logger, string signer, string owner);
+    private static partial void LogNsecSignerKeysMissing(ILogger logger, string signer, DomainLabels owner);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC RRSIG failed for {Owner}")]
-    private static partial void LogNsecRrsigFailed(ILogger logger, string owner);
+    private static partial void LogNsecRrsigFailed(ILogger logger, DomainLabels owner);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC NODATA failed: type present on {Owner}")]
-    private static partial void LogNsecNodataTypePresent(ILogger logger, string owner);
+    private static partial void LogNsecNodataTypePresent(ILogger logger, DomainLabels owner);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC NODATA proof for {Name}/{Type}")]
-    private static partial void LogNsecNodataProof(ILogger logger, string name, DomainRecordType type);
+    private static partial void LogNsecNodataProof(ILogger logger, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC {Owner} covers {Name} (next={Next})")]
-    private static partial void LogNsecCoversName(ILogger logger, string owner, string name, string next);
+    private static partial void LogNsecCoversName(ILogger logger, DomainLabels owner, DomainLabels name, DomainLabels next);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC indeterminate: signed NSEC present but no keys for {Name}")]
-    private static partial void LogSignedNsecWithoutKeys(ILogger logger, string name);
+    private static partial void LogSignedNsecWithoutKeys(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC no covering NSEC for {Name}")]
-    private static partial void LogNoCoveringNsec(ILogger logger, string name);
+    private static partial void LogNoCoveringNsec(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 owners could not be decoded for {Name}")]
-    private static partial void LogNsec3OwnersUndecodable(ILogger logger, string name);
+    private static partial void LogNsec3OwnersUndecodable(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 {Owner} has no RRSIG")]
-    private static partial void LogNsec3HasNoRrsig(ILogger logger, string owner);
+    private static partial void LogNsec3HasNoRrsig(ILogger logger, DomainLabels owner);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC indeterminate: NSEC3 signer keys missing for {Signer}")]
     private static partial void LogNsec3SignerKeysMissing(ILogger logger, string signer);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 RRSIG failed for {Owner}")]
-    private static partial void LogNsec3RrsigFailed(ILogger logger, string owner);
+    private static partial void LogNsec3RrsigFailed(ILogger logger, DomainLabels owner);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 NODATA failed: type present for {Name}")]
-    private static partial void LogNsec3NodataTypePresent(ILogger logger, string name);
+    private static partial void LogNsec3NodataTypePresent(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 NODATA proof for {Name}/{Type}")]
-    private static partial void LogNsec3NodataProof(ILogger logger, string name, DomainRecordType type);
+    private static partial void LogNsec3NodataProof(ILogger logger, DomainLabels name, DomainRecordType type);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 closest encloser not found for {Name}")]
-    private static partial void LogNsec3ClosestEncloserNotFound(ILogger logger, string name);
+    private static partial void LogNsec3ClosestEncloserNotFound(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 NXDOMAIN but QNAME hash matches for {Name}")]
-    private static partial void LogNsec3NxdomainQnameMatches(ILogger logger, string name);
+    private static partial void LogNsec3NxdomainQnameMatches(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 QNAME is closest encloser but NODATA bits failed for {Name}")]
-    private static partial void LogNsec3QnameIsClosestEncloser(ILogger logger, string name);
+    private static partial void LogNsec3QnameIsClosestEncloser(ILogger logger, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 no cover for next-closer {Next} of {Name}")]
-    private static partial void LogNsec3NoNextCloserCover(ILogger logger, string next, string name);
+    private static partial void LogNsec3NoNextCloserCover(ILogger logger, DomainLabels next, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 Opt-Out cover for next-closer {Next}; insecure for {Name}")]
-    private static partial void LogNsec3OptOutCover(ILogger logger, string next, string name);
+    private static partial void LogNsec3OptOutCover(ILogger logger, DomainLabels next, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 no wildcard proof at *.{Closest} for {Name}")]
-    private static partial void LogNsec3NoWildcardProof(ILogger logger, string closest, string name);
+    private static partial void LogNsec3NoWildcardProof(ILogger logger, DomainLabels closest, DomainLabels name);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC NSEC3 proof ok for {Name} (closest={Closest}, next={Next})")]
-    private static partial void LogNsec3ProofOk(ILogger logger, string name, string closest, string next);
+    private static partial void LogNsec3ProofOk(ILogger logger, DomainLabels name, DomainLabels closest, DomainLabels next);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC keys already authenticated for {Zone}")]
     private static partial void LogKeysAlreadyAuthenticated(ILogger logger, string zone);

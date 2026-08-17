@@ -53,7 +53,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
                     context.ClientEndPoint,
                     context.ServerEndPoint,
                     question.Type,
-                    question.Name.ToString(),
+                    question.Name,
                     context.ServFailReason ?? "unspecified",
                     hitString);
                 continue;
@@ -67,7 +67,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
                 context.ClientEndPoint,
                 context.ServerEndPoint,
                 question.Type,
-                question.Name.ToString(),
+                question.Name,
                 addresses);
         }
     }
@@ -82,7 +82,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
                 context.ClientEndPoint,
                 context.ServerEndPoint,
                 question.Type,
-                question.Name.ToString());
+                question.Name);
         }
     }
 
@@ -109,7 +109,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
         IPEndPoint? client,
         IPEndPoint? server,
         DomainRecordType queryType,
-        string name,
+        DomainLabels name,
         string reason,
         string cacheState);
 
@@ -121,7 +121,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
         IPEndPoint? client,
         IPEndPoint? server,
         DomainRecordType queryType,
-        string name,
+        DomainLabels name,
         string answers);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "[{QueryId:n}] {Client} -> {Server}: {QueryType} {Name}")]
@@ -131,5 +131,5 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
         IPEndPoint? client,
         IPEndPoint? server,
         DomainRecordType queryType,
-        string name);
+        DomainLabels name);
 }

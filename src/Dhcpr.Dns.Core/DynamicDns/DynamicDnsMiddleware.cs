@@ -22,18 +22,19 @@ public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
     // After directed upstream (100), before forward (500) / recursive (5000).
     public int Priority => 200;
 
-    public ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        await Task.Yield();
         if (context.UpstreamEndpoints is { Length: > 0 })
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var answer = DynamicDnsAnswerer.TryAnswer(_store, _zones, context.DomainMessage);
         if (answer is null)
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         context.DoNotCacheResponse = true;
-        return ValueTask.FromResult<DomainMessage?>(answer with { Id = context.DomainMessage.Id });
+        return answer with { Id = context.DomainMessage.Id };
     }
 }

@@ -5,5 +5,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public sealed class NoOpLiveQueryEventPublisher : ILiveQueryEventPublisher
 {
-    public ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken) => default;
+    public async ValueTask PublishAsync(DnsQueryEvent evt, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+    }
 }

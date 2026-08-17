@@ -26,27 +26,28 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
     public string Name => "Root Zone";
     public int Priority => 50;
 
-    public ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        await Task.Yield();
         // Directed upstream hops must hit live nameservers (with DO=1) so DNSSEC
         // sees RRSIGs. Primed root.zone answers are unsigned NS/DS/glue only.
         if (context.UpstreamEndpoints is { Length: > 0 })
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var snapshot = _store.Current;
         if (snapshot is null)
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var question = context.DomainMessage.Questions[0];
         var ownerKey = RootZoneSnapshot.NormalizeOwner(question.Name.ToString());
         if (!snapshot.TryGetRecords(ownerKey, out var records))
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var matching = records.Where(r => r.Type == question.Type).ToImmutableArray();
         if (matching.Length == 0)
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var rrsigs = records
             .Where(r =>
@@ -62,7 +63,7 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         if (dnssecEnabled)
         {
             if (rrsigs.Length == 0 || !HasCurrentlyValidRrsig(rrsigs, DateTimeOffset.UtcNow))
-                return ValueTask.FromResult<DomainMessage?>(null);
+                return null;
         }
 
         var answers = rrsigs.Length == 0
@@ -89,7 +90,7 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
             }
         };
 
-        return ValueTask.FromResult<DomainMessage?>(response);
+        return response;
     }
 
     private static bool HasCurrentlyValidRrsig(

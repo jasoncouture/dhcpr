@@ -610,7 +610,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         List<DomainResourceRecord> allRecords,
         CancellationToken cancellationToken)
     {
-        await ValueTask.CompletedTask.ConfigureAwait(false);
+        await Task.Yield();
         var scope = context.DnssecScope!;
         zone = DnssecScope.NormalizeZone(zone);
 

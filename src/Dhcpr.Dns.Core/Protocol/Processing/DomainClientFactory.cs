@@ -23,9 +23,10 @@ public sealed class DomainClientFactory : IDomainClientFactory
         return new DomainClientParallelWrapper(clients);
     }
 
-    public ValueTask<IDomainClient> GetDomainClientAsync(DomainClientOptions options,
+    public async ValueTask<IDomainClient> GetDomainClientAsync(DomainClientOptions options,
         CancellationToken cancellationToken)
     {
+        await Task.Yield();
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Type != DomainClientType.Internal &&
             ReferenceEquals(options.EndPoint, DomainClientOptions.DefaultEndPoint))
@@ -77,6 +78,6 @@ public sealed class DomainClientFactory : IDomainClientFactory
             clients[0] = new DomainClientTimeoutWrapper(clients[0], options.TimeOut);
         }
 
-        return ValueTask.FromResult(clients[0]);
+        return clients[0];
     }
 }

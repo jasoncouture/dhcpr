@@ -20,29 +20,30 @@ public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
     // After DynDNS (200), before NS-cut (310) / forward (500) / recursive (5000).
     public int Priority => 300;
 
-    public ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage?> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
+        await Task.Yield();
         if (context.UpstreamEndpoints is { Length: > 0 })
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         if (context.DomainMessage.Questions.Length == 0)
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var question = context.DomainMessage.Questions[0];
         if (_zones.FindZone(question.Name.ToString()) is not { } localZone)
-            return ValueTask.FromResult<DomainMessage?>(null);
+            return null;
 
         var local = ZoneAnswerEngine.Answer(localZone, context.DomainMessage);
         if (local.Message is not null &&
             local.Kind is ZoneAnswerKind.Answer or ZoneAnswerKind.NoData or ZoneAnswerKind.NameError)
         {
             context.DoNotCacheResponse = true;
-            return ValueTask.FromResult<DomainMessage?>(Finalize(context.DomainMessage, local.Message));
+            return Finalize(context.DomainMessage, local.Message);
         }
 
-        return ValueTask.FromResult<DomainMessage?>(null);
+        return null;
     }
 
     private static DomainMessage Finalize(DomainMessage request, DomainMessage response)

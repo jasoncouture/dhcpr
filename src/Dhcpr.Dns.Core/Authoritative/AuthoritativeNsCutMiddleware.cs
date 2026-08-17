@@ -69,32 +69,29 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
         return Finalize(context.DomainMessage, followed);
     }
 
-    private ValueTask<LocalReferralCut?> TryLocalChildZoneAsync(
+    private async ValueTask<LocalReferralCut?> TryLocalChildZoneAsync(
         DomainMessageContext context,
         string? cutApex,
         DomainMessage request,
         CancellationToken cancellationToken)
     {
+        await Task.Yield();
         _ = cancellationToken;
         if (cutApex is null || _zones.FindZoneExactApex(cutApex) is not { } childZone)
-            return ValueTask.FromResult<LocalReferralCut?>(null);
+            return null;
 
         var local = ZoneAnswerEngine.Answer(childZone, request);
         if (local.Message is not null &&
             local.Kind is ZoneAnswerKind.Answer or ZoneAnswerKind.NoData or ZoneAnswerKind.NameError)
         {
             context.DoNotCacheResponse = true;
-            return ValueTask.FromResult<LocalReferralCut?>(
-                new LocalReferralCut(local.Message, Terminal: true, NextCutApex: null));
+            return new LocalReferralCut(local.Message, Terminal: true, NextCutApex: null);
         }
 
         if (local.Kind is ZoneAnswerKind.Referral && local.Message is not null)
-        {
-            return ValueTask.FromResult<LocalReferralCut?>(
-                new LocalReferralCut(local.Message, Terminal: false, local.ReferralCutApex));
-        }
+            return new LocalReferralCut(local.Message, Terminal: false, local.ReferralCutApex);
 
-        return ValueTask.FromResult<LocalReferralCut?>(null);
+        return null;
     }
 
     private static DomainMessage Finalize(DomainMessage request, DomainMessage response)

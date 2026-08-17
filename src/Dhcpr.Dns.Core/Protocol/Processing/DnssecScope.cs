@@ -61,6 +61,7 @@ public sealed class DnssecScope
 
     public void LoadTrustAnchors(IEnumerable<TrustAnchorConfiguration> anchors)
     {
+        var byZone = new Dictionary<string, List<DelegationSignerData>>(StringComparer.OrdinalIgnoreCase);
         foreach (var anchor in anchors)
         {
             if (!anchor.TryValidate(out _))
@@ -86,10 +87,21 @@ public sealed class DnssecScope
                 (DelegationSignerDigestType)anchor.DigestType,
                 digest.ToImmutableArray());
 
+            if (!byZone.TryGetValue(zone, out var digests))
+            {
+                digests = [];
+                byZone[zone] = digests;
+            }
+
+            digests.Add(ds);
+        }
+
+        foreach (var (zone, digests) in byZone)
+        {
             _delegations[zone] = new AuthenticatedDelegation
             {
                 Zone = zone,
-                Digests = [ds],
+                Digests = [.. digests],
                 IsTrustAnchor = true
             };
         }

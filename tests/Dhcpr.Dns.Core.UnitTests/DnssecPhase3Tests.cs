@@ -83,6 +83,35 @@ public class DnssecPhase3Tests
     }
 
     [Fact]
+    public void LoadTrustAnchors_KeepsAllDsForTheSameZone()
+    {
+        var scope = new DnssecScope();
+        scope.LoadTrustAnchors([
+            new TrustAnchorConfiguration
+            {
+                Name = ".",
+                KeyTag = 20326,
+                Algorithm = 8,
+                DigestType = 2,
+                DigestHex = "E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"
+            },
+            new TrustAnchorConfiguration
+            {
+                Name = ".",
+                KeyTag = 38696,
+                Algorithm = 8,
+                DigestType = 2,
+                DigestHex = "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A4C0FB2B16"
+            }
+        ]);
+
+        Assert.True(scope.TryGetDelegation(".", out var ta));
+        Assert.Equal(2, ta.Digests.Length);
+        Assert.Contains(ta.Digests, d => d.KeyTag == 20326);
+        Assert.Contains(ta.Digests, d => d.KeyTag == 38696);
+    }
+
+    [Fact]
     public async Task Middleware_SetsAdWhenScopeSecure()
     {
         var (dnsKeyRecord, privateKey) = CreateEcdsaDnsKey("example.com");

@@ -248,14 +248,21 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return builder.MoveToImmutable();
     }
 
-    private sealed class CacheEntry(
-        DomainMessageFlags Flags,
-        DomainResourceRecords Records,
-        DateTimeOffset CachedAt)
+    private sealed class CacheEntry
     {
-        public DomainMessageFlags Flags { get; } = Flags;
-        public DomainResourceRecords Records { get; } = Records;
-        public DateTimeOffset CachedAt { get; } = CachedAt;
+        public CacheEntry(
+            DomainMessageFlags flags,
+            DomainResourceRecords records,
+            DateTimeOffset cachedAt)
+        {
+            Flags = flags;
+            Records = records;
+            CachedAt = cachedAt;
+        }
+
+        public DomainMessageFlags Flags { get; }
+        public DomainResourceRecords Records { get; }
+        public DateTimeOffset CachedAt { get; }
         public DnssecValidationStatus SecurityStatus { get; set; }
     }
 }

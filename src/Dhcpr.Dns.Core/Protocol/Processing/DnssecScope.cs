@@ -7,31 +7,6 @@ using Dhcpr.Dns.Core.Protocol.Zone;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public enum DnssecValidationStatus
-{
-    Unchecked,
-    Secure,
-    Insecure,
-    Bogus,
-    Indeterminate
-}
-
-/// <summary>Authenticated DNSKEY set for a zone apex.</summary>
-public sealed class AuthenticatedDnsKeySet
-{
-    public required string Zone { get; init; }
-    public required ImmutableArray<DomainResourceRecord> Keys { get; init; }
-}
-
-/// <summary>Authenticated DS set (or trust-anchor equivalent) for a child zone.</summary>
-public sealed class AuthenticatedDelegation
-{
-    public required string Zone { get; init; }
-    public required ImmutableArray<DelegationSignerData> Digests { get; init; }
-    /// <summary>True when this is a configured trust anchor, not a fetched DS RRset.</summary>
-    public bool IsTrustAnchor { get; init; }
-}
-
 public sealed class DnssecScope
 {
     private readonly ConcurrentDictionary<string, AuthenticatedDnsKeySet> _keys =

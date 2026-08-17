@@ -16,7 +16,14 @@ public static class DomainResourceRecordCanonicalizationExtensions
     /// Computes the canonical wire format of a resource record according to RFC 4034 Section 6.2.
     /// This canonical format is used for DNSSEC signature verification.
     /// </summary>
-    public static byte[] ToCanonicalWireFormat(this DomainResourceRecord record, uint originalTtl)
+    /// <param name="rrsigLabels">
+    /// RRSIG Labels field. When the owner has more labels than this value, the owner is
+    /// replaced by "*" plus the least-significant Labels labels (RFC 4034 §6.2 wildcard form).
+    /// </param>
+    public static byte[] ToCanonicalWireFormat(
+        this DomainResourceRecord record,
+        uint originalTtl,
+        byte? rrsigLabels = null)
     {
         var size = record.EstimatedSize;
         var buffer = ArrayPool<byte>.Shared.Rent(size * 2); // Rent a bit more just in case compression was expanding it.
@@ -25,8 +32,8 @@ public static class DomainResourceRecordCanonicalizationExtensions
             var span = buffer.AsSpan();
             var start = span;
 
-            // 1. Owner name (fully expanded, lowercase)
-            EncodeCanonicalName(ref span, record.Name);
+            // 1. Owner name (fully expanded, lowercase; wildcard-rewritten when RRSIG.Labels requires it)
+            EncodeCanonicalName(ref span, CanonicalOwnerName(record.Name, rrsigLabels));
 
             // 2. Type
             BinaryPrimitives.WriteUInt16BigEndian(span, (ushort)record.Type);
@@ -147,6 +154,20 @@ public static class DomainResourceRecordCanonicalizationExtensions
             or DomainRecordType.MX or DomainRecordType.DNAME or DomainRecordType.ALIAS
             or DomainRecordType.MD or DomainRecordType.MF or DomainRecordType.MB
             or DomainRecordType.MG or DomainRecordType.MR;
+    }
+
+    internal static DomainLabels CanonicalOwnerName(DomainLabels owner, byte? rrsigLabels)
+    {
+        if (rrsigLabels is not byte labels || owner.Count <= labels)
+            return owner;
+
+        // RFC 4034 §6.2: "*" + least-significant `labels` labels of the expanded owner.
+        var parts = new string[labels + 1];
+        parts[0] = "*";
+        var start = owner.Count - labels;
+        for (var i = 0; i < labels; i++)
+            parts[i + 1] = owner[start + i];
+        return new DomainLabels(parts);
     }
 
     public static void EncodeCanonicalName(ref Span<byte> span, DomainLabels labels)

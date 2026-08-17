@@ -86,4 +86,37 @@ public class CanonicalizationTests
         Assert.Equal((byte)'e', canonicalWire[25]);
         // ... verified it lowercases correctly
     }
+
+    [Fact]
+    public void WildcardOwnerIsRewrittenFromRrsigLabels()
+    {
+        // RFC 4034 §6.2: when the owner has more labels than RRSIG.Labels,
+        // the canonical owner is "*" plus the least-significant Labels labels.
+        var record = new DomainResourceRecord(
+            new DomainLabels("random.example.com"),
+            DomainRecordType.A,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(3600),
+            new BlobData(ImmutableArray.Create<byte>(1, 2, 3, 4))
+        );
+
+        var canonicalWire = record.ToCanonicalWireFormat(300, rrsigLabels: 2);
+
+        // *.example.com. = 1+1 + 1+7 + 1+3 + 1 = 15
+        Assert.Equal(1, canonicalWire[0]);
+        Assert.Equal((byte)'*', canonicalWire[1]);
+        Assert.Equal(7, canonicalWire[2]);
+        Assert.Equal((byte)'e', canonicalWire[3]);
+        Assert.Equal((byte)'x', canonicalWire[4]);
+        Assert.Equal((byte)'a', canonicalWire[5]);
+        Assert.Equal((byte)'m', canonicalWire[6]);
+        Assert.Equal((byte)'p', canonicalWire[7]);
+        Assert.Equal((byte)'l', canonicalWire[8]);
+        Assert.Equal((byte)'e', canonicalWire[9]);
+        Assert.Equal(3, canonicalWire[10]);
+        Assert.Equal((byte)'c', canonicalWire[11]);
+        Assert.Equal((byte)'o', canonicalWire[12]);
+        Assert.Equal((byte)'m', canonicalWire[13]);
+        Assert.Equal(0, canonicalWire[14]);
+    }
 }

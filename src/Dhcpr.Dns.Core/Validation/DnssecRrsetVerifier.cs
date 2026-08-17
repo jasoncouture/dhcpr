@@ -50,7 +50,7 @@ public static class DnssecRrsetVerifier
                 if (keyTag != rrsig.KeyTag || dnsKey.Algorithm != rrsig.Algorithm)
                     continue;
 
-                var canonicalRrset = BuildCanonicalRrset(rrset, rrsig.OriginalTtl);
+                var canonicalRrset = BuildCanonicalRrset(rrset, rrsig.OriginalTtl, rrsig.Labels);
                 var rrsigPrefix = EncodeRrsigWithoutSignature(rrsig);
                 if (validator.VerifySignature(rrsig, rrsigPrefix, canonicalRrset, dnsKey))
                     return true;
@@ -60,11 +60,14 @@ public static class DnssecRrsetVerifier
         return false;
     }
 
-    public static byte[] BuildCanonicalRrset(IReadOnlyList<DomainResourceRecord> rrset, uint originalTtl)
+    public static byte[] BuildCanonicalRrset(
+        IReadOnlyList<DomainResourceRecord> rrset,
+        uint originalTtl,
+        byte? rrsigLabels = null)
     {
         using var parts = ListPool<byte[]>.Default.Get();
-        foreach (var record in rrset.OrderBy(r => r.ToCanonicalWireFormat(originalTtl), ByteArrayComparer.Instance))
-            parts.Add(record.ToCanonicalWireFormat(originalTtl));
+        foreach (var record in rrset.OrderBy(r => r.ToCanonicalWireFormat(originalTtl, rrsigLabels), ByteArrayComparer.Instance))
+            parts.Add(record.ToCanonicalWireFormat(originalTtl, rrsigLabels));
 
         var total = parts.Sum(static p => p.Length);
         var buffer = new byte[total];

@@ -16,7 +16,7 @@ public static class BindZoneUnsupportedFilter
     public static string Filter(string text)
     {
         var expanded = ExpandParentheses(text);
-        var sb = new StringBuilder(expanded.Length);
+        var sb = new StringBuilder();
         foreach (var rawLine in expanded.Split('\n'))
         {
             if (ShouldKeepLine(rawLine))
@@ -143,7 +143,7 @@ public static class BindZoneUnsupportedFilter
 
     private static string ExpandParentheses(string text)
     {
-        var sb = new StringBuilder(text.Length);
+        var sb = new StringBuilder();
         var depth = 0;
         foreach (var ch in text)
         {

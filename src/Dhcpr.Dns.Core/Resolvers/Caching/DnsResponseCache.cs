@@ -230,7 +230,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (age <= TimeSpan.Zero)
             return records;
 
-        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(records.Length);
+        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>();
         foreach (var record in records)
         {
             if (record.Type == DomainRecordType.OPT)
@@ -245,7 +245,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
             builder.Add(record with { TimeToLive = ttl });
         }
 
-        return builder.MoveToImmutable();
+        return builder.ToImmutable();
     }
 
     private sealed class CacheEntry

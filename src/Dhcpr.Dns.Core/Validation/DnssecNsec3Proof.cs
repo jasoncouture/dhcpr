@@ -88,7 +88,7 @@ public static class DnssecNsec3Proof
         if (closestEncloser.Labels.Length == 0)
             return new DomainLabels(ImmutableArray.Create(new DomainLabel("*")));
 
-        var labels = ImmutableArray.CreateBuilder<DomainLabel>(closestEncloser.Labels.Length + 1);
+        var labels = ImmutableArray.CreateBuilder<DomainLabel>();
         labels.Add(new DomainLabel("*"));
         labels.AddRange(closestEncloser.Labels);
         return new DomainLabels(labels.ToImmutable());

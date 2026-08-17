@@ -30,7 +30,7 @@ public sealed class AnswerShuffleMiddleware : IDomainMessageMiddleware
         if (answers.Length <= 1)
             return message;
 
-        var addressIndices = new List<int>(answers.Length);
+        var addressIndices = new List<int>();
         for (var i = 0; i < answers.Length; i++)
         {
             if (answers[i].Type is DomainRecordType.A or DomainRecordType.AAAA)

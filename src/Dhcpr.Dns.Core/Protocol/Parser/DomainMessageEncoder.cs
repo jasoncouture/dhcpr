@@ -89,10 +89,10 @@ public static class DomainMessageEncoder
         if (count <= 0)
             return ImmutableArray<DomainResourceRecord>.Empty;
 
-        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>(count);
+        var builder = ImmutableArray.CreateBuilder<DomainResourceRecord>();
         for (var i = 0; i < count; i++)
             builder.Add(records[start + i]);
-        return builder.MoveToImmutable();
+        return builder.ToImmutable();
     }
 
     public static DomainMessageFlags ReadMessageFlagsAndAdvance(ref ReadOnlyDnsParsingSpan bytes)

@@ -47,13 +47,16 @@ public sealed class UdpDomainClient : IDomainClient
         ushort messageId,
         CancellationToken cancellationToken)
     {
+        // Clone so ReceiveFromAsync cannot mutate the caller's target endpoint.
+        var receiveFrom = new IPEndPoint(target.Address, target.Port);
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var socketResult = await socket.ReceiveFromAsync(buffer, target, cancellationToken);
-            buffer = buffer[..socketResult.ReceivedBytes];
+            var socketResult = await socket.ReceiveFromAsync(buffer, receiveFrom, cancellationToken);
+            if (!IsExpectedSource(socketResult.RemoteEndPoint, target))
+                continue;
 
-            var result = DomainMessageEncoder.Decode(buffer.Span);
+            var result = DomainMessageEncoder.Decode(buffer.Span[..socketResult.ReceivedBytes]);
 
             if (result.Id != messageId) // ID did not match, try again.
                 continue;
@@ -61,4 +64,9 @@ public sealed class UdpDomainClient : IDomainClient
             return result;
         }
     }
+
+    private static bool IsExpectedSource(EndPoint remote, IPEndPoint target)
+        => remote is IPEndPoint from &&
+           from.Port == target.Port &&
+           from.Address.Equals(target.Address);
 }

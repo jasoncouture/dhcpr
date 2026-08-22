@@ -27,6 +27,10 @@ public sealed class RuntimeSettingsStoreTests : IDisposable
         Assert.True(File.Exists(path));
         Assert.True(store.Current.Routes.ContainsKey("example.com"));
         Assert.Equal("ads.example", Assert.Single(store.Current.BlackholeDomains));
+        var seeded = Assert.Single(store.Current.Records);
+        Assert.Equal("www.home.arpa", seeded.Name);
+        Assert.Equal("A", seeded.Type);
+        Assert.Equal("10.0.0.5", seeded.Value);
     }
 
     [Fact]
@@ -63,6 +67,53 @@ public sealed class RuntimeSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveRejectsInvalidRecordsWithoutWriting()
+    {
+        var store = CreateStore();
+        var before = File.ReadAllText(SettingsPath);
+        var next = store.Current;
+        next.Records =
+        [
+            new DnsRecordConfiguration { Name = "www.home.arpa", Type = "CNAME", Value = "other.home.arpa" },
+            new DnsRecordConfiguration { Name = "www.home.arpa", Type = "A", Value = "10.0.0.5" }
+        ];
+
+        var error = await store.SaveAsync(next, CancellationToken.None);
+
+        Assert.NotNull(error);
+        Assert.Contains("CNAME", error, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllText(SettingsPath));
+        Assert.Equal("www.home.arpa", Assert.Single(store.Current.Records).Name);
+        Assert.Equal("A", store.Current.Records[0].Type);
+    }
+
+    [Fact]
+    public async Task SaveReplacesRecords()
+    {
+        var store = CreateStore();
+        var next = store.Current;
+        next.Records =
+        [
+            new DnsRecordConfiguration
+            {
+                Name = "*.apps.home.arpa",
+                Type = "AAAA",
+                Value = "2001:db8::10",
+                Clients = ["10.0.0.0/8"]
+            }
+        ];
+
+        var error = await store.SaveAsync(next, CancellationToken.None);
+
+        Assert.Null(error);
+        var saved = Assert.Single(store.Current.Records);
+        Assert.Equal("*.apps.home.arpa", saved.Name);
+        Assert.Equal("AAAA", saved.Type);
+        Assert.Equal("2001:db8::10", saved.Value);
+        Assert.Equal("10.0.0.0/8", Assert.Single(saved.Clients));
+    }
+
+    [Fact]
     public async Task SaveSignalsChangeToken()
     {
         var store = CreateStore();
@@ -90,6 +141,9 @@ public sealed class RuntimeSettingsStoreTests : IDisposable
                 "Routes": {
                   "example.com": { "Upstreams": [ "10.0.0.1:53" ], "Clients": [] }
                 },
+                "Records": [
+                  { "Name": "ns.external.test", "Type": "NS", "Value": "ns1.external.test" }
+                ],
                 "BlackholeDomains": [ "external.test" ],
                 "Dnssec": { "Enabled": true, "AllowedAlgorithms": [], "DeniedAlgorithms": [] },
                 "HealthCheck": { "Enabled": true, "Domains": [], "TimeoutSeconds": 5 }
@@ -103,6 +157,9 @@ public sealed class RuntimeSettingsStoreTests : IDisposable
 
         Assert.True(token.HasChanged);
         Assert.Equal("external.test", Assert.Single(store.Current.BlackholeDomains));
+        var record = Assert.Single(store.Current.Records);
+        Assert.Equal("ns.external.test", record.Name);
+        Assert.Equal("NS", record.Type);
     }
 
     private string SettingsPath => Path.Combine(_dataPath, ApplicationConfiguration.SettingsFileName);
@@ -112,6 +169,9 @@ public sealed class RuntimeSettingsStoreTests : IDisposable
         Directory.CreateDirectory(_dataPath);
         var configuration = new ConfigurationManager();
         configuration["DNS:Routes:example.com:Upstreams:0"] = "10.0.0.1:53";
+        configuration["DNS:Records:0:Name"] = "www.home.arpa";
+        configuration["DNS:Records:0:Type"] = "A";
+        configuration["DNS:Records:0:Value"] = "10.0.0.5";
         configuration["DNS:BlackholeDomains:0"] = "ads.example";
         configuration["DNS:Dnssec:Enabled"] = "true";
         configuration["DNS:HealthCheck:Enabled"] = "true";

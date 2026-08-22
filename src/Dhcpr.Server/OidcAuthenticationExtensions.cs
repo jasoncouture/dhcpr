@@ -13,6 +13,7 @@ public static class OidcAuthenticationExtensions
     public const string DnsAdminPolicy = "DnsAdmin";
     public const string LoginPath = "/account/login";
     public const string LogoutPath = "/account/logout";
+    public const string AccessDeniedPath = "/Account/AccessDenied";
 
     public static WebApplicationBuilder AddDhcprAuthentication(this WebApplicationBuilder builder)
     {
@@ -23,7 +24,11 @@ public static class OidcAuthenticationExtensions
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
             })
-            .AddCookie()
+            .AddCookie(static options =>
+            {
+                options.LoginPath = LoginPath;
+                options.AccessDeniedPath = AccessDeniedPath;
+            })
             .AddOpenIdConnect();
         builder.Services.AddOptions<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme)
             .PostConfigure(static options =>

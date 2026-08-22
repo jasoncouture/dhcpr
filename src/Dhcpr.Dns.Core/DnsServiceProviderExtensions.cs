@@ -1,5 +1,6 @@
 ﻿using Dhcpr.Core;
 using Dhcpr.Dns.Core.Authoritative;
+using Dhcpr.Dns.Core.ConfiguredRecords;
 using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -55,6 +56,7 @@ public static class DnsServiceProviderExtensions
         // Process-bound: shared pipeline. ForwardResolver holds IOptionsMonitor.OnChange.
         services.AddSingleton<IDomainMessageMiddleware, RootZoneMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
+        services.AddSingleton<IDomainMessageMiddleware, ConfiguredRecordMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, DynamicDnsMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
         services.AddSingleton<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();

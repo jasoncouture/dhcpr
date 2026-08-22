@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 
 using Dhcpr.Core;
+using Dhcpr.Dns.Core.ConfiguredRecords;
 
 using Microsoft.Extensions.Configuration;
 
@@ -18,9 +19,18 @@ public sealed class DnsConfiguration : IValidateSelf
     /// </summary>
     public Dictionary<string, DnsRouteConfiguration> Routes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Sparse overlay records (A/AAAA/CNAME/NS). Misses fall through to DynDNS / zones / forward.
+    /// Empty <c>Clients</c> on a record means any client.
+    /// </summary>
+    public DnsRecordConfiguration[] Records { get; set; } = [];
+
     private Dictionary<string, ParsedDnsRoute> _parsedRoutes = new(StringComparer.OrdinalIgnoreCase);
+    private ParsedConfiguredRecordIndex _parsedRecords = ParsedConfiguredRecordIndex.Empty;
 
     public IReadOnlyDictionary<string, ParsedDnsRoute> GetParsedRoutes() => _parsedRoutes;
+
+    public ParsedConfiguredRecordIndex GetParsedRecords() => _parsedRecords;
 
     /// <summary>
     /// Domain suffixes that always receive NXDOMAIN (no cache / upstream).
@@ -103,6 +113,11 @@ public sealed class DnsConfiguration : IValidateSelf
 
             _parsedRoutes[route.Key] = new ParsedDnsRoute(endpoints, clients);
         }
+
+        Records ??= [];
+        if (!ParsedConfiguredRecordIndex.TryBuild(Records, out var parsedRecords, out error))
+            return false;
+        _parsedRecords = parsedRecords;
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (ListenAddresses is null || ListenAddresses.Length == 0)

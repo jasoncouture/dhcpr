@@ -1,12 +1,12 @@
 :root {
-    --bg: #12110f;
-    --surface: #1c1916;
-    --surface-2: #26221e;
-    --border: #3a342e;
-    --text: #f3e6d8;
-    --muted: #a89888;
-    --accent: #ff8a3d;
-    --accent-hover: #ff9f5c;
+    --bg: #0b0f14;
+    --surface: #141a22;
+    --surface-2: #1c2530;
+    --border: #2a3542;
+    --text: #d6dde6;
+    --muted: #8b98a8;
+    --accent: #ff6a00;
+    --accent-hover: #ff8533;
     --error: #e06c75;
     --hit: #98c379;
 }
@@ -64,7 +64,7 @@ input[type="checkbox"] {
     gap: 0.75rem;
     height: 2.75rem;
     padding: 0 0.75rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--accent);
     background: var(--surface);
 }
 
@@ -72,11 +72,11 @@ input[type="checkbox"] {
     font-weight: 700;
     font-size: 1.1rem;
     letter-spacing: 0.04em;
-    color: var(--text);
+    color: var(--accent);
 }
 
 .brand:hover {
-    color: var(--accent);
+    color: var(--accent-hover);
 }
 
 .topbar .user {
@@ -96,7 +96,7 @@ input[type="checkbox"] {
     height: 2rem;
     padding: 0.4rem;
     background: transparent;
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 4px;
     cursor: pointer;
 }
@@ -104,7 +104,7 @@ input[type="checkbox"] {
 .hamburger span {
     display: block;
     height: 2px;
-    background: var(--text);
+    background: var(--accent);
     border-radius: 1px;
 }
 
@@ -129,6 +129,7 @@ input[type="checkbox"] {
     flex-direction: column;
     background: var(--surface);
     border-right: 1px solid var(--border);
+    box-shadow: inset 2px 0 0 var(--accent);
     overflow: hidden;
 }
 
@@ -152,9 +153,9 @@ input[type="checkbox"] {
 }
 
 .sidebar nav a.active {
-    color: var(--accent);
+    color: #0b0f14;
     border-left-color: var(--accent);
-    background: var(--surface-2);
+    background: var(--accent);
 }
 
 .sidebar .logout {

@@ -35,6 +35,7 @@ public static class OidcAuthenticationExtensions
             {
                 // PAR authorize GETs 502 at the proxy before Keycloak sees them; use classic authorize.
                 options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
+                options.SignOutScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             });
         builder.Services.AddAuthorization(options =>
         {
@@ -82,12 +83,26 @@ public static class OidcAuthenticationExtensions
                     new AuthenticationProperties { RedirectUri = returnUrl ?? "/" },
                     [OpenIdConnectDefaults.AuthenticationScheme]))
             .AllowAnonymous();
-        app.MapGet(LogoutPath, async context =>
+        app.MapGet(LogoutPath, async Task<IResult> (HttpContext context) =>
             {
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                await context.SignOutAsync(
-                    OpenIdConnectDefaults.AuthenticationScheme,
-                    new AuthenticationProperties { RedirectUri = "/" });
+                // Keycloak requires id_token_hint. That token lives on the cookie ticket;
+                // sign out OIDC first so the handler can still read it. A second hit
+                // (Blazor) has no ticket — skip the IdP and just go home.
+                var idToken = await context.GetTokenAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    "id_token");
+                if (string.IsNullOrEmpty(idToken))
+                {
+                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    return Results.Redirect("/");
+                }
+
+                return Results.SignOut(
+                    new AuthenticationProperties { RedirectUri = "/" },
+                    [
+                        OpenIdConnectDefaults.AuthenticationScheme,
+                        CookieAuthenticationDefaults.AuthenticationScheme
+                    ]);
             })
             .AllowAnonymous();
         return app;

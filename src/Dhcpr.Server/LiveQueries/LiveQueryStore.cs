@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Net;
 using System.Threading.Channels;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -74,6 +75,9 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
     public async ValueTask HandleAsync(DnsQueryEvent message, CancellationToken cancellationToken)
     {
         await Task.Yield();
+        if (IsLoopbackClient(message))
+            return;
+
         lock (_ringLock)
         {
             _ring.AddFirst(message);
@@ -84,6 +88,9 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
         foreach (var writer in _subscribers.Values)
             writer.TryWrite(message);
     }
+
+    private static bool IsLoopbackClient(DnsQueryEvent evt) =>
+        evt.Client?.Address is { } address && IPAddress.IsLoopback(address);
 
     public async ValueTask DisposeAsync()
     {

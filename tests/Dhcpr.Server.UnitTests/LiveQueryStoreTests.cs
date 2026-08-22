@@ -46,6 +46,39 @@ public class LiveQueryStoreTests
     }
 
     [Fact]
+    public async Task LoopbackClientsAreNotRetainedOrFannedOut()
+    {
+        var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
+        await using var store = new LiveQueryStore(subscriber);
+        var (reader, subscription) = store.Subscribe();
+        using (subscription)
+        {
+            var loopback = CreateEvent(1) with
+            {
+                Client = new IPEndPoint(IPAddress.Loopback, 0)
+            };
+            var ipv6Loopback = CreateEvent(2) with
+            {
+                Client = new IPEndPoint(IPAddress.IPv6Loopback, 0)
+            };
+            var external = CreateEvent(3);
+
+            await store.HandleAsync(loopback, CancellationToken.None);
+            await store.HandleAsync(ipv6Loopback, CancellationToken.None);
+            await store.HandleAsync(external, CancellationToken.None);
+
+            var snapshot = store.GetSnapshot();
+            Assert.Single(snapshot);
+            Assert.Equal(external.Id, snapshot[0].Id);
+
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var received = await reader.ReadAsync(cancellationTokenSource.Token);
+            Assert.Equal(external.Id, received.Id);
+            Assert.False(reader.TryRead(out _));
+        }
+    }
+
+    [Fact]
     public async Task DropOldestWhenSubscriberFallsBehind()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
@@ -69,7 +102,7 @@ public class LiveQueryStoreTests
         => new(
             Guid.CreateVersion7(),
             DateTimeOffset.UtcNow,
-            new IPEndPoint(IPAddress.Loopback, 53000 + index),
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000 + index),
             new IPEndPoint(IPAddress.Loopback, 53),
             $"q-{index}.example",
             DomainRecordType.A,

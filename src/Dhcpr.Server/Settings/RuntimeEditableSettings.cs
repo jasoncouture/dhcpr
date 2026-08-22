@@ -7,6 +7,8 @@ public sealed class RuntimeEditableSettings
     public Dictionary<string, DnsRouteConfiguration> Routes { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    public DnsRecordConfiguration[] Records { get; set; } = [];
+
     public string[] BlackholeDomains { get; set; } = [];
     public DnssecConfiguration Dnssec { get; set; } = new();
     public DnsHealthCheckConfiguration HealthCheck { get; set; } = new();
@@ -23,6 +25,14 @@ public sealed class RuntimeEditableSettings
                     Clients = [.. kv.Value.Clients ?? []]
                 },
                 StringComparer.OrdinalIgnoreCase),
+            Records = (Records ?? []).Select(static r => new DnsRecordConfiguration
+            {
+                Name = r.Name,
+                Type = r.Type,
+                Ttl = r.Ttl,
+                Value = r.Value,
+                Clients = [.. r.Clients ?? []]
+            }).ToArray(),
             BlackholeDomains = [.. BlackholeDomains],
             Dnssec = new DnssecConfiguration
             {

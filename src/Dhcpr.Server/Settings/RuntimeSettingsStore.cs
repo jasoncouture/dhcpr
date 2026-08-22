@@ -108,6 +108,7 @@ public sealed class RuntimeSettingsStore : IRuntimeSettingsStore
                 Addresses = []
             },
             Routes = settings.Routes,
+            Records = settings.Records,
             BlackholeDomains = settings.BlackholeDomains,
             Dnssec = settings.Dnssec,
             HealthCheck = settings.HealthCheck,
@@ -129,6 +130,7 @@ public sealed class RuntimeSettingsStore : IRuntimeSettingsStore
             Routes = new Dictionary<string, DnsRouteConfiguration>(
                 dns.Routes ?? new Dictionary<string, DnsRouteConfiguration>(),
                 StringComparer.OrdinalIgnoreCase),
+            Records = dns.Records ?? [],
             BlackholeDomains = dns.BlackholeDomains ?? [],
             Dnssec = dns.Dnssec ?? new DnssecConfiguration(),
             HealthCheck = dns.HealthCheck ?? new DnsHealthCheckConfiguration(),
@@ -143,6 +145,7 @@ public sealed class RuntimeSettingsStore : IRuntimeSettingsStore
         if (routes is not null)
             settings.Routes = new Dictionary<string, DnsRouteConfiguration>(routes, StringComparer.OrdinalIgnoreCase);
 
+        settings.Records = configuration.GetSection("DNS:Records").Get<DnsRecordConfiguration[]>() ?? [];
         settings.BlackholeDomains = configuration.GetSection("DNS:BlackholeDomains").Get<string[]>() ?? [];
         configuration.GetSection("DNS:Dnssec").Bind(settings.Dnssec);
         configuration.GetSection("DNS:HealthCheck").Bind(settings.HealthCheck);
@@ -230,6 +233,7 @@ public sealed class RuntimeSettingsStore : IRuntimeSettingsStore
             DNS = new DnsRuntimeSettingsSection
             {
                 Routes = settings.Routes,
+                Records = settings.Records,
                 BlackholeDomains = settings.BlackholeDomains,
                 Dnssec = settings.Dnssec,
                 HealthCheck = settings.HealthCheck

@@ -12,6 +12,7 @@ internal sealed class RuntimeDnsSettingsPostConfigure(IRuntimeSettingsStore stor
     {
         var snapshot = store.Current;
         options.Routes = snapshot.Routes;
+        options.Records = snapshot.Records;
         options.BlackholeDomains = snapshot.BlackholeDomains;
         options.Dnssec = snapshot.Dnssec;
         options.HealthCheck = snapshot.HealthCheck;

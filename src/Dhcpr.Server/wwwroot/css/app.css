@@ -123,3 +123,82 @@ main {
 .query-table tbody tr:hover {
     background: var(--surface);
 }
+
+.settings {
+    max-width: 52rem;
+}
+
+.settings h1 {
+    font-size: 1.15rem;
+    margin: 0 0 1rem;
+}
+
+.settings h2 {
+    font-size: 0.95rem;
+    margin: 0 0 0.6rem;
+    color: var(--accent);
+}
+
+.settings section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-bottom: 0.65rem;
+    color: var(--muted);
+}
+
+.settings label.checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+}
+
+.settings input,
+.settings textarea {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.5rem;
+    font: inherit;
+}
+
+.settings .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.settings button {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.7rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+.settings button.primary {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.settings button.danger {
+    color: var(--error);
+    border-color: var(--error);
+}
+
+.form-error {
+    color: var(--error);
+}
+
+.form-saved {
+    color: var(--hit);
+}

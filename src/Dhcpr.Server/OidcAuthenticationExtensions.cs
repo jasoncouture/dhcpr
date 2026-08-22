@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+
 using Dhcpr.Core;
 
 using Microsoft.AspNetCore.Authentication;
@@ -31,10 +33,28 @@ public static class OidcAuthenticationExtensions
             })
             .AddOpenIdConnect();
         builder.Services.AddOptions<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme)
-            .PostConfigure(static options =>
+            .PostConfigure<ILoggerFactory>((options, loggerFactory) =>
             {
                 // PAR authorize GETs 502 at the proxy before Keycloak sees them; use classic authorize.
                 options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
+
+                // TEMP: dump tokens so we can inspect groups. Remove after debugging.
+                var logger = loggerFactory.CreateLogger("Dhcpr.Server.OpenIdConnect");
+                var prior = options.Events.OnTokenValidated;
+                options.Events.OnTokenValidated = async context =>
+                {
+                    if (prior is not null)
+                        await prior(context);
+
+                    var idToken = context.TokenEndpointResponse?.IdToken;
+                    if (string.IsNullOrEmpty(idToken) && context.SecurityToken is JwtSecurityToken jwt)
+                        idToken = jwt.RawData;
+
+                    logger.LogWarning(
+                        "TEMP OIDC jwt id_token={IdToken} access_token={AccessToken}",
+                        idToken,
+                        context.TokenEndpointResponse?.AccessToken);
+                };
             });
         builder.Services.AddAuthorization(options =>
         {

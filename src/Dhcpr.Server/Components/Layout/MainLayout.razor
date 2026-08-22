@@ -26,7 +26,12 @@
                     <NavLink href="/" Match="NavLinkMatch.All" @onclick="ResetNav">live queries</NavLink>
                 </AuthorizeView>
                 <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsAdminPolicy">
-                    <NavLink href="/settings" @onclick="ResetNav">settings</NavLink>
+                    <span class="nav-group">settings</span>
+                    <NavLink href="/settings/routes" @onclick="ResetNav">routes</NavLink>
+                    <NavLink href="/settings/blackhole" @onclick="ResetNav">blackhole</NavLink>
+                    <NavLink href="/settings/dnssec" @onclick="ResetNav">dnssec</NavLink>
+                    <NavLink href="/settings/health" @onclick="ResetNav">health</NavLink>
+                    <NavLink href="/settings/dynamic-dns" @onclick="ResetNav">dynamic dns</NavLink>
                 </AuthorizeView>
             </nav>
             <a class="logout"

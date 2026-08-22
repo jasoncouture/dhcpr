@@ -1,0 +1,25 @@
+<div class="settings">
+    <h1>@Title</h1>
+
+    @if (Error is not null)
+    {
+        <p class="form-error">@Error</p>
+    }
+    @if (Saved)
+    {
+        <p class="form-saved">Saved.</p>
+    }
+
+    @ChildContent
+
+    <button type="button" class="primary" @onclick="OnSave" disabled="@Saving">Save</button>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Saved { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

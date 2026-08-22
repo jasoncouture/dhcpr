@@ -1,0 +1,104 @@
+@page "/settings"
+@page "/settings/routes"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="Routes" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    @foreach (var route in _routes)
+    {
+        <div class="card">
+            <label>
+                Suffix
+                <input @bind="route.Suffix" />
+            </label>
+            <label>
+                Upstreams (one host:port per line)
+                <textarea rows="3" @bind="route.Upstreams"></textarea>
+            </label>
+            <label>
+                Clients (CIDR or IP, one per line; empty = any)
+                <textarea rows="4" @bind="route.Clients"></textarea>
+            </label>
+            <button type="button" class="danger" @onclick="() => _routes.Remove(route)">Remove</button>
+        </div>
+    }
+    <button type="button" @onclick="AddRoute">Add route</button>
+</SettingsForm>
+
+@code {
+    private readonly List<RouteEdit> _routes = [];
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+        => Load(Store.Current);
+
+    private void AddRoute()
+        => _routes.Add(new RouteEdit());
+
+    private void Load(RuntimeEditableSettings settings)
+    {
+        _routes.Clear();
+        foreach (var (suffix, route) in settings.Routes.OrderBy(static kv => kv.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            _routes.Add(new RouteEdit
+            {
+                Suffix = suffix,
+                Upstreams = SettingsEdit.JoinLines(route.Upstreams),
+                Clients = SettingsEdit.JoinLines(route.Clients)
+            });
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            var routes = new Dictionary<string, DnsRouteConfiguration>(StringComparer.OrdinalIgnoreCase);
+            foreach (var route in _routes)
+            {
+                var suffix = route.Suffix.Trim().TrimEnd('.');
+                if (string.IsNullOrWhiteSpace(suffix))
+                {
+                    _error = "Each route needs a domain suffix";
+                    return;
+                }
+
+                if (!routes.TryAdd(suffix, new DnsRouteConfiguration
+                    {
+                        Upstreams = SettingsEdit.SplitLines(route.Upstreams),
+                        Clients = SettingsEdit.SplitLines(route.Clients)
+                    }))
+                {
+                    _error = $"Duplicate route suffix: {suffix}";
+                    return;
+                }
+            }
+
+            var settings = Store.Current;
+            settings.Routes = routes;
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            Load(Store.Current);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class RouteEdit
+    {
+        public string Suffix { get; set; } = "";
+        public string Upstreams { get; set; } = "";
+        public string Clients { get; set; } = "";
+    }
+}

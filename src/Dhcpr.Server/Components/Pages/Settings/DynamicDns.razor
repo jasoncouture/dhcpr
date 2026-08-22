@@ -1,0 +1,79 @@
+@page "/settings/dynamic-dns"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="Dynamic DNS" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    <label class="checkbox">
+        <input type="checkbox" @bind="_enabled" />
+        Enabled
+    </label>
+    <label>
+        Username
+        <input @bind="_username" />
+    </label>
+    <label>
+        Password (leave blank to keep current)
+        <input type="password" @bind="_password" autocomplete="new-password" />
+    </label>
+    <label>
+        TTL seconds
+        <input type="number" min="1" max="86400" @bind="_ttl" />
+    </label>
+    <label class="checkbox">
+        <input type="checkbox" @bind="_trustForwardedFor" />
+        Trust X-Forwarded-For
+    </label>
+</SettingsForm>
+
+@code {
+    private bool _enabled = true;
+    private string _username = "";
+    private string _password = "";
+    private string _existingPassword = "";
+    private int _ttl = 60;
+    private bool _trustForwardedFor;
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        var dyn = Store.Current.DynamicDns;
+        _enabled = dyn.Enabled;
+        _username = dyn.Username;
+        _existingPassword = dyn.Password;
+        _ttl = dyn.TtlSeconds;
+        _trustForwardedFor = dyn.TrustForwardedFor;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            var settings = Store.Current;
+            settings.DynamicDns = new DynamicDnsConfiguration
+            {
+                Enabled = _enabled,
+                Username = _username,
+                Password = string.IsNullOrEmpty(_password) ? _existingPassword : _password,
+                TtlSeconds = _ttl,
+                TrustForwardedFor = _trustForwardedFor
+            };
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            _password = "";
+            OnInitialized();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

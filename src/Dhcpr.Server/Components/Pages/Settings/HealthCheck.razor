@@ -1,0 +1,63 @@
+@page "/settings/health"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="Health check" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    <label class="checkbox">
+        <input type="checkbox" @bind="_enabled" />
+        Enabled
+    </label>
+    <label>
+        Domains (one per line)
+        <textarea rows="6" @bind="_domains"></textarea>
+    </label>
+    <label>
+        Timeout seconds
+        <input type="number" min="1" max="120" @bind="_timeout" />
+    </label>
+</SettingsForm>
+
+@code {
+    private bool _enabled = true;
+    private string _domains = "";
+    private int _timeout = 5;
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        var health = Store.Current.HealthCheck;
+        _enabled = health.Enabled;
+        _domains = SettingsEdit.JoinLines(health.Domains);
+        _timeout = health.TimeoutSeconds;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            var settings = Store.Current;
+            settings.HealthCheck = new DnsHealthCheckConfiguration
+            {
+                Enabled = _enabled,
+                Domains = SettingsEdit.SplitLines(_domains),
+                TimeoutSeconds = _timeout
+            };
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            OnInitialized();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

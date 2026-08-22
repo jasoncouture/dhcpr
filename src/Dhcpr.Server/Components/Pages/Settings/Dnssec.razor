@@ -1,0 +1,69 @@
+@page "/settings/dnssec"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="DNSSEC" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    <label class="checkbox">
+        <input type="checkbox" @bind="_enabled" />
+        Enabled
+    </label>
+    <label>
+        Allowed algorithms (comma-separated bytes; empty = defaults)
+        <input @bind="_allowedAlgorithms" />
+    </label>
+    <label>
+        Denied algorithms (comma-separated bytes)
+        <input @bind="_deniedAlgorithms" />
+    </label>
+</SettingsForm>
+
+@code {
+    private bool _enabled = true;
+    private string _allowedAlgorithms = "";
+    private string _deniedAlgorithms = "";
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        var dnssec = Store.Current.Dnssec;
+        _enabled = dnssec.Enabled;
+        _allowedAlgorithms = SettingsEdit.JoinBytes(dnssec.AllowedAlgorithms);
+        _deniedAlgorithms = SettingsEdit.JoinBytes(dnssec.DeniedAlgorithms);
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            if (!SettingsEdit.TryParseBytes(_allowedAlgorithms, "DNS:Dnssec:AllowedAlgorithms", out var allowed, out _error) ||
+                !SettingsEdit.TryParseBytes(_deniedAlgorithms, "DNS:Dnssec:DeniedAlgorithms", out var denied, out _error))
+            {
+                return;
+            }
+
+            var settings = Store.Current;
+            settings.Dnssec = new DnssecConfiguration
+            {
+                Enabled = _enabled,
+                AllowedAlgorithms = allowed,
+                DeniedAlgorithms = denied
+            };
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            OnInitialized();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

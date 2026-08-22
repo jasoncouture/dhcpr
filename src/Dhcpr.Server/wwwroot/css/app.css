@@ -145,6 +145,14 @@ input[type="checkbox"] {
     gap: 0.15rem;
 }
 
+.sidebar .nav-group {
+    padding: 0.75rem 0.65rem 0.2rem;
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 .sidebar nav a {
     color: var(--text);
     padding: 0.5rem 0.65rem;

@@ -1,0 +1,43 @@
+@page "/settings/blackhole"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="Blackhole domains" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    <label>
+        One suffix per line
+        <textarea rows="10" @bind="_blackhole"></textarea>
+    </label>
+</SettingsForm>
+
+@code {
+    private string _blackhole = "";
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+        => _blackhole = SettingsEdit.JoinLines(Store.Current.BlackholeDomains);
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            var settings = Store.Current;
+            settings.BlackholeDomains = SettingsEdit.SplitLines(_blackhole);
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            _blackhole = SettingsEdit.JoinLines(Store.Current.BlackholeDomains);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

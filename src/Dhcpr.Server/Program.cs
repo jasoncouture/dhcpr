@@ -4,7 +4,10 @@ using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
 using Dhcpr.Server.Components;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Server.Cache;
 using Dhcpr.Server.LiveQueries;
+using Dhcpr.Server.Orleans.Cache;
 using Dhcpr.Server.Orleans.LiveQueries;
 using Dhcpr.Server.Settings;
 
@@ -63,6 +66,10 @@ builder.Services.Replace(ServiceDescriptor.Singleton<ILiveQueryEventPublisher, O
 builder.Services.AddHostedService(static sp =>
     (OrleansLiveQueryEventPublisher)sp.GetRequiredService<ILiveQueryEventPublisher>());
 builder.Services.AddHostedService<LiveQueryOrleansBridge>();
+builder.Services.Replace(ServiceDescriptor.Singleton<IDnsCacheEventPublisher, OrleansDnsCacheEventPublisher>());
+builder.Services.AddHostedService(static sp =>
+    (OrleansDnsCacheEventPublisher)sp.GetRequiredService<IDnsCacheEventPublisher>());
+builder.Services.AddHostedService<DnsCacheOrleansBridge>();
 builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();
 builder.Services.AddHostedService(static sp =>
     (LiveQueryStore)sp.GetRequiredService<ILiveQueryStore>());

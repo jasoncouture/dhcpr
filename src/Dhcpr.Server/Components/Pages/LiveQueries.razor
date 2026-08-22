@@ -1,5 +1,6 @@
 @page "/"
 @rendermode InteractiveServer
+@attribute [Authorize(Policy = OidcAuthenticationExtensions.DnsViewerPolicy)]
 @implements IAsyncDisposable
 @inject ILiveQueryStore Store
 

@@ -1,9 +1,21 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 
 <div class="page">
     <header class="header">
         <a href="/" class="brand">dhcpr</a>
-        <span class="subtitle">live queries</span>
+        <nav class="nav">
+            <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsViewerPolicy">
+                <a href="/">live queries</a>
+            </AuthorizeView>
+            <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsAdminPolicy">
+                <a href="/settings">settings</a>
+            </AuthorizeView>
+        </nav>
+        <AuthorizeView>
+            <span class="user">@context.User.Identity?.Name</span>
+            <a href="@OidcAuthenticationExtensions.LogoutPath" data-enhance-nav="false">logout</a>
+        </AuthorizeView>
     </header>
     <main>
         @Body

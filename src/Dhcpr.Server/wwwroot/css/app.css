@@ -48,7 +48,18 @@ a {
     letter-spacing: 0.04em;
 }
 
-.subtitle {
+.nav {
+    display: flex;
+    gap: 0.85rem;
+    margin-left: 0.5rem;
+}
+
+.header .user {
+    margin-left: auto;
+    color: var(--muted);
+}
+
+.not-authorized {
     color: var(--muted);
 }
 

@@ -66,6 +66,7 @@ builder.Services.AddHostedService(static sp =>
     (LiveQueryStore)sp.GetRequiredService<ILiveQueryStore>());
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.AddDhcprAuthentication();
 
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
@@ -76,13 +77,19 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
-app.UseAntiforgery();
+app.UseDhcprForwardedHeaders();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
 app.MapStaticAssets();
+app.MapDhcprAccountEndpoints();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .RequireAuthorization();
 
-app.MapOrleansDashboard(routePrefix: "/orleans");
+app.MapOrleansDashboard(routePrefix: "/orleans")
+    .RequireAuthorization(OidcAuthenticationExtensions.DnsAdminPolicy);
 app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 app.MapDnsOverHttp();

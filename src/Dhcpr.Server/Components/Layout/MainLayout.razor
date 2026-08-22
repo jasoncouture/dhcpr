@@ -28,10 +28,10 @@
                 <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsAdminPolicy">
                     <NavLink href="/settings" @onclick="ResetNav">settings</NavLink>
                 </AuthorizeView>
-                <a class="logout"
-                   href="@OidcAuthenticationExtensions.LogoutPath"
-                   data-enhance-nav="false">sign out</a>
             </nav>
+            <a class="logout"
+               href="@OidcAuthenticationExtensions.LogoutPath"
+               data-enhance-nav="false">sign out</a>
         </aside>
         <button type="button"
                 class="nav-backdrop"

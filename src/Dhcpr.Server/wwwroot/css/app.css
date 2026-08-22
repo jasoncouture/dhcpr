@@ -18,6 +18,8 @@
 html, body {
     margin: 0;
     padding: 0;
+    height: 100%;
+    overflow: hidden;
     background: var(--bg);
     color: var(--text);
     color-scheme: dark;
@@ -50,9 +52,10 @@ input[type="checkbox"] {
 }
 
 .page {
-    min-height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .topbar {
@@ -135,6 +138,9 @@ input[type="checkbox"] {
 .sidebar nav {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     padding: 0.55rem 0.45rem;
     gap: 0.15rem;
 }
@@ -157,17 +163,15 @@ input[type="checkbox"] {
     background: var(--accent);
 }
 
-.sidebar nav a.logout {
-    margin-top: 0.35rem;
+.sidebar .logout {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
     border-top: 1px solid var(--border);
-    border-left-color: transparent;
-    border-radius: 0 4px 4px 0;
     color: var(--muted);
 }
 
-.sidebar nav a.logout:hover {
+.sidebar .logout:hover {
     color: var(--accent);
-    background: var(--surface-2);
 }
 
 .nav-backdrop {
@@ -177,6 +181,7 @@ input[type="checkbox"] {
 main {
     flex: 1;
     min-width: 0;
+    overflow: auto;
     padding: 0.75rem 1rem 1.5rem;
 }
 
@@ -247,7 +252,7 @@ main {
     color: var(--muted);
     font-weight: 600;
     position: sticky;
-    top: 2.75rem;
+    top: 0;
     background: var(--bg);
 }
 

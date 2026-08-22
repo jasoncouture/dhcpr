@@ -26,6 +26,7 @@
                     <NavLink href="/" Match="NavLinkMatch.All" @onclick="ResetNav">live queries</NavLink>
                 </AuthorizeView>
                 <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsAdminPolicy">
+                    <a href="/orleans" data-enhance-nav="false">orleans</a>
                     <span class="nav-group">settings</span>
                     <NavLink href="/settings/routes" @onclick="ResetNav">routes</NavLink>
                     <NavLink href="/settings/blackhole" @onclick="ResetNav">blackhole</NavLink>

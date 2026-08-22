@@ -129,7 +129,6 @@ input[type="checkbox"] {
     flex-direction: column;
     background: var(--surface);
     border-right: 1px solid var(--border);
-    box-shadow: inset 2px 0 0 var(--accent);
     overflow: hidden;
 }
 

@@ -22,9 +22,9 @@ public static class DynDnsEndpointExtensions
         HttpContext httpContext,
         IDynamicDnsStore store,
         IAuthoritativeZoneStore zones,
-        IOptions<DynamicDnsConfiguration> options)
+        IOptionsMonitor<DynamicDnsConfiguration> options)
     {
-        var config = options.Value;
+        var config = options.CurrentValue;
         var hostnameParam = httpContext.Request.Query["hostname"].ToString();
         var myipParam = httpContext.Request.Query["myip"].ToString();
         var auth = httpContext.Request.Headers.Authorization.ToString();

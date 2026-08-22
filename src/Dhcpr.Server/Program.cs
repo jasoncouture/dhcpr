@@ -6,6 +6,7 @@ using Dhcpr.Server;
 using Dhcpr.Server.Components;
 using Dhcpr.Server.LiveQueries;
 using Dhcpr.Server.Orleans.LiveQueries;
+using Dhcpr.Server.Settings;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -53,6 +54,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
 
 builder.Services.AddCoreServices();
 builder.Services.AddDns();
+builder.Services.AddDhcprRuntimeSettings();
 builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 builder.AddDhcprOrleans();

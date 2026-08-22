@@ -8,6 +8,7 @@ public sealed class ApplicationConfiguration : IValidateSelf
     public const string CacheDirectoryName = "cache";
     public const string ZonesDirectoryName = "zones";
     public const string DynamicDnsFileName = "dynamic-dns.json";
+    public const string SettingsFileName = "settings.json";
     public const string NamedRootFileName = "root-servers.txt";
     public const string RootZoneFileName = "root.zone";
 
@@ -37,6 +38,9 @@ public sealed class ApplicationConfiguration : IValidateSelf
 
     public string GetDynamicDnsPath()
         => Path.Combine(GetDataDirectory(), DynamicDnsFileName);
+
+    public string GetSettingsPath()
+        => Path.Combine(GetDataDirectory(), SettingsFileName);
 
     /// <summary>Path under the data directory (used by root-zone helpers).</summary>
     public string GetZoneFilePath(string fileName)

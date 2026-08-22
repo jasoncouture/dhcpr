@@ -10,6 +10,7 @@
         <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
         <ThreadPoolMinThreads>32</ThreadPoolMinThreads>
         <ThreadPoolMaxThreads>1024</ThreadPoolMaxThreads>
+        <NoWarn>$(NoWarn);SYSLIB1100;SYSLIB1101</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

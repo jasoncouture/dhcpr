@@ -33,6 +33,7 @@ public static class DnsServiceProviderExtensions
         });
         services.AddMessagePipe();
         // Process-bound: shared response cache across all queries.
+        services.TryAddSingleton<IDnsCacheEventPublisher, NoOpDnsCacheEventPublisher>();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
 
         services.AddHttpClient(nameof(NamedRootHttpClient), ConfigureInternicHttpClient);

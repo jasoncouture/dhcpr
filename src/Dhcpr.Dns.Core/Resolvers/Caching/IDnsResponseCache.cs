@@ -39,4 +39,23 @@ public interface IDnsResponseCache
     /// Removes every cached entry.
     /// </summary>
     void Clear();
+
+    /// <summary>
+    /// Applies a replica fill without publishing another cluster event.
+    /// </summary>
+    void Import(
+        DomainMessage request,
+        DomainMessage response,
+        DnssecValidationStatus securityStatus,
+        DateTimeOffset cachedAt);
+
+    /// <summary>
+    /// Applies a replica DNSSEC status without publishing another cluster event.
+    /// </summary>
+    void ImportSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus);
+
+    /// <summary>
+    /// Applies a replica clear without publishing another cluster event.
+    /// </summary>
+    void ImportClear();
 }

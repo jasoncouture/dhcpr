@@ -19,10 +19,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
     private static readonly TimeSpan _maxCacheTtl = TimeSpan.FromHours(1);
 
     private readonly IMemoryCache _memoryCache;
+    private readonly IDnsCacheEventPublisher _events;
 
-    public DnsResponseCache(IMemoryCache memoryCache)
+    public DnsResponseCache(IMemoryCache memoryCache, IDnsCacheEventPublisher? events = null)
     {
         _memoryCache = memoryCache;
+        _events = events ?? NoOpDnsCacheEventPublisher.Instance;
     }
 
     public bool TryGet(DomainMessage request, out DomainMessage? response)
@@ -60,7 +62,13 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return true;
     }
 
-    public void Clear() => (_memoryCache as MemoryCache)?.Clear();
+    public void Clear()
+    {
+        ImportClear();
+        _events.PublishClear();
+    }
+
+    public void ImportClear() => (_memoryCache as MemoryCache)?.Clear();
 
     public void Remove(DomainMessage request)
     {
@@ -70,6 +78,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
     }
 
     public void UpdateSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus)
+    {
+        ImportSecurityStatus(request, securityStatus);
+        _events.PublishSecurityStatus(request, securityStatus);
+    }
+
+    public void ImportSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus)
     {
         if (request.Questions.Length != 1)
             return;
@@ -92,14 +106,35 @@ public sealed class DnsResponseCache : IDnsResponseCache
         DomainMessage response,
         DnssecValidationStatus securityStatus = DnssecValidationStatus.Unchecked)
     {
+        var cachedAt = DateTimeOffset.UtcNow;
+        if (!TryAccept(request, response, securityStatus, cachedAt, storeGlue: true))
+            return;
+
+        _events.PublishSet(request, response, securityStatus, cachedAt);
+    }
+
+    public void Import(
+        DomainMessage request,
+        DomainMessage response,
+        DnssecValidationStatus securityStatus,
+        DateTimeOffset cachedAt)
+        => TryAccept(request, response, securityStatus, cachedAt, storeGlue: true);
+
+    private bool TryAccept(
+        DomainMessage request,
+        DomainMessage response,
+        DnssecValidationStatus securityStatus,
+        DateTimeOffset cachedAt,
+        bool storeGlue)
+    {
         if (request.Questions.Length != 1)
-            return;
+            return false;
         if (response.Flags.Truncated)
-            return;
+            return false;
         if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure or DomainResponseCode.Refused)
-            return;
+            return false;
         if (securityStatus is DnssecValidationStatus.Bogus)
-            return;
+            return false;
 
         var questionType = request.Questions[0].Type;
 
@@ -108,21 +143,24 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (response.Records.Answers.Length == 0 &&
             response.Records.Any(r => r.Type == DomainRecordType.NS) &&
             response.Flags.ResponseCode is DomainResponseCode.NoError)
-            return;
+            return false;
 
         // Upstream hop types (DNSKEY / DS / NS) cache like any other answer, including RRSIGs.
         // Glue from NS responses is side-cached as A/AAAA with the parent's security status.
-        if (!TryStore(request, response, securityStatus))
-            return;
+        if (!TryStore(request, response, securityStatus, cachedAt))
+            return false;
 
-        if (questionType is DomainRecordType.NS)
-            CacheGlueRecords(response, securityStatus);
+        if (storeGlue && questionType is DomainRecordType.NS)
+            CacheGlueRecords(response, securityStatus, cachedAt);
+
+        return true;
     }
 
     private bool TryStore(
         DomainMessage request,
         DomainMessage response,
-        DnssecValidationStatus securityStatus)
+        DnssecValidationStatus securityStatus,
+        DateTimeOffset cachedAt)
     {
         var lifetime = ComputeLifetime(response);
         if (lifetime <= TimeSpan.Zero)
@@ -131,10 +169,17 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (lifetime > _maxCacheTtl)
             lifetime = _maxCacheTtl;
 
+        var age = DateTimeOffset.UtcNow - cachedAt;
+        if (age < TimeSpan.Zero)
+            age = TimeSpan.Zero;
+        lifetime -= age;
+        if (lifetime <= TimeSpan.Zero)
+            return false;
+
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
         // Strip AD — security lives in SecurityStatus only.
         var flags = response.Flags with { Authentic = false };
-        var entry = new CacheEntry(flags, response.Records, DateTimeOffset.UtcNow)
+        var entry = new CacheEntry(flags, response.Records, cachedAt)
         {
             SecurityStatus = securityStatus
         };
@@ -148,7 +193,10 @@ public sealed class DnsResponseCache : IDnsResponseCache
         return true;
     }
 
-    private void CacheGlueRecords(DomainMessage nsResponse, DnssecValidationStatus securityStatus)
+    private void CacheGlueRecords(
+        DomainMessage nsResponse,
+        DnssecValidationStatus securityStatus,
+        DateTimeOffset cachedAt)
     {
         var nsNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in nsResponse.Records)
@@ -183,7 +231,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
                     glueRecords,
                     ImmutableArray<DomainResourceRecord>.Empty,
                     ImmutableArray<DomainResourceRecord>.Empty));
-            TryStore(glueRequest, glueResponse, securityStatus);
+            TryStore(glueRequest, glueResponse, securityStatus, cachedAt);
         }
     }
 

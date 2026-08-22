@@ -157,15 +157,17 @@ input[type="checkbox"] {
     background: var(--accent);
 }
 
-.sidebar .logout {
-    margin-top: auto;
-    padding: 0.75rem 1rem;
+.sidebar nav a.logout {
+    margin-top: 0.35rem;
     border-top: 1px solid var(--border);
+    border-left-color: transparent;
+    border-radius: 0 4px 4px 0;
     color: var(--muted);
 }
 
-.sidebar .logout:hover {
+.sidebar nav a.logout:hover {
     color: var(--accent);
+    background: var(--surface-2);
 }
 
 .nav-backdrop {

@@ -237,6 +237,109 @@ public class DnsResponseCacheTests
         await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    private static DnsResponseCache CreateCache()
-        => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+    [Fact]
+    public void SetPublishesOnceImportDoesNot()
+    {
+        var publisher = new RecordingCachePublisher();
+        var cache = CreateCache(publisher);
+        var request = DomainMessage.CreateRequest("pub.example", DomainRecordType.A);
+        var response = AddressResponse(request, "203.0.113.8");
+
+        cache.Set(request, response);
+        Assert.Equal(1, publisher.Sets);
+
+        cache.Import(request, response, DnssecValidationStatus.Secure, DateTimeOffset.UtcNow);
+        Assert.Equal(1, publisher.Sets);
+        Assert.Equal(0, publisher.Clears);
+    }
+
+    [Fact]
+    public void ImportAppliesReplicaPayload()
+    {
+        var source = CreateCache();
+        var replica = CreateCache();
+        var request = DomainMessage.CreateRequest("replica.example", DomainRecordType.A);
+        var response = AddressResponse(request, "198.51.100.4");
+        var cachedAt = DateTimeOffset.UtcNow;
+
+        source.Set(request, response);
+        replica.Import(request, response, DnssecValidationStatus.Unchecked, cachedAt);
+
+        Assert.True(replica.TryGet(request, out var cached, out var status));
+        Assert.Equal(IPAddress.Parse("198.51.100.4"), ((IPAddressData)cached!.Records.Answers[0].Data).Address);
+        Assert.Equal(DnssecValidationStatus.Unchecked, status);
+    }
+
+    [Fact]
+    public void ImportClearEmptiesWithoutPublishing()
+    {
+        var publisher = new RecordingCachePublisher();
+        var cache = CreateCache(publisher);
+        var request = DomainMessage.CreateRequest("wipe.example", DomainRecordType.A);
+        cache.Set(request, AddressResponse(request, "192.0.2.9"));
+        publisher.Sets = 0;
+
+        cache.ImportClear();
+
+        Assert.False(cache.TryGet(request, out _));
+        Assert.Equal(0, publisher.Clears);
+
+        cache.Clear();
+        Assert.Equal(1, publisher.Clears);
+    }
+
+    [Fact]
+    public void ImportSecurityStatusDoesNotPublish()
+    {
+        var publisher = new RecordingCachePublisher();
+        var cache = CreateCache(publisher);
+        var request = DomainMessage.CreateRequest("sec.example", DomainRecordType.A);
+        cache.Set(request, AddressResponse(request, "192.0.2.10"));
+
+        cache.ImportSecurityStatus(request, DnssecValidationStatus.Secure);
+        Assert.Equal(0, publisher.Statuses);
+
+        Assert.True(cache.TryGet(request, out _, out var status));
+        Assert.Equal(DnssecValidationStatus.Secure, status);
+
+        cache.UpdateSecurityStatus(request, DnssecValidationStatus.Insecure);
+        Assert.Equal(1, publisher.Statuses);
+    }
+
+    private static DomainMessage AddressResponse(DomainMessage request, string ip)
+        => DomainMessage.CreateResponse(
+            request,
+            new[]
+            {
+                new DomainResourceRecord(
+                    request.Questions[0].Name,
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(300),
+                    new IPAddressData(IPAddress.Parse(ip)))
+            },
+            responseCode: DomainResponseCode.NoError);
+
+    private static DnsResponseCache CreateCache(IDnsCacheEventPublisher? publisher = null)
+        => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }), publisher);
+
+    private sealed class RecordingCachePublisher : IDnsCacheEventPublisher
+    {
+        public Guid OriginId { get; } = Guid.NewGuid();
+        public int Sets;
+        public int Statuses;
+        public int Clears;
+
+        public void PublishSet(
+            DomainMessage request,
+            DomainMessage response,
+            DnssecValidationStatus securityStatus,
+            DateTimeOffset cachedAt)
+            => Sets++;
+
+        public void PublishSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus)
+            => Statuses++;
+
+        public void PublishClear() => Clears++;
+    }
 }

@@ -337,6 +337,7 @@ main {
 }
 
 .settings input,
+.settings select,
 .settings textarea {
     background: var(--surface);
     color: var(--text);
@@ -345,6 +346,7 @@ main {
 }
 
 .settings input:focus,
+.settings select:focus,
 .settings textarea:focus {
     border-color: var(--accent);
 }

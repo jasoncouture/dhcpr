@@ -1,0 +1,125 @@
+@page "/settings/records"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
+@inject IRuntimeSettingsStore Store
+
+<SettingsForm Title="Records" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
+    @foreach (var record in _records)
+    {
+        <div class="card">
+            <label>
+                Name
+                <input @bind="record.Name" placeholder="www.home.arpa or *.apps.home.arpa" />
+            </label>
+            <label>
+                Type
+                <select @bind="record.Type">
+                    <option value="A">A</option>
+                    <option value="AAAA">AAAA</option>
+                    <option value="CNAME">CNAME</option>
+                    <option value="NS">NS</option>
+                </select>
+            </label>
+            <label>
+                TTL seconds (empty = 300)
+                <input @bind="record.Ttl" inputmode="numeric" />
+            </label>
+            <label>
+                Value
+                <input @bind="record.Value" placeholder="IPv4, IPv6, or domain name" />
+            </label>
+            <label>
+                Clients (CIDR or IP, one per line; empty = any)
+                <textarea rows="3" @bind="record.Clients"></textarea>
+            </label>
+            <button type="button" class="danger" @onclick="() => _records.Remove(record)">Remove</button>
+        </div>
+    }
+    <button type="button" @onclick="AddRecord">Add record</button>
+</SettingsForm>
+
+@code {
+    private readonly List<RecordEdit> _records = [];
+    private string? _error;
+    private bool _saved;
+    private bool _saving;
+
+    protected override void OnInitialized()
+        => Load(Store.Current);
+
+    private void AddRecord()
+        => _records.Add(new RecordEdit());
+
+    private void Load(RuntimeEditableSettings settings)
+    {
+        _records.Clear();
+        foreach (var record in settings.Records ?? [])
+        {
+            _records.Add(new RecordEdit
+            {
+                Name = record.Name,
+                Type = string.IsNullOrWhiteSpace(record.Type) ? "A" : record.Type.ToUpperInvariant(),
+                Ttl = record.Ttl?.ToString(),
+                Value = record.Value,
+                Clients = SettingsEdit.JoinLines(record.Clients)
+            });
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _error = null;
+        try
+        {
+            var records = new List<DnsRecordConfiguration>();
+            for (var i = 0; i < _records.Count; i++)
+            {
+                var edit = _records[i];
+                int? ttl = null;
+                if (!string.IsNullOrWhiteSpace(edit.Ttl))
+                {
+                    if (!int.TryParse(edit.Ttl.Trim(), out var parsedTtl))
+                    {
+                        _error = $"Record {i + 1}: TTL must be a number";
+                        return;
+                    }
+
+                    ttl = parsedTtl;
+                }
+
+                records.Add(new DnsRecordConfiguration
+                {
+                    Name = edit.Name.Trim(),
+                    Type = edit.Type.Trim(),
+                    Ttl = ttl,
+                    Value = edit.Value.Trim(),
+                    Clients = SettingsEdit.SplitLines(edit.Clients)
+                });
+            }
+
+            var settings = Store.Current;
+            settings.Records = records.ToArray();
+            _error = await Store.SaveAsync(settings, CancellationToken.None);
+            if (_error is not null)
+                return;
+
+            _saved = true;
+            Load(Store.Current);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class RecordEdit
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "A";
+        public string? Ttl { get; set; }
+        public string Value { get; set; } = "";
+        public string Clients { get; set; } = "";
+    }
+}

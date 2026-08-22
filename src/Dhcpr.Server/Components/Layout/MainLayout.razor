@@ -26,7 +26,12 @@
                     <NavLink href="/" Match="NavLinkMatch.All" @onclick="ResetNav">live queries</NavLink>
                 </AuthorizeView>
                 <AuthorizeView Policy="@OidcAuthenticationExtensions.DnsAdminPolicy">
-                    <a href="/orleans" data-enhance-nav="false">orleans</a>
+                    <a class="nav-external" href="/orleans" data-enhance-nav="false">
+                        orleans
+                        <svg class="nav-external-icon" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill="currentColor" d="M6.5 3.5h-3A1.5 1.5 0 0 0 2 5v7.5A1.5 1.5 0 0 0 3.5 14H11a1.5 1.5 0 0 0 1.5-1.5v-3h-1.25v3a.25.25 0 0 1-.25.25H3.5a.25.25 0 0 1-.25-.25V5a.25.25 0 0 1 .25-.25h3zm3.75 0H14v3.75h-1.25V5.634L7.442 11.19l-.884-.884 5.308-5.557H10.25z"/>
+                        </svg>
+                    </a>
                     <span class="nav-group">settings</span>
                     <NavLink href="/settings/routes" @onclick="ResetNav">routes</NavLink>
                     <NavLink href="/settings/blackhole" @onclick="ResetNav">blackhole</NavLink>

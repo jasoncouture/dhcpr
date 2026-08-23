@@ -46,6 +46,7 @@ public sealed partial class DnssecValidator : IDnssecValidator
             {
                 DnssecAlgorithmType.RsaSha256 => VerifyRsaSha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 DnssecAlgorithmType.EcdsaP256Sha256 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
+                DnssecAlgorithmType.EcdsaP384Sha384 => VerifyEcdsaP384Sha384(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 _ => false
             };
         }
@@ -112,6 +113,28 @@ public sealed partial class DnssecValidator : IDnssecValidator
         });
 
         return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+    }
+
+    /// <summary>RFC 6605 ECDSAP384SHA384: uncompressed X||Y (96) and r||s (96).</summary>
+    private static bool VerifyEcdsaP384Sha384(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
+    {
+        const int expectedKeySize = 96;
+        const int expectedSignatureSize = 96;
+        const int coordinateSize = 48;
+
+        if (publicKeyData.Length != expectedKeySize || signature.Length != expectedSignatureSize) return false;
+
+        using var ecdsa = ECDsa.Create(new ECParameters
+        {
+            Curve = ECCurve.NamedCurves.nistP384,
+            Q = new ECPoint
+            {
+                X = publicKeyData[..coordinateSize].ToArray(),
+                Y = publicKeyData[coordinateSize..].ToArray()
+            }
+        });
+
+        return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA384, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
     }
 
     public ushort CalculateKeyTag(DomainNameSystemKeyData dnsKey, DomainResourceRecord dnsKeyRecord)

@@ -79,6 +79,43 @@ public class DnssecValidatorTests
     }
 
     [Fact]
+    public void EcdsaP384Sha384SignatureVerificationWorks()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+        var pubParams = ecdsa.ExportParameters(false);
+        var x = pubParams.Q.X!;
+        var y = pubParams.Q.Y!;
+        var pubKey = new byte[96];
+        x.CopyTo(pubKey.AsSpan(48 - x.Length));
+        y.CopyTo(pubKey.AsSpan(96 - y.Length));
+
+        var payload = "This is some test data that we will sign."u8.ToArray();
+        var signature = ecdsa.SignData(payload, HashAlgorithmName.SHA384, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+
+        var rrsigData = new ResourceRecordSignatureData(
+            DomainRecordType.A,
+            DnssecAlgorithmType.EcdsaP384Sha384,
+            2,
+            3600,
+            (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
+            (uint)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(),
+            1234,
+            new DomainLabels("fedoraproject.org"),
+            signature.ToImmutableArray()
+        );
+
+        var dnsKeyData = new DomainNameSystemKeyData(
+            256,
+            3,
+            DnssecAlgorithmType.EcdsaP384Sha384,
+            pubKey.ToImmutableArray()
+        );
+
+        var result = _validator.VerifySignature(rrsigData, ReadOnlySpan<byte>.Empty, payload, dnsKeyData);
+        Assert.True(result);
+    }
+
+    [Fact]
     public void RsaSha256SignatureVerificationWorks()
     {
         using var rsa = RSA.Create(2048);

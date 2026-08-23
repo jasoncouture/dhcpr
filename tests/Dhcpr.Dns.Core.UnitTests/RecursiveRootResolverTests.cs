@@ -184,6 +184,59 @@ public class RecursiveRootResolverTests
         Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(_nsResolvedAddress));
         Assert.Contains(internalClient.Queries,
             q => q.Equals("a.gtld-servers.net/A", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(internalClient.Queries,
+            q => q.Equals("a.gtld-servers.net/AAAA", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ReferralWithoutGlueFallsBackToAaaaWhenAIsEmpty()
+    {
+        var v6 = IPAddress.Parse("2001:db8::53");
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DomainMessage(
+                    request.Id,
+                    ResponseFlags(),
+                    request.Questions,
+                    new DomainResourceRecords(
+                        ImmutableArray<DomainResourceRecord>.Empty,
+                        ImmutableArray.Create(NsRecord("com", "a.gtld-servers.net")),
+                        ImmutableArray<DomainResourceRecord>.Empty));
+            }
+
+            if (type == DomainRecordType.A && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
+                return EmptyNoError(request);
+
+            if (type == DomainRecordType.AAAA && name.Equals("a.gtld-servers.net", StringComparison.OrdinalIgnoreCase))
+                return Answer(request, AaaaRecord("a.gtld-servers.net", v6));
+
+            if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(v6)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(internalClient.Client);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com")),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains(internalClient.Queries,
+            q => q.Equals("a.gtld-servers.net/A", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(internalClient.Queries,
+            q => q.Equals("a.gtld-servers.net/AAAA", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(v6));
     }
 
     [Fact]
@@ -557,6 +610,8 @@ public class RecursiveRootResolverTests
             ((NameData)r.Data).Name.ToString()
                 .Equals("apiproxy-log-nlb.elb.us-east-2.amazonaws.com", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(dradisNs));
+        Assert.DoesNotContain(internalClient.Queries,
+            q => q.Equals("us-east-2.internal.dradis.netflix.com/NS", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -911,6 +966,10 @@ public class RecursiveRootResolverTests
 
     private static DomainResourceRecord ARecord(string owner, IPAddress address)
         => new(new DomainLabels(owner), DomainRecordType.A, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
+            new IPAddressData(address));
+
+    private static DomainResourceRecord AaaaRecord(string owner, IPAddress address)
+        => new(new DomainLabels(owner), DomainRecordType.AAAA, DomainRecordClass.IN, TimeSpan.FromSeconds(60),
             new IPAddressData(address));
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

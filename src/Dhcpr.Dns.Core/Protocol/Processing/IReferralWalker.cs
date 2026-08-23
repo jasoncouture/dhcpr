@@ -29,7 +29,8 @@ public interface IReferralWalker
         ReferralWalkOptions? options = null);
 
     /// <summary>
-    /// Resolves A and AAAA for <paramref name="nsNames"/> via the internal client.
+    /// Resolves A for <paramref name="nsNames"/> via the internal client, then AAAA
+    /// only when A produced no addresses.
     /// When <paramref name="ignoreDnssecStatus"/> is <see langword="true"/>, side-lookup status does not update the parent scope.
     /// </summary>
     ValueTask<IReadOnlyList<IPAddress>> ResolveNameserverAddressesAsync(

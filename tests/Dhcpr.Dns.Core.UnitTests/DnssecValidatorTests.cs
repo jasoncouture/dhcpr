@@ -116,6 +116,40 @@ public class DnssecValidatorTests
     }
 
     [Fact]
+    public void Ed25519SignatureVerificationWorks()
+    {
+        // RFC 8032 §7.1 TEST 2
+        var pubKey = Convert.FromHexString(
+            "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c");
+        var payload = new byte[] { 0x72 };
+        var signature = Convert.FromHexString(
+            "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da" +
+            "085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00");
+
+        var rrsigData = new ResourceRecordSignatureData(
+            DomainRecordType.A,
+            DnssecAlgorithmType.Ed25519,
+            2,
+            3600,
+            (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
+            (uint)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(),
+            1234,
+            new DomainLabels("example.com"),
+            signature.ToImmutableArray()
+        );
+
+        var dnsKeyData = new DomainNameSystemKeyData(
+            256,
+            3,
+            DnssecAlgorithmType.Ed25519,
+            pubKey.ToImmutableArray()
+        );
+
+        var result = _validator.VerifySignature(rrsigData, ReadOnlySpan<byte>.Empty, payload, dnsKeyData);
+        Assert.True(result);
+    }
+
+    [Fact]
     public void RsaSha256SignatureVerificationWorks()
     {
         using var rsa = RSA.Create(2048);

@@ -47,6 +47,7 @@ public sealed partial class DnssecValidator : IDnssecValidator
                 DnssecAlgorithmType.RsaSha256 => VerifyRsaSha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 DnssecAlgorithmType.EcdsaP256Sha256 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 DnssecAlgorithmType.EcdsaP384Sha384 => VerifyEcdsaP384Sha384(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
+                DnssecAlgorithmType.Ed25519 => VerifyEd25519(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 _ => false
             };
         }
@@ -135,6 +136,21 @@ public sealed partial class DnssecValidator : IDnssecValidator
         });
 
         return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA384, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+    }
+
+    /// <summary>RFC 8080 ED25519: raw 32-byte public key and 64-byte signature.</summary>
+    private static bool VerifyEd25519(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
+    {
+        const int expectedKeySize = 32;
+        const int expectedSignatureSize = 64;
+        if (publicKeyData.Length != expectedKeySize || signature.Length != expectedSignatureSize)
+            return false;
+
+        var publicKey = publicKeyData.ToArray();
+        var signatureBytes = signature.ToArray();
+        var message = data.ToArray();
+        return Org.BouncyCastle.Math.EC.Rfc8032.Ed25519.Verify(
+            signatureBytes, 0, publicKey, 0, message, 0, message.Length);
     }
 
     public ushort CalculateKeyTag(DomainNameSystemKeyData dnsKey, DomainResourceRecord dnsKeyRecord)

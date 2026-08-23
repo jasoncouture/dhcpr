@@ -26,11 +26,15 @@ public sealed class NameserverTipCache
 
     public bool TryGetClosest(
         DomainLabels name,
+        DomainRecordType type,
         out ImmutableArray<IPEndPoint> tips,
         out DomainLabels zone)
     {
         var labels = name.Labels;
-        for (var skip = 0; skip < labels.Length; skip++)
+        // DS is at the parent. A self-match would send com/DS to the
+        // TLD nameservers (no DS) and sticky-Bogus the chain.
+        var skipSelf = type is DomainRecordType.DS ? 1 : 0;
+        for (var skip = skipSelf; skip < labels.Length; skip++)
         {
             var suffix = new DomainLabels(labels[skip..]);
             var key = Normalize(suffix.ToString());

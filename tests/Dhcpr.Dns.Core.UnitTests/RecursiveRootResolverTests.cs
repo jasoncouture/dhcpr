@@ -484,6 +484,53 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task DsForRememberedZoneStartsAtRootNotChild()
+    {
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
+
+            if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(_comServer.Address)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var tips = new NameserverTipCache();
+        var resolver = CreateResolver(internalClient.Client);
+        await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+            {
+                NameserverTips = tips
+            },
+            CancellationToken.None);
+
+        var before = internalClient.QueriedEndPoints.Count;
+        await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("com", DomainRecordType.DS))
+            {
+                NameserverTips = tips
+            },
+            CancellationToken.None);
+
+        var dsHops = internalClient.QueriedEndPoints.Skip(before).ToList();
+        Assert.Contains(dsHops, ep => ep.Address.Equals(_rootServer.Address));
+        Assert.DoesNotContain(dsHops, ep => ep.Address.Equals(_comServer.Address));
+    }
+
+    [Fact]
     public async Task CnameTargetAuthorityNsIsNotTreatedAsZoneCut()
     {
         // apple.com NS answer itunes.apple.com/NS with a CNAME plus NS for the

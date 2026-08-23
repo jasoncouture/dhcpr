@@ -43,7 +43,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
         using var rootEndPoints = ListPool<IPEndPoint>.Default.Get();
         using var zoneLabels = ListPool<DomainLabel>.Default.Get();
         if (context.NameserverTips is { } tips &&
-            tips.TryGetClosest(question.Name, out var cachedTips, out var cachedZone))
+            tips.TryGetClosest(question.Name, question.Type, out var cachedTips, out var cachedZone))
         {
             rootEndPoints.AddRange(cachedTips);
             foreach (var label in cachedZone.Labels)

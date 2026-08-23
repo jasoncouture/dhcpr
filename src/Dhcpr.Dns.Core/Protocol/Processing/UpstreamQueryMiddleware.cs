@@ -11,7 +11,10 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 {
-    private const int MaxParallelNameservers = 3;
+    // Dual-stack NS plus amazonaws/ELB liars: a batch of 3 often has no honest
+    // peer, so the next batch waits out a 250ms UDP timeout. 8 fits a typical
+    // 4-name × A/AAAA cut in one race; first NOERROR wins.
+    private const int MaxParallelNameservers = 8;
 
     private readonly IDomainClientFactory _clientFactory;
     private readonly IEdnsProtocolService _ednsProtocolService;
@@ -32,8 +35,8 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
             return null;
 
-        // Preserve caller order (RecursiveRootResolver shuffles before directing).
-        using var remaining = endPoints.ToPooledList();
+        // Caller shuffles; interleave families so one batch is not all IPv6.
+        using var remaining = NameserverSelection.InterleaveFamilies(endPoints).ToPooledList();
 
         var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
         DomainMessage? nameErrorFallback = null;

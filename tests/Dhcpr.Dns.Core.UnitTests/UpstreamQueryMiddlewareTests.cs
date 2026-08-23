@@ -33,7 +33,7 @@ public class UpstreamQueryMiddlewareTests
 
         var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
         var request = DomainMessage.CreateRequest("example.com");
-        // First batch (3) is all unreachable; second batch contains the reachable peer.
+        // First opening race (up to 8) includes the reachable peer.
         var context = new DomainMessageContext(null, null, request)
         {
             UpstreamEndpoints = ImmutableArray.Create(unreachable1, unreachable2, unreachable3, reachable)

@@ -209,6 +209,55 @@ public class CanonicalNameResolverDecoratorTests
     }
 
     [Fact]
+    public async Task DirectedHopReturnsInnerCnameWithoutChase()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("ichnaea-web.netflix.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels("ichnaea-web.dradis.netflix.com")))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        var internalClient = Substitute.For<IInternalDomainClient>();
+
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        var request = DomainMessage.CreateRequest("ichnaea-web.netflix.com", DomainRecordType.A);
+        var result = await decorator.ProcessAsync(
+            new DomainMessageContext(null, null, request)
+            {
+                UpstreamEndpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53))
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.CNAME);
+        Assert.DoesNotContain(result.Records.Answers, r => r.Type == DomainRecordType.A);
+        await internalClient.DidNotReceive()
+            .SendAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
+        await internalClient.DidNotReceive()
+            .SendAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<ImmutableArray<IPEndPoint>>(),
+                Arg.Any<CancellationToken>());
+        await internalClient.DidNotReceive()
+            .SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FailedChaseReturnsServerFailureNotPartialCnameChain()
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();

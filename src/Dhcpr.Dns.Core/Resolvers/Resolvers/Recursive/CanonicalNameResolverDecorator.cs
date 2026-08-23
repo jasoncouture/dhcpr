@@ -29,6 +29,14 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
         if (result is null)
             return result;
+
+        // Directed hops are stub queries to a specific nameserver set. Chase
+        // aliases only on the undirected pass so a zone-walk referral is not
+        // expanded into a full CNAME tree (and BypassCache from the hop is
+        // not inherited onto every remaining alias).
+        if (context.UpstreamEndpoints is { Length: > 0 })
+            return result;
+
         if (!context.DomainMessage.Flags.RecursionDesired)
             return result;
 

@@ -490,6 +490,76 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task EmptyNonTerminalNxDomainDoesNotAbortZoneWalk()
+    {
+        // Netflix-style empty non-terminals: the parent is delegated, but
+        // intermediate labels (internal.dradis… / us-east-2.internal.dradis…)
+        // are AA NXDOMAIN while the leaf still exists.
+        var dradisNs = IPAddress.Parse("192.0.2.80");
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
+
+            if (type == DomainRecordType.NS && name.Equals("netflix.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("netflix.com", "ns-101.awsdns-12.com", IPAddress.Parse("205.251.192.101"));
+
+            if (type == DomainRecordType.NS &&
+                name.Equals("dradis.netflix.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("dradis.netflix.com", "e.ns.nflxso.net", dradisNs);
+
+            if (type == DomainRecordType.NS &&
+                (name.Equals("internal.dradis.netflix.com", StringComparison.OrdinalIgnoreCase) ||
+                 name.Equals("us-east-2.internal.dradis.netflix.com", StringComparison.OrdinalIgnoreCase)))
+            {
+                return DomainMessage.CreateResponse(
+                    request, DomainResourceRecords.Empty, DomainResponseCode.NameError) with
+                {
+                    Flags = ResponseFlags(authoritative: true) with { ResponseCode = DomainResponseCode.NameError }
+                };
+            }
+
+            if (type == DomainRecordType.A &&
+                name.Equals("ichnaea-web.us-east-2.internal.dradis.netflix.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(dradisNs)))
+                {
+                    return Answer(
+                        request,
+                        CnameRecord(
+                            "ichnaea-web.us-east-2.internal.dradis.netflix.com",
+                            "apiproxy-log-nlb.elb.us-east-2.amazonaws.com"));
+                }
+
+                return EmptyNoError(request);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var resolver = CreateResolver(internalClient.Client);
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest(
+                    "ichnaea-web.us-east-2.internal.dradis.netflix.com")),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Contains(result.Records.Answers, r =>
+            r.Type == DomainRecordType.CNAME &&
+            ((NameData)r.Data).Name.ToString()
+                .Equals("apiproxy-log-nlb.elb.us-east-2.amazonaws.com", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(dradisNs));
+    }
+
+    [Fact]
     public async Task CnameFallbackKeepsOriginalQuestionType()
     {
         var internalClient = new ScriptedInternalDomainClient(request =>

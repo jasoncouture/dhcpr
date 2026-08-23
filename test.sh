@@ -6,9 +6,10 @@ dig @$SERVER -p $PORT fast.com
 dig @$SERVER -p $PORT www.google.com
 dig @$SERVER -p $PORT www.facebook.com
 dig @$SERVER -p $PORT bag.itunes.apple.com
-dig @$SERVER -p $PORT ichnaea-web.netflix.com
 dig @$SERVER -p $PORT nas.nebula
 dig @$SERVER -p $PORT NS instigaterevolution.com
 dig @$SERVER -p $PORT NS google.com
 dig @$SERVER -p $PORT NS alertr.info
 dig @$SERVER -p $PORT +dnssec NS cloudflare.com
+dig @$SERVER -p $PORT ichnaea-web.netflix.com
+dig @$SERVER -p $PORT +dnssec fedoraproject.org

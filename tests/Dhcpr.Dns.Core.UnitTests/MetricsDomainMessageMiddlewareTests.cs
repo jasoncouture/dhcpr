@@ -126,6 +126,32 @@ public class MetricsDomainMessageMiddlewareTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task TagsRcodeFromResponse()
+    {
+        string? rcode = null;
+        using var listener = CreateListener((_, tags) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "rcode")
+                    rcode = tag.Value?.ToString();
+            }
+        });
+
+        var request = DomainMessage.CreateRequest("missing.example");
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
+        var middleware = CreateMiddleware(response);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Equal(nameof(DomainResponseCode.NameError), rcode);
+    }
+
     private static MetricsDomainMessageMiddleware CreateMiddleware(DomainMessage? response)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
@@ -140,6 +166,9 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     private static MeterListener CreateListener(Action<long> onMeasurement)
+        => CreateListener((measurement, _) => onMeasurement.Invoke(measurement));
+
+    private static MeterListener CreateListener(Action<long, ReadOnlySpan<KeyValuePair<string, object?>>> onMeasurement)
     {
         var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, meterListener) =>
@@ -150,7 +179,8 @@ public class MetricsDomainMessageMiddlewareTests
                 meterListener.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<long>((_, measurement, _, _) => onMeasurement.Invoke(measurement));
+        listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+            onMeasurement.Invoke(measurement, tags));
         listener.Start();
         return listener;
     }

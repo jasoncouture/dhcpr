@@ -44,6 +44,7 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
                 1,
                 new KeyValuePair<string, object?>("cache_hit", context.CacheHit),
                 new KeyValuePair<string, object?>("error", error),
+                new KeyValuePair<string, object?>("rcode", result.Flags.ResponseCode.ToString("G")),
                 new KeyValuePair<string, object?>("query_type", question.Type.ToString("G")),
                 new KeyValuePair<string, object?>("query_class", question.Class.ToString("G")),
                 new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"));

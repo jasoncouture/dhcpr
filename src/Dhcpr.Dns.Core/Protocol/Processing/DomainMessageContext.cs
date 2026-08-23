@@ -37,6 +37,12 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public QueryWorkBudget? WorkBudget { get; init; }
 
     /// <summary>
+    /// Shared across a client query and internal re-entries. Zone-cut NS
+    /// addresses learned on directed hops (which bypass the response cache).
+    /// </summary>
+    public NameserverTipCache? NameserverTips { get; init; }
+
+    /// <summary>
     /// Set by the cache decorator when the response was served from cache.
     /// Stored on the context so the flag is visible to outer middleware after await
     /// (AsyncLocal does not flow mutations back to the caller).

@@ -255,7 +255,8 @@ public sealed partial class DnsServer : BackgroundService
         var context = new DomainMessageContext(remoteIPEndPoint, localEndPoint, message)
         {
             DnssecScope = new DnssecScope(),
-            WorkBudget = new QueryWorkBudget()
+            WorkBudget = new QueryWorkBudget(),
+            NameserverTips = new NameserverTipCache()
         };
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient);
@@ -282,7 +283,8 @@ public sealed partial class DnsServer : BackgroundService
             var context = new DomainMessageContext(remoteIPEndPoint, endPoint, message)
             {
                 DnssecScope = new DnssecScope(),
-                WorkBudget = new QueryWorkBudget()
+                WorkBudget = new QueryWorkBudget(),
+                NameserverTips = new NameserverTipCache()
             };
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);

@@ -41,8 +41,20 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
         var question = context.DomainMessage.Questions[0];
         var remainingLabels = question.Name.Labels;
         using var rootEndPoints = ListPool<IPEndPoint>.Default.Get();
-        rootEndPoints.AddRange(_rootServerTips.GetEndpoints().OrderBy(_ => Random.Shared.Next()));
         using var zoneLabels = ListPool<DomainLabel>.Default.Get();
+        if (context.NameserverTips is { } tips &&
+            tips.TryGetClosest(question.Name, out var cachedTips, out var cachedZone))
+        {
+            rootEndPoints.AddRange(cachedTips);
+            foreach (var label in cachedZone.Labels)
+                zoneLabels.Add(label);
+            remainingLabels = remainingLabels[..^cachedZone.Labels.Length];
+        }
+        else
+        {
+            rootEndPoints.AddRange(_rootServerTips.GetEndpoints().OrderBy(_ => Random.Shared.Next()));
+        }
+
         using var addressRecords = ListPool<IPAddress>.Default.Get();
         try
         {
@@ -78,16 +90,18 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
                     context.DnssecScope?.PopIgnoreStatus();
                 }
 
-                // NXDOMAIN/SERVFAIL/REFUSED are not referrals, even if NS is present.
+                // NXDOMAIN/SERVFAIL/REFUSED are not referrals. Empty non-terminals
+                // (Netflix internal.dradis…) are AA NXDOMAIN; deeper labels are not
+                // cuts. FollowAsync from the current NS finds the leaf.
                 if (responseMessage.Flags.ResponseCode is not DomainResponseCode.NoError)
-                    continue;
+                    break;
 
                 using var nsNames = _referralWalker.GetNameserverNames(
                     responseMessage.Records, message.Questions[0].Name).ToPooledList();
 
-                // Authoritative NODATA / no referral — keep current nameservers and continue.
+                // Authoritative NODATA / no referral — no cut; stop walking labels.
                 if (nsNames.Count == 0)
-                    continue;
+                    break;
 
                 var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 addressRecords.AddRange(_referralWalker.GetGlueAddresses(responseMessage.Records, nsNameSet));
@@ -102,6 +116,9 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
 
                 rootEndPoints.Clear();
                 rootEndPoints.AddRange(addressRecords.Select(i => new IPEndPoint(i, 53)));
+                context.NameserverTips?.Remember(
+                    new DomainLabels(zoneLabels.ToImmutableArray()).ToString(),
+                    rootEndPoints);
             }
 
             var cloned = context.DomainMessage with { Id = (ushort)Random.Shared.Next(0, ushort.MaxValue + 1) };

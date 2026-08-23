@@ -103,6 +103,8 @@ public sealed class ReferralWalker : IReferralWalker
 
             endPoints.Clear();
             endPoints.AddRange(referralAddresses.Select(i => new IPEndPoint(i, 53)));
+            if (GetNsOwner(last.Records) is { } cut)
+                context.NameserverTips?.Remember(cut, endPoints);
         }
 
         if (options.ServFailNonAuthoritativeApexTypes &&
@@ -143,6 +145,8 @@ public sealed class ReferralWalker : IReferralWalker
 
         endPoints.Clear();
         endPoints.AddRange(addresses.Select(i => new IPEndPoint(i, 53)));
+        if (GetNsOwner(referral.Records) is { } cut)
+            context.NameserverTips?.Remember(cut, endPoints);
         return true;
     }
 

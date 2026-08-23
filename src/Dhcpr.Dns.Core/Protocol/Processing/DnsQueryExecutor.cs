@@ -89,7 +89,8 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             IsInternal = false,
             BypassCache = bypassCache,
             DnssecScope = new DnssecScope(),
-            WorkBudget = new QueryWorkBudget()
+            WorkBudget = new QueryWorkBudget(),
+            NameserverTips = new NameserverTipCache()
         };
 
         var queued = new HttpDnsPacketReceivedMessage(context);

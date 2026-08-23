@@ -429,6 +429,61 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
+    public async Task SharedTipCacheSkipsKnownZoneCut()
+    {
+        var comNsQueries = 0;
+        var queried = new List<IPEndPoint>();
+        var internalClient = new ScriptedInternalDomainClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            var type = request.Questions[0].Type;
+
+            if (type == DomainRecordType.NS && name.Equals("com", StringComparison.OrdinalIgnoreCase))
+            {
+                Interlocked.Increment(ref comNsQueries);
+                return Referral("com", "a.gtld-servers.net", _comServer.Address);
+            }
+
+            if (type == DomainRecordType.NS && name.Equals("google.com", StringComparison.OrdinalIgnoreCase))
+                return Referral("google.com", "ns1.google.com", _googleNs.Address);
+
+            if (type == DomainRecordType.A && name.Equals("www.google.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(_googleNs.Address)))
+                    return Answer(request, ARecord("www.google.com", _googleWwwAddress));
+                return EmptyNoError(request);
+            }
+
+            if (type == DomainRecordType.A && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (queried.Any(ep => ep.Address.Equals(_comServer.Address)))
+                    return Answer(request, ARecord("example.com", IPAddress.Parse("93.184.216.34")));
+                return EmptyNoError(request);
+            }
+
+            return EmptyNoError(request);
+        }, onUpstreamQuery: (_, endPoint) => queried.Add(endPoint));
+
+        var tips = new NameserverTipCache();
+        var resolver = CreateResolver(internalClient.Client);
+        await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.google.com"))
+            {
+                NameserverTips = tips
+            },
+            CancellationToken.None);
+        Assert.Equal(1, comNsQueries);
+
+        await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+            {
+                NameserverTips = tips
+            },
+            CancellationToken.None);
+        Assert.Equal(1, comNsQueries);
+    }
+
+    [Fact]
     public async Task CnameTargetAuthorityNsIsNotTreatedAsZoneCut()
     {
         // apple.com NS answer itunes.apple.com/NS with a CNAME plus NS for the
@@ -557,6 +612,8 @@ public class RecursiveRootResolverTests
             ((NameData)r.Data).Name.ToString()
                 .Equals("apiproxy-log-nlb.elb.us-east-2.amazonaws.com", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(internalClient.QueriedEndPoints, ep => ep.Address.Equals(dradisNs));
+        Assert.DoesNotContain(internalClient.Queries,
+            q => q.Equals("us-east-2.internal.dradis.netflix.com/NS", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

@@ -36,10 +36,12 @@ public class InternalDomainClientTests
         var queue = new CountingQueue();
         var client = new InternalDomainClient(queue.Queue);
         var budget = new QueryWorkBudget(limit: 1);
+        var tips = new NameserverTipCache();
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
             InternalHopDepth = 3,
-            WorkBudget = budget
+            WorkBudget = budget,
+            NameserverTips = tips
         };
 
         var sendTask = client.SendAsync(
@@ -52,6 +54,7 @@ public class InternalDomainClientTests
         Assert.NotNull(queue.LastMessage);
         Assert.Equal(3, queue.LastMessage!.Context.InternalHopDepth);
         Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
+        Assert.Same(tips, queue.LastMessage.Context.NameserverTips);
         Assert.True(queue.LastMessage.Context.BypassCache);
         Assert.True(budget.TryConsume());
 

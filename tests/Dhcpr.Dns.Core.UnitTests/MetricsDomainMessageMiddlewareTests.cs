@@ -73,6 +73,29 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
+    public async Task DoesNotCountBypassCacheAnswers()
+    {
+        long observed = 0;
+        using var listener = CreateListener(measurement => observed += measurement);
+
+        var request = DomainMessage.CreateRequest("example.com");
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        var middleware = CreateMiddleware(response);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request)
+        {
+            BypassCache = true
+        };
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(response, result);
+        Assert.Equal(0, observed);
+    }
+
+    [Fact]
     public async Task CountsBlackholeNxDomain()
     {
         long observed = 0;

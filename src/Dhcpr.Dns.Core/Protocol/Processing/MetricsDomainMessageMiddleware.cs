@@ -32,6 +32,11 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
         if (result is null)
             return null;
 
+        // Directed hops set BypassCache so a parent referral is never stored or
+        // replayed. They cannot hit and must not appear in cache_hit rate.
+        if (context.BypassCache)
+            return result;
+
         var error = result.Flags.ResponseCode is not DomainResponseCode.NoError;
         foreach (var question in context.DomainMessage.Questions)
         {

@@ -209,6 +209,84 @@ public class CanonicalNameResolverDecoratorTests
     }
 
     [Fact]
+    public async Task NestedChaseThatAlreadyHasAddressesIsNotRequeried()
+    {
+        var address = IPAddress.Parse("3.21.189.253");
+        var lookups = new List<string>();
+
+        var internalClient = CreateInternalClient(request =>
+        {
+            var name = request.Questions[0].Name.ToString();
+            lookups.Add(name);
+
+            if (name.Equals("ichnaea-web.dradis.netflix.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("ichnaea-web.dradis.netflix.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels(
+                                "ichnaea-web.us-east-2.internal.dradis.netflix.com"))),
+                        new DomainResourceRecord(
+                            new DomainLabels("ichnaea-web.us-east-2.internal.dradis.netflix.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels(
+                                "apiproxy-log-nlb.elb.us-east-2.amazonaws.com"))),
+                        new DomainResourceRecord(
+                            new DomainLabels("apiproxy-log-nlb.elb.us-east-2.amazonaws.com"),
+                            DomainRecordType.A,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new IPAddressData(address))
+                    },
+                    responseCode: DomainResponseCode.NoError);
+            }
+
+            throw new InvalidOperationException($"unexpected lookup {name}");
+        });
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
+                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                    request,
+                    new[]
+                    {
+                        new DomainResourceRecord(
+                            new DomainLabels("ichnaea-web.netflix.com"),
+                            DomainRecordType.CNAME,
+                            DomainRecordClass.IN,
+                            TimeSpan.FromSeconds(60),
+                            new NameData(new DomainLabels("ichnaea-web.dradis.netflix.com")))
+                    },
+                    responseCode: DomainResponseCode.NoError));
+            });
+
+        IDomainMessageMiddleware decorator = new CanonicalNameResolverDecorator(inner, internalClient);
+        var result = await decorator.ProcessAsync(
+            new DomainMessageContext(
+                null,
+                null,
+                DomainMessage.CreateRequest("ichnaea-web.netflix.com", DomainRecordType.A)),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "ichnaea-web.dradis.netflix.com" }, lookups);
+        Assert.Equal(3, result!.Records.Answers.Count(r => r.Type == DomainRecordType.CNAME));
+        Assert.Contains(result.Records.Answers, r =>
+            r.Type == DomainRecordType.A && ((IPAddressData)r.Data).Address.Equals(address));
+    }
+
+    [Fact]
     public async Task DirectedHopReturnsInnerCnameWithoutChase()
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();

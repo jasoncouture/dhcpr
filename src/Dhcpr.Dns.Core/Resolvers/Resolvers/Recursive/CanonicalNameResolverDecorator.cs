@@ -98,16 +98,35 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
 
             if (chasedCnames.Any(i => i.Type is DomainRecordType.CNAME))
             {
+                // Nested decorator already walked the rest of the chain. Keep
+                // those addresses — stripping them forces another uncached
+                // multi-cut walk (directed hops set BypassCache).
+                var nestedAddresses = KeepTypesWithCoveringRrsigs(
+                    nextResponse.Records.Answers,
+                    questionType);
+
                 result = result with
                 {
                     Records = result.Records with
                     {
-                        Answers = result.Records.Answers.Concat(chasedCnames).ToImmutableArray()
+                        Answers = result.Records.Answers
+                            .Concat(chasedCnames)
+                            .Concat(nestedAddresses)
+                            .ToImmutableArray()
                     }
                 };
 
                 foreach (var cname in chasedCnames.Where(r => r.Type is DomainRecordType.CNAME))
                     seen.Add(cname.Name.ToString());
+
+                if (nestedAddresses.Any(i => i.Type == questionType))
+                {
+                    return FinalizeChase(result with
+                    {
+                        Flags = result.Flags with { ResponseCode = DomainResponseCode.NoError }
+                    });
+                }
+
                 continue;
             }
 

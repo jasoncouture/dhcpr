@@ -108,7 +108,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         var isTcp = message is TcpDnsPacketReceivedMessage;
         // DNS-over-TCP prefixes every message with a 2-byte big-endian length.
         var lengthPrefix = isTcp ? 2 : 0;
-        var buffer = ArrayPool<byte>.Shared.Rent(response.EstimatedSize + lengthPrefix);
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize) + lengthPrefix);
 
         var udpLimit = 512;
         var optRecord = message.Context.DomainMessage.Records.Additional.FirstOrDefault(r => r.Type == DomainRecordType.OPT);

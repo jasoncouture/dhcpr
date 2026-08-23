@@ -55,7 +55,7 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
                     ? DnsQueryExecutionStatus.Cancelled
                     : DnsQueryExecutionStatus.NoResponse);
 
-        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(512, response.EstimatedSize));
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize));
         try
         {
             var length = DomainMessageEncoder.Encode(buffer, response);

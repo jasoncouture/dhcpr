@@ -7,11 +7,12 @@ namespace Dhcpr.Dns.Core.Protocol;
 public record DomainMessage(ushort Id, DomainMessageFlags Flags, ImmutableArray<DomainQuestion> Questions,
     DomainResourceRecords Records) : ISelfComputeEstimatedSize
 {
-    private int? _size;
-
+    // Not cached: `with` copies private fields and would keep a stale size
+    // after CNAME assembly or truncation replaces Records.
     // The additional 4 ushorts are the counts for questions and answers.
-    public int EstimatedSize => _size ??= Flags.EstimatedSize + Records.EstimatedSize + Questions.Select(i => i.EstimatedSize).DefaultIfEmpty(0).Sum() +
-                                 (sizeof(ushort) * 5); // Fields: Id, Counts:Questions, Answers, Authority, Additional)
+    public int EstimatedSize =>
+        Flags.EstimatedSize + Records.EstimatedSize + Questions.Select(i => i.EstimatedSize).DefaultIfEmpty(0).Sum() +
+        (sizeof(ushort) * 5); // Fields: Id, Counts:Questions, Answers, Authority, Additional
 
     public static DomainMessage CreateRequest(string domain, DomainRecordType type = DomainRecordType.A,
         DomainRecordClass @class = DomainRecordClass.IN, bool recursionRequested = true,

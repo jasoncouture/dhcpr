@@ -10,8 +10,9 @@ public record DomainResourceRecords
     ImmutableArray<DomainResourceRecord> Additional
 ) : IEnumerable<DomainResourceRecord>, ISelfComputeEstimatedSize
 {
-    private int? _size;
-    public int EstimatedSize => _size ??=
+    // Not cached: `with` copies private fields and would keep a stale size
+    // after answers are appended (CNAME chase) or dropped (UDP truncation).
+    public int EstimatedSize =>
         Answers.Sum(static i => i.EstimatedSize) +
         Authorities.Sum(static i => i.EstimatedSize) +
         Additional.Sum(static i => i.EstimatedSize);

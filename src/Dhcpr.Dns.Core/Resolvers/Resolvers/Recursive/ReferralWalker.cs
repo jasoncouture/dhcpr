@@ -159,15 +159,27 @@ public sealed class ReferralWalker : IReferralWalker
             context.DnssecScope?.PushIgnoreStatus();
         try
         {
-            // AAAA lookups are a full recurse each. WhenAll(A+AAAA) stalls the
-            // zone cut on the slowest AAAA (often a 250ms UDP timeout) even
-            // after A glue is already in hand. Take A first; AAAA only if none.
-            var addresses = await LookupGlueAsync(
-                context, nsNames, DomainRecordType.A, cancellationToken);
-            if (addresses.Count == 0)
+            using var nameserverQueries = nsNames
+                .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
+                    new[]
+                    {
+                        _internalClient
+                            .SendAsync(context, DomainMessage.CreateRequest(name, DomainRecordType.A),
+                                cancellationToken).AsTask(),
+                        _internalClient
+                            .SendAsync(context, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
+                                cancellationToken).AsTask()
+                    })
+                .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
+                .ToPooledList();
+
+            var responses = await Task.WhenAll(nameserverQueries);
+            var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var addresses = new List<IPAddress>();
+            foreach (var nextMessage in responses)
             {
-                addresses = await LookupGlueAsync(
-                    context, nsNames, DomainRecordType.AAAA, cancellationToken);
+                if (nextMessage is null) continue;
+                addresses.AddRange(GetGlueAddresses(nextMessage.Records, nsNameSet));
             }
 
             return addresses;
@@ -177,32 +189,6 @@ public sealed class ReferralWalker : IReferralWalker
             if (ignoreDnssecStatus)
                 context.DnssecScope?.PopIgnoreStatus();
         }
-    }
-
-    private async ValueTask<List<IPAddress>> LookupGlueAsync(
-        DomainMessageContext context,
-        IReadOnlyList<string> nsNames,
-        DomainRecordType type,
-        CancellationToken cancellationToken)
-    {
-        using var nameserverQueries = nsNames
-            .Select([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
-                _internalClient
-                    .SendAsync(context, DomainMessage.CreateRequest(name, type), cancellationToken)
-                    .AsTask())
-            .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
-            .ToPooledList();
-
-        var responses = await Task.WhenAll(nameserverQueries);
-        var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var addresses = new List<IPAddress>();
-        foreach (var nextMessage in responses)
-        {
-            if (nextMessage is null) continue;
-            addresses.AddRange(GetGlueAddresses(nextMessage.Records, nsNameSet));
-        }
-
-        return addresses;
     }
 
     public IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)

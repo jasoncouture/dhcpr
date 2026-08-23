@@ -35,7 +35,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
             return null;
 
-        // Caller shuffles; interleave families so one batch is not all IPv6.
+        // Caller shuffles; interleave families so a batch is not all one family.
         using var remaining = NameserverSelection.InterleaveFamilies(endPoints).ToPooledList();
 
         var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);

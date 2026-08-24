@@ -150,6 +150,43 @@ public class DnssecValidatorTests
     }
 
     [Fact]
+    public void Ed448SignatureVerificationWorks()
+    {
+        // RFC 8032 §7.4 "1 octet" (empty context)
+        var pubKey = Convert.FromHexString(
+            "43ba28f430cdff456ae531545f7ecd0ac834a55d9358c0372bfa0c6c6798c086" +
+            "6aea01eb00742802b8438ea4cb82169c235160627b4c3a9480");
+        var payload = new byte[] { 0x03 };
+        var signature = Convert.FromHexString(
+            "26b8f91727bd62897af15e41eb43c377efb9c610d48f2335cb0bd0087810f435" +
+            "2541b143c4b981b7e18f62de8ccdf633fc1bf037ab7cd779805e0dbcc0aae1cb" +
+            "cee1afb2e027df36bc04dcecbf154336c19f0af7e0a6472905e799f1953d2a0f" +
+            "f3348ab21aa4adafd1d234441cf807c03a00");
+
+        var rrsigData = new ResourceRecordSignatureData(
+            DomainRecordType.A,
+            DnssecAlgorithmType.Ed448,
+            2,
+            3600,
+            (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
+            (uint)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(),
+            1234,
+            new DomainLabels("example.com"),
+            signature.ToImmutableArray()
+        );
+
+        var dnsKeyData = new DomainNameSystemKeyData(
+            256,
+            3,
+            DnssecAlgorithmType.Ed448,
+            pubKey.ToImmutableArray()
+        );
+
+        var result = _validator.VerifySignature(rrsigData, ReadOnlySpan<byte>.Empty, payload, dnsKeyData);
+        Assert.True(result);
+    }
+
+    [Fact]
     public void RsaSha256SignatureVerificationWorks()
     {
         using var rsa = RSA.Create(2048);

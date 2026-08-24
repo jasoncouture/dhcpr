@@ -48,6 +48,7 @@ public sealed partial class DnssecValidator : IDnssecValidator
                 DnssecAlgorithmType.EcdsaP256Sha256 => VerifyEcdsaP256Sha256(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 DnssecAlgorithmType.EcdsaP384Sha384 => VerifyEcdsaP384Sha384(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 DnssecAlgorithmType.Ed25519 => VerifyEd25519(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
+                DnssecAlgorithmType.Ed448 => VerifyEd448(payloadSpan, rrsig.Signature.AsSpan(), dnsKey.PublicKey.AsSpan()),
                 _ => false
             };
         }
@@ -151,6 +152,21 @@ public sealed partial class DnssecValidator : IDnssecValidator
         var message = data.ToArray();
         return Org.BouncyCastle.Math.EC.Rfc8032.Ed25519.Verify(
             signatureBytes, 0, publicKey, 0, message, 0, message.Length);
+    }
+
+    /// <summary>RFC 8080 ED448: raw 57-byte public key, 114-byte signature, empty context.</summary>
+    private static bool VerifyEd448(ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, ReadOnlySpan<byte> publicKeyData)
+    {
+        const int expectedKeySize = 57;
+        const int expectedSignatureSize = 114;
+        if (publicKeyData.Length != expectedKeySize || signature.Length != expectedSignatureSize)
+            return false;
+
+        var publicKey = publicKeyData.ToArray();
+        var signatureBytes = signature.ToArray();
+        var message = data.ToArray();
+        return Org.BouncyCastle.Math.EC.Rfc8032.Ed448.Verify(
+            signatureBytes, 0, publicKey, 0, [], message, 0, message.Length);
     }
 
     public ushort CalculateKeyTag(DomainNameSystemKeyData dnsKey, DomainResourceRecord dnsKeyRecord)

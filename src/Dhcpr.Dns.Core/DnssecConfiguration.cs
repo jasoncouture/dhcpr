@@ -16,7 +16,7 @@ public sealed class DnssecConfiguration : IValidateSelf
 
     /// <summary>
     /// Algorithms allowed for verification. Empty means the built-in defaults
-    /// (RSASHA256=8, ECDSAP256SHA256=13, ECDSAP384SHA384=14, ED25519=15).
+    /// (RSASHA256=8, ECDSAP256SHA256=13, ECDSAP384SHA384=14, ED25519=15, ED448=16).
     /// </summary>
     public byte[] AllowedAlgorithms { get; set; } = [];
 
@@ -28,7 +28,8 @@ public sealed class DnssecConfiguration : IValidateSelf
         (byte)DnssecAlgorithmType.RsaSha256,
         (byte)DnssecAlgorithmType.EcdsaP256Sha256,
         (byte)DnssecAlgorithmType.EcdsaP384Sha384,
-        (byte)DnssecAlgorithmType.Ed25519
+        (byte)DnssecAlgorithmType.Ed25519,
+        (byte)DnssecAlgorithmType.Ed448
     ];
 
     public bool IsAlgorithmAllowed(byte algorithm)

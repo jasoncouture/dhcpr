@@ -28,6 +28,7 @@ public class DnssecPhase5Tests
     [InlineData(13, true)]
     [InlineData(14, true)]
     [InlineData(15, true)]
+    [InlineData(16, true)]
     [InlineData(5, false)]
     public void DefaultPolicy_AllowsBuiltInAlgorithmsOnly(byte algorithm, bool expected)
     {

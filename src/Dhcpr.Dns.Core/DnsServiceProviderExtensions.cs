@@ -77,6 +77,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
+        // RFC 9462: resolver.arpa is locally served (never cached or forwarded).
+        services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.

@@ -13,3 +13,4 @@ dig @$SERVER -p $PORT NS alertr.info
 dig @$SERVER -p $PORT +dnssec NS cloudflare.com
 dig @$SERVER -p $PORT ichnaea-web.netflix.com
 dig @$SERVER -p $PORT +dnssec fedoraproject.org
+dig @$SERVER -p $PORT SVCB _dns.resolver.arpa

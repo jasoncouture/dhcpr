@@ -38,6 +38,12 @@ public sealed class DnsConfiguration : IValidateSelf
     /// </summary>
     public string[] BlackholeDomains { get; set; } = Array.Empty<string>();
 
+    /// <summary>
+    /// RFC 9462 designated resolvers advertised as SVCB at <c>_dns.resolver.arpa</c>.
+    /// Empty → NODATA for that name; <c>resolver.arpa</c> is still served locally and never forwarded.
+    /// </summary>
+    public DesignatedResolverConfiguration[] DesignatedResolvers { get; set; } = [];
+
     public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
 
     /// <summary>DNSSEC validation enable/disable and algorithm policy.</summary>
@@ -174,6 +180,15 @@ public sealed class DnsConfiguration : IValidateSelf
             }
 
             BlackholeDomains[i] = domain;
+        }
+
+        DesignatedResolvers ??= [];
+        for (var i = 0; i < DesignatedResolvers.Length; i++)
+        {
+            var designated = DesignatedResolvers[i] ?? new DesignatedResolverConfiguration();
+            DesignatedResolvers[i] = designated;
+            if (!designated.TryValidate(i, out error))
+                return false;
         }
 
         error = null;

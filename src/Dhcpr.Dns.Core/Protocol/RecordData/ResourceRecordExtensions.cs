@@ -59,6 +59,9 @@ public static class ResourceRecordExtensions
                 return CreateData<CertificationAuthorityAuthorizationData>(ref parsingSpan, dataLength);
             case DomainRecordType.LUA:
                 return CreateData<LuaRecordData>(ref parsingSpan, dataLength);
+            case DomainRecordType.SVCB:
+            case DomainRecordType.HTTPS:
+                return CreateData<SvcbData>(ref parsingSpan, dataLength);
             default:
                 return CreateData<BlobData>(ref parsingSpan, dataLength);
         }

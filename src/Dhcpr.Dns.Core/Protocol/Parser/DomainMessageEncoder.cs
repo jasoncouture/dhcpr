@@ -368,6 +368,15 @@ public static class DomainMessageEncoder
         EncodeAndAdvance(ref buffer, (byte)0);
     }
 
+    /// <summary>RFC 9460: SVCB/HTTPS TargetName must not be compressed.</summary>
+    public static void EncodeUncompressedAndAdvance(ref DnsParsingSpan buffer, DomainLabels labels)
+    {
+        for (var index = 0; index < labels.Labels.Length; index++)
+            EncodeAndAdvance(ref buffer, labels.Labels[index]);
+
+        EncodeAndAdvance(ref buffer, (byte)0);
+    }
+
     public static void EncodeAndAdvance(ref DnsParsingSpan bytes, byte value)
     {
         bytes.Span[0] = value;

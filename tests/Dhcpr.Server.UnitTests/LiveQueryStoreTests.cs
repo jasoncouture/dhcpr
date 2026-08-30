@@ -46,34 +46,40 @@ public class LiveQueryStoreTests
     }
 
     [Fact]
-    public async Task LoopbackClientsAreNotRetainedOrFannedOut()
+    public async Task HealthCheckProbesAreNotRetainedOrFannedOut()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
         await using var store = new LiveQueryStore(subscriber);
         var (reader, subscription) = store.Subscribe();
         using (subscription)
         {
-            var loopback = CreateEvent(1) with
+            var probe = CreateEvent(1) with
             {
                 Client = new IPEndPoint(IPAddress.Loopback, 0)
             };
-            var ipv6Loopback = CreateEvent(2) with
+            var ipv6Probe = CreateEvent(2) with
             {
                 Client = new IPEndPoint(IPAddress.IPv6Loopback, 0)
             };
-            var external = CreateEvent(3);
+            var loopbackClient = CreateEvent(3) with
+            {
+                Client = new IPEndPoint(IPAddress.Loopback, 43767)
+            };
+            var external = CreateEvent(4);
 
-            await store.HandleAsync(loopback, CancellationToken.None);
-            await store.HandleAsync(ipv6Loopback, CancellationToken.None);
+            await store.HandleAsync(probe, CancellationToken.None);
+            await store.HandleAsync(ipv6Probe, CancellationToken.None);
+            await store.HandleAsync(loopbackClient, CancellationToken.None);
             await store.HandleAsync(external, CancellationToken.None);
 
             var snapshot = store.GetSnapshot();
-            Assert.Single(snapshot);
+            Assert.Equal(2, snapshot.Length);
             Assert.Equal(external.Id, snapshot[0].Id);
+            Assert.Equal(loopbackClient.Id, snapshot[1].Id);
 
             using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            var received = await reader.ReadAsync(cancellationTokenSource.Token);
-            Assert.Equal(external.Id, received.Id);
+            Assert.Equal(loopbackClient.Id, (await reader.ReadAsync(cancellationTokenSource.Token)).Id);
+            Assert.Equal(external.Id, (await reader.ReadAsync(cancellationTokenSource.Token)).Id);
             Assert.False(reader.TryRead(out _));
         }
     }

@@ -62,20 +62,16 @@
 
     private int VisibleCount =>
         _hideBlackhole
-            ? _rows.Count(static r => !IsLoopbackClient(r) && r.Middleware != BlackholeMiddleware)
-            : _rows.Count(static r => !IsLoopbackClient(r));
+            ? _rows.Count(static r => r.Middleware != BlackholeMiddleware)
+            : _rows.Count;
 
     private IEnumerable<DnsQueryEvent> VisibleRows()
     {
-        var rows = _rows.Where(static r => !IsLoopbackClient(r));
         if (!_hideBlackhole)
-            return rows;
+            return _rows;
 
-        return rows.Where(static r => r.Middleware != BlackholeMiddleware);
+        return _rows.Where(static r => r.Middleware != BlackholeMiddleware);
     }
-
-    private static bool IsLoopbackClient(DnsQueryEvent evt) =>
-        evt.Client?.Address is { } address && IPAddress.IsLoopback(address);
 
     protected override void OnInitialized()
     {

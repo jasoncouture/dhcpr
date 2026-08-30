@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @implements IDisposable
 @inject NavigationManager Navigation
+@inject IOptions<AuthenticationConfiguration> Authentication
 
 <div class="page @(_navToggled ? "nav-toggled" : null)">
     <header class="topbar">
@@ -42,9 +43,12 @@
                     <NavLink href="/settings/dynamic-dns" @onclick="ResetNav">dynamic dns</NavLink>
                 </AuthorizeView>
             </nav>
-            <a class="logout"
-               href="@OidcAuthenticationExtensions.LogoutPath"
-               data-enhance-nav="false">sign out</a>
+            @if (Authentication.Value.Enabled)
+            {
+                <a class="logout"
+                   href="@OidcAuthenticationExtensions.LogoutPath"
+                   data-enhance-nav="false">sign out</a>
+            }
         </aside>
         <button type="button"
                 class="nav-backdrop"

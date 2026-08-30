@@ -3,7 +3,10 @@ using Dhcpr.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Server;
 
@@ -17,6 +20,32 @@ public static class OidcAuthenticationExtensions
 
     public static WebApplicationBuilder AddDhcprAuthentication(this WebApplicationBuilder builder)
     {
+        builder.Services.AddOptionsWithValidateOnStart<AuthenticationConfiguration>()
+            .BindConfiguration("Authentication")
+            .Validate(static o => o.Validate(), "Invalid Authentication configuration");
+
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(
+                DnsViewerPolicy,
+                policy => policy.RequireRole(ApplicationRoles.DnsUser, ApplicationRoles.DnsAdmin));
+            options.AddPolicy(
+                DnsAdminPolicy,
+                policy => policy.RequireRole(ApplicationRoles.DnsAdmin));
+        });
+        builder.Services.AddCascadingAuthenticationState();
+
+        var authentication = builder.Configuration.GetSection("Authentication").Get<AuthenticationConfiguration>()
+            ?? new AuthenticationConfiguration();
+        if (!authentication.Enabled)
+        {
+            // Scheme so UseAuthentication does not throw; nobody is signed in.
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie();
+            builder.Services.AddSingleton<IAuthorizationHandler, OpenAuthorizationHandler>();
+            return builder;
+        }
+
         builder.Services.AddOptions<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme)
             .BindConfiguration("Authentication:Keycloak");
         builder.Services.AddAuthentication(options =>
@@ -37,16 +66,6 @@ public static class OidcAuthenticationExtensions
                 options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
                 options.SignOutScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             });
-        builder.Services.AddAuthorization(options =>
-        {
-            options.AddPolicy(
-                DnsViewerPolicy,
-                policy => policy.RequireRole(ApplicationRoles.DnsUser, ApplicationRoles.DnsAdmin));
-            options.AddPolicy(
-                DnsAdminPolicy,
-                policy => policy.RequireRole(ApplicationRoles.DnsAdmin));
-        });
-        builder.Services.AddCascadingAuthenticationState();
         return builder;
     }
 
@@ -78,6 +97,9 @@ public static class OidcAuthenticationExtensions
 
     public static WebApplication MapDhcprAccountEndpoints(this WebApplication app)
     {
+        if (!app.Services.GetRequiredService<IOptions<AuthenticationConfiguration>>().Value.Enabled)
+            return app;
+
         app.MapGet(LoginPath, (string? returnUrl) =>
                 Results.Challenge(
                     new AuthenticationProperties { RedirectUri = returnUrl ?? "/" },

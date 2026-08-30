@@ -7,7 +7,9 @@ Recursive DNS resolver (and optional DHCP server) with a small operator UI.
 .NET 10, in-process DoT/DoH, validating DNSSEC, and a Helm chart for Kubernetes.
 
 **How to use it:** [docs/](docs/README.md) — start with the
-[quickstart](docs/quickstart.md).
+[quickstart](docs/quickstart.md). A public resolver is at
+**`dns.alertr.info`** (`23.162.92.54` / `2602:81e:9004::4`);
+see [docs/public-resolver.md](docs/public-resolver.md).
 
 ## What it does
 

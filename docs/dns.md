@@ -136,6 +136,9 @@ current root KSK (key tag 20326). Override only when you intend to.
 
 ## Query from a client
 
+The public instance is [dns.alertr.info](public-resolver.md)
+(`23.162.92.54` / `2602:81e:9004::4`).
+
 Development (unprivileged port):
 
 ```bash

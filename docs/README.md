@@ -9,6 +9,7 @@ ships a Helm chart.
 
 | Doc | What it covers |
 |-----|----------------|
+| [Public resolver](public-resolver.md) | `dns.alertr.info` (`23.162.92.54` / `2602:81e:9004::4`) |
 | [Quickstart](quickstart.md) | Clone, build, query, open the UI |
 | [Configuration](configuration.md) | Every settings key and environment variable |
 | [DNS](dns.md) | How a query is answered |

@@ -136,6 +136,7 @@ assumed (the image is built for that). Dashboard: `/orleans` (admin role).
 
 ## Public VIP
 
-This chart’s Service is ClusterIP. A public anycast / MetalLB address in front
-of 853 and 443 is an **out-of-repo** Service that targets `dns-tls` and
-`https`. Document that next to your cluster, not here.
+This chart’s Service is ClusterIP. The published instance
+[dns.alertr.info](public-resolver.md) is a separate LoadBalancer
+(`23.162.92.54` / `2602:81e:9004::4`) in front of `https`, `dns-tls`, and
+classic 53. That object is not in this repository.

@@ -117,6 +117,11 @@ You should see two ServiceMode records (priorities 1 and 2) when TLS is up.
 Clients that implement DDR (recent Android, some stubs) will prefer DoT/DoH
 automatically.
 
+## Public instance
+
+[dns.alertr.info](public-resolver.md) — `23.162.92.54` / `2602:81e:9004::4` —
+publishes DoT on 853 and DoH on 443 with certificate `CN=dns.alertr.info`.
+
 ## Helm
 
 See [Helm](helm.md) `secureDns`. Public MetalLB / extra LoadBalancer objects

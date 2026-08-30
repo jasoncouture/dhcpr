@@ -1,5 +1,5 @@
 using System.Net;
-using System.Net.Sockets;
+using System.Security.Cryptography;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
@@ -19,14 +19,20 @@ public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
     private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(300);
 
     private readonly IDomainMessageMiddleware _inner;
-    private readonly IOptionsMonitor<DnsConfiguration> _options;
+    private readonly IOptionsMonitor<DnsConfiguration> _dns;
+    private readonly IOptionsMonitor<TlsConfiguration> _tls;
+    private readonly ITlsServerCertificateProvider _certificates;
 
     public ResolverArpaMiddleware(
         IDomainMessageMiddleware inner,
-        IOptionsMonitor<DnsConfiguration> options)
+        IOptionsMonitor<DnsConfiguration> dns,
+        IOptionsMonitor<TlsConfiguration> tls,
+        ITlsServerCertificateProvider certificates)
     {
         _inner = inner;
-        _options = options;
+        _dns = dns;
+        _tls = tls;
+        _certificates = certificates;
     }
 
     public string Name => _inner.Name;
@@ -72,8 +78,8 @@ public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
 
     private DomainMessage CreateDiscoveryResponse(DomainMessage request)
     {
-        var designated = _options.CurrentValue.DesignatedResolvers;
-        if (designated is not { Length: > 0 })
+        var designated = GetAdvertisedResolvers();
+        if (designated.Length == 0)
             return Nodata(request);
 
         var owner = request.Questions[0].Name;
@@ -115,6 +121,26 @@ public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
             answers,
             additional: additional,
             responseCode: DomainResponseCode.NoError);
+    }
+
+    private DesignatedResolverConfiguration[] GetAdvertisedResolvers()
+    {
+        var configured = _dns.CurrentValue.DesignatedResolvers;
+        if (configured is { Length: > 0 })
+            return configured;
+
+        var tls = _tls.CurrentValue;
+        if (!tls.Enabled)
+            return [];
+
+        try
+        {
+            return DesignatedResolverAdvertisement.ForTls(tls, _certificates.GetCertificate());
+        }
+        catch (Exception exception) when (exception is IOException or CryptographicException)
+        {
+            return [];
+        }
     }
 
     private static SvcbData ToSvcbData(DesignatedResolverConfiguration designated, DomainLabels target)

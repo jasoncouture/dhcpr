@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -109,6 +111,38 @@ public class ResolverArpaMiddlewareTests
     }
 
     [Fact]
+    public async Task DiscoverySvcbUsesTlsCertificateWhenDesignatedResolversEmpty()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var tls = new TlsConfiguration
+        {
+            Enabled = true,
+            Listeners = ["0.0.0.0:853"],
+            HttpsPort = 443,
+            CertificatePath = "tls.crt",
+            PrivateKeyPath = "tls.key"
+        };
+        Assert.True(tls.TryValidate(out _));
+        var certificates = Substitute.For<ITlsServerCertificateProvider>();
+        certificates.GetCertificate().Returns(SelfSigned("dns.example.com"));
+        var middleware = Create(inner, [], tls, certificates);
+        var request = DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB);
+
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result!.Records.Answers.Length);
+        var first = Assert.IsType<SvcbData>(result.Records.Answers[0].Data);
+        var second = Assert.IsType<SvcbData>(result.Records.Answers[1].Data);
+        Assert.Equal("dns.example.com", first.TargetName.ToString());
+        Assert.Equal("dns.example.com", second.TargetName.ToString());
+        Assert.Contains(first.Parameters, p => p.Key is SvcbParameterKey.Alpn);
+        Assert.Contains(second.Parameters, p => p.Key is SvcbParameterKey.DohPath);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void TryValidate_RejectsResolverArpaTarget()
     {
         var dns = ValidDns();
@@ -140,10 +174,27 @@ public class ResolverArpaMiddlewareTests
     private static ResolverArpaMiddleware Create(
         IDomainMessageMiddleware inner,
         params DesignatedResolverConfiguration[] designated)
+        => Create(inner, designated, tls: null, certificates: null);
+
+    private static ResolverArpaMiddleware Create(
+        IDomainMessageMiddleware inner,
+        DesignatedResolverConfiguration[] designated,
+        TlsConfiguration? tls,
+        ITlsServerCertificateProvider? certificates)
     {
-        var monitor = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
-        monitor.CurrentValue.Returns(new DnsConfiguration { DesignatedResolvers = designated });
-        return new ResolverArpaMiddleware(inner, monitor);
+        var dns = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
+        dns.CurrentValue.Returns(new DnsConfiguration { DesignatedResolvers = designated });
+        var tlsMonitor = Substitute.For<IOptionsMonitor<TlsConfiguration>>();
+        tlsMonitor.CurrentValue.Returns(tls ?? new TlsConfiguration());
+        certificates ??= Substitute.For<ITlsServerCertificateProvider>();
+        return new ResolverArpaMiddleware(inner, dns, tlsMonitor, certificates);
+    }
+
+    private static X509Certificate2 SelfSigned(string commonName)
+    {
+        using var key = ECDsa.Create();
+        var request = new CertificateRequest($"CN={commonName}", key, HashAlgorithmName.SHA256);
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
     }
 
     private static DomainMessageContext Context(DomainMessage request)

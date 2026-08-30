@@ -99,6 +99,7 @@ public static class DnsServiceProviderExtensions
         // Process-bound: shared StringBuilder pool.
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
         // Process-bound: options validators are resolved from the root provider.
+        services.AddSingleton<ITlsServerCertificateProvider, FileTlsServerCertificateProvider>();
         services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
         services.AddSingleton<IValidateOptions<TlsConfiguration>, TlsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()

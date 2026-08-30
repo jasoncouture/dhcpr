@@ -3,6 +3,7 @@ using System.Net.Sockets;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Queue;
+using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -27,6 +28,8 @@ public class TcpListenDisposeTests
         var server = new DnsServer(
             queue,
             Monitor(new DnsConfiguration()),
+            Monitor(new TlsConfiguration()),
+            Substitute.For<ITlsServerCertificateProvider>(),
             NullLogger<DnsServer>.Instance);
 
         var listener = new TcpListener(IPAddress.Loopback, 0);

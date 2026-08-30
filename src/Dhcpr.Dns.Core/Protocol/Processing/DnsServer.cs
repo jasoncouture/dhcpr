@@ -2,8 +2,11 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Queue;
@@ -22,15 +25,21 @@ public sealed partial class DnsServer : BackgroundService
 
     private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
+    private readonly IOptionsMonitor<TlsConfiguration> _tlsOptions;
+    private readonly ITlsServerCertificateProvider _certificates;
     private readonly ILogger<DnsServer> _logger;
 
     public DnsServer(
         IMessageQueue<DnsPacketReceivedMessage> messageQueue,
         IOptionsMonitor<DnsConfiguration> options,
+        IOptionsMonitor<TlsConfiguration> tlsOptions,
+        ITlsServerCertificateProvider certificates,
         ILogger<DnsServer> logger)
     {
         _messageQueue = messageQueue;
         _options = options;
+        _tlsOptions = tlsOptions;
+        _certificates = certificates;
         _logger = logger;
     }
 
@@ -82,6 +91,32 @@ public sealed partial class DnsServer : BackgroundService
                 }
             }
 
+            var tls = _tlsOptions.CurrentValue;
+            if (tls.Enabled)
+            {
+                if (!tls.TryValidate(out var tlsError))
+                    throw new InvalidOperationException(tlsError);
+                _ = _certificates.GetCertificate();
+
+                foreach (var listener in tls.GetParsedListeners())
+                {
+                    var addresses = await ResolveEndPointAddressesAsync(listener, stoppingToken);
+                    if (addresses.Length == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"TLS listen \"{listener}\" did not resolve to any addresses.");
+                    }
+
+                    var port = GetListenPort(listener);
+                    foreach (var address in addresses)
+                    {
+                        var endPoint = new IPEndPoint(address, port);
+                        tasks.Add(ServeTlsDnsAsync(endPoint, listenerToken));
+                        LogListening(_logger, "tls", endPoint, string.Empty);
+                    }
+                }
+            }
+
             var completed = await Task.WhenAny(tasks);
             if (stoppingToken.IsCancellationRequested)
             {
@@ -121,6 +156,29 @@ public sealed partial class DnsServer : BackgroundService
 
         return await System.Net.Dns.GetHostAddressesAsync(listen.Host, cancellationToken);
     }
+
+    private static async Task<IPAddress[]> ResolveEndPointAddressesAsync(
+        EndPoint listener,
+        CancellationToken cancellationToken)
+    {
+        switch (listener)
+        {
+            case IPEndPoint ip:
+                return [ip.Address];
+            case DnsEndPoint dns:
+                return await System.Net.Dns.GetHostAddressesAsync(dns.Host, cancellationToken);
+            default:
+                throw new InvalidOperationException($"Unsupported TLS listen endpoint: {listener}");
+        }
+    }
+
+    private static int GetListenPort(EndPoint listener)
+        => listener switch
+        {
+            IPEndPoint ip => ip.Port,
+            DnsEndPoint dns => dns.Port,
+            _ => throw new InvalidOperationException($"Unsupported TLS listen endpoint: {listener}")
+        };
 
     private async Task ServeUdpDnsAsync(IPEndPoint listenEndPoint, CancellationToken cancellationToken)
     {
@@ -173,6 +231,43 @@ public sealed partial class DnsServer : BackgroundService
 
     public Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
         => HandleStreamClientAsync(client, client.GetStream(), cancellationToken);
+
+    public async Task HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        SslStream? sslStream = null;
+        try
+        {
+            sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
+            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken);
+            await HandleStreamClientAsync(client, sslStream, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            // Handshake, idle timeout, remote close, or malformed client — drop the connection.
+        }
+        finally
+        {
+            if (sslStream is not null)
+                await sslStream.DisposeAsync();
+            client.Dispose();
+        }
+    }
+
+    private SslServerAuthenticationOptions CreateTlsServerOptions()
+        => new()
+        {
+            EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+            CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+            ClientCertificateRequired = false,
+            ApplicationProtocols = [new SslApplicationProtocol("dot")],
+            ServerCertificateSelectionCallback = SelectTlsCertificate
+        };
+
+    private X509Certificate SelectTlsCertificate(object sender, string? hostName)
+        => _certificates.GetCertificate();
 
     internal async Task HandleStreamClientAsync(
         TcpClient client,
@@ -378,6 +473,39 @@ public sealed partial class DnsServer : BackgroundService
                     var client = await acceptTask;
                     if (client is not null)
                         activeTasks.Add(HandleTcpClientAsync(client, stoppingToken));
+                    if (stoppingToken.IsCancellationRequested)
+                        return;
+                    acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
+                }
+            }
+        }
+        finally
+        {
+            tcpServer.Stop();
+            var pending = acceptTask is null ? activeTasks : activeTasks.Append(acceptTask);
+            await Task.WhenAll(pending).IgnoreExceptionsAsync();
+        }
+    }
+
+    private async Task ServeTlsDnsAsync(IPEndPoint listenEndPoint, CancellationToken stoppingToken)
+    {
+        var tcpServer = new TcpListener(listenEndPoint);
+        var activeTasks = new List<Task>();
+        Task<TcpClient?>? acceptTask = null;
+        try
+        {
+            tcpServer.Start(ushort.MaxValue);
+            acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var completedTask = await Task.WhenAny(activeTasks.Append(acceptTask));
+                await completedTask;
+                activeTasks.Remove(completedTask);
+                if (completedTask == acceptTask)
+                {
+                    var client = await acceptTask;
+                    if (client is not null)
+                        activeTasks.Add(HandleTlsClientAsync(client, stoppingToken));
                     if (stoppingToken.IsCancellationRequested)
                         return;
                     acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);

@@ -78,7 +78,7 @@ dot:
   httpsPort: 443
   existingSecret: ""
   certManager:
-    enabled: false
+    enabled: true
     issuerRef:
       name: ""
       kind: ClusterIssuer

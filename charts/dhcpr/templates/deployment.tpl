@@ -87,6 +87,9 @@ spec:
             {{- if and (not .Values.dot.existingSecret) (not .Values.dot.certManager.enabled) }}
             {{- fail "dot.enabled requires dot.existingSecret or dot.certManager.enabled" }}
             {{- end }}
+            {{- if or (not .Values.dot.certManager.dnsNames) (not (index .Values.dot.certManager.dnsNames 0)) }}
+            {{- fail "dot.certManager.dnsNames is required when DoT is enabled" }}
+            {{- end }}
             - name: TLS__Enabled
               value: "true"
             - name: TLS__Listeners__0

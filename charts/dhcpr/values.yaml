@@ -83,7 +83,7 @@ dot:
       name: ""
       kind: ClusterIssuer
       group: cert-manager.io
-    # Defaults to [httpRoute.host] when empty.
+    # Required when dot.enabled is true.
     dnsNames: []
     # Defaults to "<fullname>-dot-tls" when empty.
     secretName: ""

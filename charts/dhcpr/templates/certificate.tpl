@@ -2,11 +2,8 @@
 {{- $fullName := include "dhcpr.fullname" . -}}
 {{- $issuer := .Values.dot.certManager.issuerRef.name | required "dot.certManager.issuerRef.name is required when cert-manager is enabled" -}}
 {{- $dnsNames := .Values.dot.certManager.dnsNames -}}
-{{- if not $dnsNames }}
-{{- $dnsNames = list .Values.httpRoute.host }}
-{{- end }}
-{{- if not (index $dnsNames 0) }}
-{{- fail "dot.certManager.dnsNames (or httpRoute.host) is required when cert-manager is enabled" }}
+{{- if or (not $dnsNames) (not (index $dnsNames 0)) }}
+{{- fail "dot.certManager.dnsNames is required when DoT is enabled" }}
 {{- end }}
 apiVersion: cert-manager.io/v1
 kind: Certificate

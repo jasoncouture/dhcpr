@@ -1,4 +1,3 @@
-{{- $secureDns := index .Values "secure-dns" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -46,12 +45,12 @@ spec:
             - name: dns-tcp
               containerPort: 53
               protocol: TCP
-            {{- if $secureDns.enabled }}
+            {{- if .Values.secureDns.enabled }}
             - name: https
-              containerPort: {{ $secureDns.dohPort | default 443 }}
+              containerPort: {{ .Values.secureDns.dohPort | default 443 }}
               protocol: TCP
             - name: dns-tls
-              containerPort: {{ $secureDns.dotPort }}
+              containerPort: {{ .Values.secureDns.dotPort }}
               protocol: TCP
             {{- end }}
             - name: orleans-silo
@@ -84,25 +83,25 @@ spec:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- if $secureDns.enabled }}
-            {{- if and (not $secureDns.existingSecret) (not $secureDns.certManager.enabled) }}
-            {{- fail "secure-dns.enabled requires existingSecret or certManager.enabled" }}
+            {{- if .Values.secureDns.enabled }}
+            {{- if and (not .Values.secureDns.existingSecret) (not .Values.secureDns.certManager.enabled) }}
+            {{- fail "secureDns.enabled requires existingSecret or certManager.enabled" }}
             {{- end }}
-            {{- if or (not $secureDns.certManager.dnsNames) (not (index $secureDns.certManager.dnsNames 0)) }}
-            {{- fail "secure-dns.certManager.dnsNames is required when secure-dns is enabled" }}
+            {{- if or (not .Values.secureDns.certManager.dnsNames) (not (index .Values.secureDns.certManager.dnsNames 0)) }}
+            {{- fail "secureDns.certManager.dnsNames is required when secureDns is enabled" }}
             {{- end }}
             - name: TLS__Enabled
               value: "true"
             - name: TLS__Listeners__0
-              value: "0.0.0.0:{{ $secureDns.dotPort }}"
+              value: "0.0.0.0:{{ .Values.secureDns.dotPort }}"
             - name: TLS__Listeners__1
-              value: "[::]:{{ $secureDns.dotPort }}"
+              value: "[::]:{{ .Values.secureDns.dotPort }}"
             - name: TLS__CertificatePath
               value: /tls/tls.crt
             - name: TLS__PrivateKeyPath
               value: /tls/tls.key
             - name: TLS__HttpsPort
-              value: "{{ $secureDns.dohPort | default 443 }}"
+              value: "{{ .Values.secureDns.dohPort | default 443 }}"
             {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
@@ -111,7 +110,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            {{- if $secureDns.enabled }}
+            {{- if .Values.secureDns.enabled }}
             - name: tls
               mountPath: /tls
               readOnly: true
@@ -126,7 +125,7 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "dhcpr.fullname" . }}-data
-        {{- if $secureDns.enabled }}
+        {{- if .Values.secureDns.enabled }}
         - name: tls
           secret:
             secretName: {{ include "dhcpr.secureDnsSecretName" . }}

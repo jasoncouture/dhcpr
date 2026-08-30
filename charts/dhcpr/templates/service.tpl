@@ -1,4 +1,3 @@
-{{- $secureDns := index .Values "secure-dns" }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -26,13 +25,13 @@ spec:
       port: {{ .Values.service.dnsPort }}
       targetPort: dns-tcp
       protocol: TCP
-    {{- if $secureDns.enabled }}
+    {{- if .Values.secureDns.enabled }}
     - name: https
-      port: {{ $secureDns.dohPort | default 443 }}
+      port: {{ .Values.secureDns.dohPort | default 443 }}
       targetPort: https
       protocol: TCP
     - name: dns-tls
-      port: {{ $secureDns.dotPort }}
+      port: {{ .Values.secureDns.dotPort }}
       targetPort: dns-tls
       protocol: TCP
     {{- end }}

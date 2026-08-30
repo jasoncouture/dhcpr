@@ -23,10 +23,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "dhcpr.secureDnsSecretName" -}}
-{{- $secureDns := index .Values "secure-dns" -}}
-{{- if $secureDns.existingSecret }}
-{{- $secureDns.existingSecret }}
+{{- if .Values.secureDns.existingSecret }}
+{{- .Values.secureDns.existingSecret }}
 {{- else }}
-{{- $secureDns.certManager.secretName | default (printf "%s-secure-dns-tls" (include "dhcpr.fullname" .)) }}
+{{- .Values.secureDns.certManager.secretName | default (printf "%s-secure-dns-tls" (include "dhcpr.fullname" .)) }}
 {{- end }}
 {{- end }}

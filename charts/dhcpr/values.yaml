@@ -72,7 +72,7 @@ httpRoute:
 # Process-terminated TLS. Public Service gets 853 (DoT) and 443 (Kestrel HTTPS,
 # same PEM — DoH / UI). HTTP 8080 stays for probes. No Gateway listener.
 # Requires existingSecret or certManager.enabled (DNS-01 issuer is cluster-owned).
-secure-dns:
+secureDns:
   enabled: false
   dotPort: 853
   dohPort: 443
@@ -83,7 +83,7 @@ secure-dns:
       name: ""
       kind: ClusterIssuer
       group: cert-manager.io
-    # Required when secure-dns.enabled is true.
+    # Required when secureDns.enabled is true.
     dnsNames: []
     # Defaults to "<fullname>-secure-dns-tls" when empty.
     secretName: ""

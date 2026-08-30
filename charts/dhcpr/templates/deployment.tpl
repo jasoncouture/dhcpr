@@ -104,6 +104,25 @@ spec:
               value: /tls/tls.key
             - name: TLS__HttpsPort
               value: "{{ .Values.secureDns.dohPort | default 443 }}"
+            {{- $dnsName := index .Values.secureDns.certManager.dnsNames 0 }}
+            - name: DNS__DesignatedResolvers__0__Target
+              value: {{ $dnsName | quote }}
+            - name: DNS__DesignatedResolvers__0__Priority
+              value: "1"
+            - name: DNS__DesignatedResolvers__0__Alpn__0
+              value: "dot"
+            - name: DNS__DesignatedResolvers__0__Port
+              value: "{{ .Values.secureDns.dotPort }}"
+            - name: DNS__DesignatedResolvers__1__Target
+              value: {{ $dnsName | quote }}
+            - name: DNS__DesignatedResolvers__1__Priority
+              value: "2"
+            - name: DNS__DesignatedResolvers__1__Alpn__0
+              value: "h2"
+            - name: DNS__DesignatedResolvers__1__Port
+              value: "{{ .Values.secureDns.dohPort | default 443 }}"
+            - name: DNS__DesignatedResolvers__1__DohPath
+              value: "/dns-query{?dns}"
             {{- end }}
           {{- with .Values.envFrom }}
           envFrom:

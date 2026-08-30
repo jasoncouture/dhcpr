@@ -73,6 +73,8 @@ httpRoute:
 # same PEM — DoH / UI). When enabled, DOTNET_URLS is http://+:8080 plus
 # https://+:dohPort so probes keep 8080. No Gateway listener.
 # Requires existingSecret or certManager.enabled (DNS-01 issuer is cluster-owned).
+# Advertises DoT (alpn=dot) and DoH (alpn=h2, /dns-query) as SVCB at
+# _dns.resolver.arpa using the first certManager.dnsNames entry.
 secureDns:
   enabled: false
   dotPort: 853

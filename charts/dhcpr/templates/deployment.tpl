@@ -90,6 +90,8 @@ spec:
             {{- if or (not .Values.secureDns.certManager.dnsNames) (not (index .Values.secureDns.certManager.dnsNames 0)) }}
             {{- fail "secureDns.certManager.dnsNames is required when secureDns is enabled" }}
             {{- end }}
+            - name: DOTNET_URLS
+              value: "http://+:8080;https://+:{{ .Values.secureDns.dohPort | default 443 }}"
             - name: TLS__Enabled
               value: "true"
             - name: TLS__Listeners__0

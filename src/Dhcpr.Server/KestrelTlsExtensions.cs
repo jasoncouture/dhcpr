@@ -12,15 +12,12 @@ public static class KestrelTlsExtensions
             if (!tls.Enabled)
                 return;
 
-            options.ListenAnyIP(tls.HttpsPort, listen =>
+            options.ConfigureHttpsDefaults(https =>
             {
-                listen.UseHttps(https =>
-                {
-                    https.ServerCertificateSelector = (_, _) =>
-                        options.ApplicationServices
-                            .GetRequiredService<ITlsServerCertificateProvider>()
-                            .GetCertificate();
-                });
+                https.ServerCertificateSelector = (_, _) =>
+                    options.ApplicationServices
+                        .GetRequiredService<ITlsServerCertificateProvider>()
+                        .GetCertificate();
             });
         });
         return builder;

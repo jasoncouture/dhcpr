@@ -59,6 +59,30 @@ or `Enabled: false` → Healthy. See [operations](operations.md).
 
 Never point probes at 443; 8080 is always HTTP.
 
+## `authentication` (OIDC)
+
+Off by default. The operator UI is then reachable without login. When
+`enabled` is true, `authority` and `clientId` are required; the chart sets
+`Authentication__Enabled` and `Authentication__Keycloak__*`.
+
+To restore the current Keycloak client (`dhcpr` on `auth.alertr.info`):
+
+```yaml
+authentication:
+  enabled: true
+  authority: https://auth.alertr.info/realms/master
+  clientId: dhcpr
+  responseType: code
+  usePkce: true
+  saveTokens: true
+  roleClaimType: groups
+  scopes:
+    - openid
+    - profile
+    - email
+    - roles
+```
+
 ## `secureDns` (DoT + DoH)
 
 Process-terminated TLS. **No Gateway listener** for 853/443 — the Service

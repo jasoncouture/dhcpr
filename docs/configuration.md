@@ -237,9 +237,20 @@ See [Dynamic DNS](dyndns.md).
 | `Enabled` | `false` (image: `DHCP__ENABLED=false`) | Only switch that is honored: bind UDP 67 |
 | `Subnets` | empty | Bound but **not used** — lease pool is hardcoded (see [DHCP](dhcp.md)) |
 
-## `Authentication:Keycloak`
+## `Authentication`
 
-OpenID Connect. Roles come from the token `groups` claim
+OpenID Connect for the operator UI. **Off by default** — the UI is open and
+every visitor can use live queries, settings, and `/orleans`. Login routes
+are not mapped.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `false` | When true, require Keycloak OIDC |
+| `Keycloak:Authority` | | Required when enabled (issuer URL) |
+| `Keycloak:ClientId` | | Required when enabled |
+| `Keycloak:*` | | Other keys bind to `OpenIdConnectOptions` |
+
+When enabled, roles come from the token `groups` claim
 (`TokenValidationParameters:RoleClaimType`).
 
 | Role | Access |
@@ -271,4 +282,9 @@ TLS__HttpsPort=443
 DataPath=/data
 DOTNET_URLS=http://+:8080
 DHCP__ENABLED=false
+
+# OIDC (off unless Enabled=true)
+Authentication__Enabled=true
+Authentication__Keycloak__Authority=https://auth.alertr.info/realms/master
+Authentication__Keycloak__ClientId=dhcpr
 ```

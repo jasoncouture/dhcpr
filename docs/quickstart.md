@@ -35,8 +35,8 @@ That profile (`src/Dhcpr.Server/Properties/launchSettings.json`) binds:
 | Operator UI | [http://localhost:5187](http://localhost:5187) |
 | DNS UDP/TCP | `127.0.0.1:65353` and `[::1]:65353` |
 
-The UI is behind OpenID Connect (Keycloak). You need a `dns-user` or `dns-admin`
-role (see [UI](ui.md)). DNS itself does not require login.
+The UI is **open by default** (`Authentication:Enabled` is false). Turn on
+OIDC for Keycloak roles — see [UI](ui.md). DNS itself does not require login.
 
 ## Send a query
 

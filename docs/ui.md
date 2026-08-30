@@ -1,12 +1,17 @@
 # Operator UI
 
-Blazor Server app. Every Razor page requires a signed-in user. DNS, DoH,
-DynDNS, `/health`, and `/metrics` do **not**.
+Blazor Server app. DNS, DoH, DynDNS, `/health`, and `/metrics` never require
+login.
+
+`Authentication:Enabled` defaults to **false**. The UI is then open (live
+queries, settings, Orleans). Sign-in routes are not registered.
 
 ## Login
 
-OpenID Connect against `Authentication:Keycloak` (standard ASP.NET Core
-`OpenIdConnectOptions`: Authority, ClientId, scopes, …).
+When `Authentication:Enabled` is true, OpenID Connect against
+`Authentication:Keycloak` (standard ASP.NET Core `OpenIdConnectOptions`:
+Authority, ClientId, scopes, …). Every Razor page then requires a signed-in
+user.
 
 | Path | Action |
 |------|--------|

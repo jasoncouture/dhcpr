@@ -29,6 +29,9 @@ jobs:
       minor: ${{ steps.nbgv.outputs.VersionMinor }}
       prerelease: ${{ steps.nbgv.outputs.PrereleaseVersion }}
       fullVersion: ${{ steps.nbgv.outputs.Version }}
+      assemblyVersion: ${{ steps.nbgv.outputs.AssemblyVersion }}
+      assemblyFileVersion: ${{ steps.nbgv.outputs.AssemblyFileVersion }}
+      informationalVersion: ${{ steps.nbgv.outputs.AssemblyInformationalVersion }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -85,6 +88,11 @@ jobs:
           sbom: true
           provenance: true
           push: true
+          set: |
+            *.args.VERSION="${{ needs.get-version.outputs.version }}"
+            *.args.ASSEMBLY_VERSION="${{ needs.get-version.outputs.assemblyVersion }}"
+            *.args.ASSEMBLY_FILE_VERSION="${{ needs.get-version.outputs.assemblyFileVersion }}"
+            *.args.INFORMATIONAL_VERSION="${{ needs.get-version.outputs.informationalVersion }}"
 
   tag-release:
     if: github.ref_type != 'tag'

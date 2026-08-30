@@ -1,12 +1,23 @@
 ARG BUILDPLATFORM
 FROM --platform=${BUILDPLATFORM} harbor.instigaterevolution.com/microsoft/dotnet/sdk:10.0-alpine AS build
 ARG TARGETARCH
+ARG VERSION=1.0.0
+ARG ASSEMBLY_VERSION=1.0.0.0
+ARG ASSEMBLY_FILE_VERSION=1.0.0.0
+ARG INFORMATIONAL_VERSION=1.0.0
 WORKDIR /src
 
 COPY --link --parents *.slnx **/*.csproj **/*.props **/*.targets ./
 RUN dotnet restore src/Dhcpr.Server/Dhcpr.Server.csproj -a "${TARGETARCH}" --os linux-musl -p:Configuration=Release --p:PublishSingleFile=true
 COPY . .
-RUN dotnet publish src/Dhcpr.Server/Dhcpr.Server.csproj -c Release -o /app/publish -a "${TARGETARCH}" --os linux-musl --no-restore --self-contained --p:PublishSingleFile=true
+# .git is dockerignored; CI overrides these ARGs with nbgv outputs.
+RUN dotnet publish src/Dhcpr.Server/Dhcpr.Server.csproj -c Release -o /app/publish -a "${TARGETARCH}" --os linux-musl --no-restore --self-contained --p:PublishSingleFile=true \
+    -p:NerdbankGitVersioningDisabled=true \
+    -p:IncludeSourceRevisionInInformationalVersion=false \
+    -p:Version="${VERSION}" \
+    -p:AssemblyVersion="${ASSEMBLY_VERSION}" \
+    -p:FileVersion="${ASSEMBLY_FILE_VERSION}" \
+    -p:InformationalVersion="${INFORMATIONAL_VERSION}"
 RUN chmod +x /app/publish/Dhcpr.Server
 
 FROM harbor.instigaterevolution.com/dockerhub/alpine:3.24 AS final

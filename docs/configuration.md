@@ -1,0 +1,267 @@
+# Configuration
+
+ASP.NET Core configuration: `appsettings.json`, `appsettings.{Environment}.json`,
+then environment variables. Nested keys use `__` in the environment
+(`DNS__ListenAddresses__0`).
+
+The process **fails to start** if validation fails (`ValidateOnStart` for `DNS`,
+`TLS`, and `DataPath`).
+
+Runtime edits from the UI (routes, records, blackhole, DNSSEC knobs, health
+check, DynDNS) are written to `{DataPath}/settings.json` and override the
+file/env values for those keys. Listen addresses, TLS, root servers, and trust
+anchors are **not** UI-editable.
+
+## `DataPath`
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `DataPath` | `.` (repo `./data` in the sample appsettings; `/data` in the image) | Root for all on-disk state |
+
+Under that directory:
+
+| Path | Contents |
+|------|----------|
+| `settings.json` | UI-saved settings |
+| `dynamic-dns.json` | DynDNS host → address map |
+| `dataprotection-keys/` | ASP.NET Data Protection keys (cookie encryption) |
+| `cache/` | `root.zone`, `root-servers.txt` |
+| `zones/` | Authoritative zone files |
+
+Use a persistent volume in Kubernetes (`persistence` on the chart). Multiple
+replicas need `ReadWriteMany` if they share the same volume.
+
+## `DNS`
+
+Bound as `DNS`. Required: `ListenAddresses` non-empty and valid.
+
+### Listen addresses
+
+```json
+"ListenAddresses": [
+  "udp://127.0.0.1:65353",
+  "tcp://127.0.0.1:65353",
+  "interface://eth0:53/"
+]
+```
+
+| Scheme | Meaning |
+|--------|---------|
+| `udp://host:port` | UDP only, one address |
+| `tcp://host:port` | TCP only, one address |
+| `interface://name:port/` | All unicast IPs on that NIC, UDP and TCP |
+
+Default port is 53 when omitted. Host may be a name, IPv4, or `[IPv6]`.
+`tls://` is rejected.
+
+### Routes (conditional forwarders)
+
+`DNS:Routes` is a map: **suffix → upstreams**. Longest suffix wins. Names that
+match no route go to the recursive resolver (root hints).
+
+```json
+"Routes": {
+  "home.arpa": {
+    "Upstreams": [ "192.168.1.1:53" ],
+    "Clients": [ "10.0.0.0/8", "192.168.0.0/16" ]
+  }
+}
+```
+
+| Field | Rule |
+|-------|------|
+| `Upstreams` | Required, non-empty. `host:port` (port defaults to 53) |
+| `Clients` | CIDR or single IP. Empty = any client may use the route |
+
+A client outside `Clients` skips that route and continues (recursion or another
+suffix).
+
+### Overlay records
+
+`DNS:Records` — sparse A / AAAA / CNAME / NS. Misses fall through to DynDNS,
+zones, then forward/recurse.
+
+| Field | Rule |
+|-------|------|
+| `Name` | Owner. Leftmost `*` is an RFC 4592 wildcard (`*.apps.home.arpa`) |
+| `Type` | `A`, `AAAA`, `CNAME`, `NS` |
+| `Ttl` | Seconds. Empty/null → 300 |
+| `Value` | IPv4, IPv6, or a domain (CNAME/NS) |
+| `Clients` | CIDR/IP allow-list. Empty = any client |
+
+CNAME cannot share the same owner **and** the same `Clients` set with another
+type.
+
+### Blackhole
+
+`DNS:BlackholeDomains` — suffixes that always get **NXDOMAIN** (no cache, no
+upstream). The name itself and every subdomain match (`example.com` also
+matches `www.example.com`).
+
+### DNSSEC
+
+`DNS:Dnssec`:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `true` | When false: never set AD, never SERVFAIL for Bogus |
+| `AllowedAlgorithms` | empty = 8, 13, 14, 15, 16 | Algorithms used for verification |
+| `DeniedAlgorithms` | empty | Always rejected, even if also allowed |
+
+Algorithm numbers: RSASHA256 = 8, ECDSAP256SHA256 = 13, ECDSAP384SHA384 = 14,
+ED25519 = 15, ED448 = 16. `0` is invalid.
+
+Client behavior when enabled:
+
+- Secure + client asked for AD → `AD=1`
+- Bogus and `CD=0` → `SERVFAIL`
+- Insecure / Unchecked → no AD
+
+### Trust anchors
+
+`DNS:TrustAnchors` — DS records. The built-in default is the current root KSK
+(key tag 20326, algorithm 8, digest type 2). Override only if you know why.
+
+```json
+"TrustAnchors": [
+  {
+    "Name": ".",
+    "KeyTag": 20326,
+    "Algorithm": 8,
+    "DigestType": 2,
+    "DigestHex": "E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"
+  }
+]
+```
+
+### Root servers
+
+`DNS:RootServers`:
+
+| Key | Default in code | Meaning |
+|-----|-----------------|---------|
+| `Enabled` | `true` | Use root hints |
+| `Download` | `true` | Refresh `named.root` / `root.zone` |
+| `LoadFromSystem` | `true` | Seed from the OS resolver if needed |
+| `Addresses` | empty | IPv4/IPv6 of root servers |
+| `DownloadUrls` | Internic + IANA HTTP | Where to pull `named.root` |
+
+The image sets `DNS__ROOTSERVERS__DOWNLOAD=true`. Cache files live under
+`{DataPath}/cache/`.
+
+### Designated resolvers (DDR)
+
+`DNS:DesignatedResolvers` — SVCB answers at `_dns.resolver.arpa`. Empty is
+valid: the zone is still served locally (NODATA) and **never forwarded**.
+
+See [encrypted DNS](encrypted-dns.md). Each entry:
+
+| Field | Rule |
+|-------|------|
+| `Priority` | 1–65535 (ServiceMode; 0 is AliasMode and rejected) |
+| `Target` | Hostname. Not `.` and not `resolver.arpa` |
+| `Alpn` | e.g. `dot`, `h2` |
+| `Port` | Optional 1–65535 |
+| `DohPath` | Optional URI template; must start with `/`. Requires `Alpn` |
+| `Ipv4Hint` / `Ipv6Hint` | Optional address hints |
+
+### Health check
+
+`DNS:HealthCheck` drives `GET /health`:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `true` | When false, the check is always Healthy |
+| `Domains` | empty | Hostnames resolved through the **DNS pipeline** (A and AAAA). Empty → Healthy |
+| `TimeoutSeconds` | `5` | 1–120, for the whole batch |
+
+Any domain that fails both A and AAAA (no response, bad rcode, no address/CNAME)
+makes the process **Unhealthy**. Kubernetes probes hit this path.
+
+### DoH limits
+
+`DNS:DOH` (JSON key `DOH`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `MaxRequestBytes` | `65535` | Max POST body or GET-decoded wire size (1–65535) |
+
+## `TLS`
+
+Separate from `DNS:ListenAddresses`. When `Enabled` is false, listeners and
+cert paths are ignored.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `false` | Master switch |
+| `Listeners` | empty | `IP` or `IP:port` (default port **853**) |
+| `CertificatePath` | | PEM cert (required if enabled) |
+| `PrivateKeyPath` | | PEM key (required if enabled) |
+| `HttpsPort` | `443` | Kestrel HTTPS (DoH + UI). Files need not exist at validation time |
+
+TLS 1.2/1.3, ALPN `dot` advertised on 853. No client certificates. The same PEM
+is used for Kestrel HTTPS. Cert files are re-read when mtime changes (no
+watcher).
+
+Do **not** put `tls://` on `DNS:ListenAddresses`.
+
+`ListenAnyIP` is not used for HTTPS: that would drop `DOTNET_URLS` (probes on
+8080). The chart sets `DOTNET_URLS=http://+:8080;https://+:443` when
+`secureDns` is on. See [encrypted DNS](encrypted-dns.md) and [Helm](helm.md).
+
+## `DynamicDns`
+
+Root-level (also editable in the UI). When enabled, username and password are
+required.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `true` | HTTP update endpoints |
+| `Username` / `Password` | | HTTP Basic |
+| `TtlSeconds` | `60` | 1–86400 |
+| `TrustForwardedFor` | `false` | Use first `X-Forwarded-For` hop when `myip` is omitted |
+
+See [Dynamic DNS](dyndns.md).
+
+## `Dhcp`
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `Enabled` | `false` (image: `DHCP__ENABLED=false`) | Bind the DHCP socket |
+| `Subnets` | empty | See [DHCP](dhcp.md) |
+
+## `Authentication:Keycloak`
+
+OpenID Connect. Roles come from the token `groups` claim
+(`TokenValidationParameters:RoleClaimType`).
+
+| Role | Access |
+|------|--------|
+| `dns-user` | Live queries |
+| `dns-admin` | Settings, Orleans dashboard |
+
+See [UI](ui.md).
+
+## Environment cheat sheet
+
+```bash
+# DNS
+DNS__ListenAddresses__0=udp://0.0.0.0:53
+DNS__Routes__home.arpa__Upstreams__0=192.168.1.1:53
+DNS__BlackholeDomains__0=ads.example
+DNS__Dnssec__Enabled=true
+DNS__HealthCheck__Domains__0=example.com
+
+# TLS / DoT / DoH
+TLS__Enabled=true
+TLS__Listeners__0=0.0.0.0:853
+TLS__Listeners__1='[::]:853'
+TLS__CertificatePath=/tls/tls.crt
+TLS__PrivateKeyPath=/tls/tls.key
+TLS__HttpsPort=443
+
+# Process
+DataPath=/data
+DOTNET_URLS=http://+:8080
+DHCP__ENABLED=false
+```

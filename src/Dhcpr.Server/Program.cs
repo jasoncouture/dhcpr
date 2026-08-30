@@ -57,6 +57,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
 
 builder.Services.AddCoreServices();
 builder.Services.AddDns();
+builder.UseTlsCertificateForHttps();
 builder.Services.AddDhcprRuntimeSettings();
 builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();

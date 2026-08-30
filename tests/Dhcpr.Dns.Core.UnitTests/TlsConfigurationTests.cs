@@ -66,6 +66,23 @@ public class TlsConfigurationTests
         Assert.Contains("PrivateKeyPath", error);
     }
 
+    [Fact]
+    public void EnabledWithInvalidHttpsPortFails()
+    {
+        var config = EnabledWithCerts();
+        config.HttpsPort = 0;
+        Assert.False(config.TryValidate(out var error));
+        Assert.Contains("HttpsPort", error);
+    }
+
+    [Fact]
+    public void EnabledDefaultsHttpsPortTo443()
+    {
+        var config = EnabledWithCerts();
+        Assert.Equal(TlsConfiguration.DefaultHttpsPort, config.HttpsPort);
+        Assert.True(config.TryValidate(out _));
+    }
+
     [Theory]
     [InlineData("0.0.0.0:853", "0.0.0.0", 853)]
     [InlineData("[::]:853", "::", 853)]

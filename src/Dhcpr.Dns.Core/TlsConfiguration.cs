@@ -9,9 +9,13 @@ public sealed class TlsConfiguration : IValidateSelf
 {
     public const int DefaultPort = 853;
 
+    public const int DefaultHttpsPort = 443;
+
     public bool Enabled { get; set; }
 
     public string[] Listeners { get; set; } = [];
+
+    public int HttpsPort { get; set; } = DefaultHttpsPort;
 
     public string CertificatePath { get; set; } = "";
 
@@ -66,6 +70,12 @@ public sealed class TlsConfiguration : IValidateSelf
         if (string.IsNullOrWhiteSpace(PrivateKeyPath))
         {
             error = "TLS:PrivateKeyPath is required when TLS is enabled";
+            return false;
+        }
+
+        if (HttpsPort is < 1 or > ushort.MaxValue)
+        {
+            error = "TLS:HttpsPort must be 1–65535 when TLS is enabled";
             return false;
         }
 

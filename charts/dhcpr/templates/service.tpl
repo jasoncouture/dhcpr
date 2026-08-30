@@ -26,6 +26,10 @@ spec:
       targetPort: dns-tcp
       protocol: TCP
     {{- if .Values.dot.enabled }}
+    - name: https
+      port: {{ .Values.dot.httpsPort | default 443 }}
+      targetPort: https
+      protocol: TCP
     - name: dns-tls
       port: {{ .Values.dot.port }}
       targetPort: dns-tls

@@ -46,6 +46,9 @@ spec:
               containerPort: 53
               protocol: TCP
             {{- if .Values.dot.enabled }}
+            - name: https
+              containerPort: {{ .Values.dot.httpsPort | default 443 }}
+              protocol: TCP
             - name: dns-tls
               containerPort: {{ .Values.dot.port }}
               protocol: TCP
@@ -94,6 +97,8 @@ spec:
               value: /tls/tls.crt
             - name: TLS__PrivateKeyPath
               value: /tls/tls.key
+            - name: TLS__HttpsPort
+              value: "{{ .Values.dot.httpsPort | default 443 }}"
             {{- end }}
           {{- with .Values.envFrom }}
           envFrom:

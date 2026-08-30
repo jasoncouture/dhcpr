@@ -11,7 +11,7 @@ RUN chmod +x /app/publish/Dhcpr.Server
 
 FROM harbor.instigaterevolution.com/dockerhub/alpine:3.24 AS final
 WORKDIR /app
-EXPOSE 8080 853
+EXPOSE 8080 443 853
 ENV DOTNET_URLS=http://+:8080 \
     DataPath=/data \
     DHCP__ENABLED="false" \

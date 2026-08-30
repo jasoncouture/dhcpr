@@ -21,3 +21,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- toYaml . }}
 {{- end }}
 {{- end }}
+
+{{- define "dhcpr.dotSecretName" -}}
+{{- if .Values.dot.existingSecret }}
+{{- .Values.dot.existingSecret }}
+{{- else }}
+{{- .Values.dot.certManager.secretName | default (printf "%s-dot-tls" (include "dhcpr.fullname" .)) }}
+{{- end }}
+{{- end }}

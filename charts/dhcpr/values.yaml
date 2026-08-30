@@ -69,6 +69,24 @@ httpRoute:
       httpOnly: true
       secure: true
 
+# DNS-over-TLS (RFC 7858). TLS terminates in the process. The public Service
+# exposes this port; there is no Gateway listener.
+# Requires existingSecret or certManager.enabled (DNS-01 issuer is cluster-owned).
+dot:
+  enabled: false
+  port: 853
+  existingSecret: ""
+  certManager:
+    enabled: false
+    issuerRef:
+      name: ""
+      kind: ClusterIssuer
+      group: cert-manager.io
+    # Defaults to [httpRoute.host] when empty.
+    dnsNames: []
+    # Defaults to "<fullname>-dot-tls" when empty.
+    secretName: ""
+
 # Classic DNS over TCP (Gateway API TCPRoute). When gateway.enabled is true,
 # parentRefs point at this chart's Gateway (sectionName: dns-tcp).
 tcpRoute:

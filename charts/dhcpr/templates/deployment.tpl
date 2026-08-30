@@ -45,6 +45,11 @@ spec:
             - name: dns-tcp
               containerPort: 53
               protocol: TCP
+            {{- if .Values.dot.enabled }}
+            - name: dns-tls
+              containerPort: {{ .Values.dot.port }}
+              protocol: TCP
+            {{- end }}
             - name: orleans-silo
               containerPort: 11111
               protocol: TCP
@@ -75,6 +80,21 @@ spec:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            {{- if .Values.dot.enabled }}
+            {{- if and (not .Values.dot.existingSecret) (not .Values.dot.certManager.enabled) }}
+            {{- fail "dot.enabled requires dot.existingSecret or dot.certManager.enabled" }}
+            {{- end }}
+            - name: TLS__Enabled
+              value: "true"
+            - name: TLS__Listeners__0
+              value: "0.0.0.0:{{ .Values.dot.port }}"
+            - name: TLS__Listeners__1
+              value: "[::]:{{ .Values.dot.port }}"
+            - name: TLS__CertificatePath
+              value: /tls/tls.crt
+            - name: TLS__PrivateKeyPath
+              value: /tls/tls.key
+            {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -82,6 +102,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            {{- if .Values.dot.enabled }}
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            {{- end }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -92,3 +117,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "dhcpr.fullname" . }}-data
+        {{- if .Values.dot.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ include "dhcpr.dotSecretName" . }}
+        {{- end }}

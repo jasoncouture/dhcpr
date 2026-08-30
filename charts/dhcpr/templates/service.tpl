@@ -25,3 +25,9 @@ spec:
       port: {{ .Values.service.dnsPort }}
       targetPort: dns-tcp
       protocol: TCP
+    {{- if .Values.dot.enabled }}
+    - name: dns-tls
+      port: {{ .Values.dot.port }}
+      targetPort: dns-tls
+      protocol: TCP
+    {{- end }}

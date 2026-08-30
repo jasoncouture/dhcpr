@@ -9,6 +9,8 @@
     --accent-hover: #ff8533;
     --error: #e06c75;
     --hit: #98c379;
+    --topbar-height: 2.75rem;
+    --footer-height: 1.75rem;
 }
 
 * {
@@ -65,7 +67,7 @@ input[type="checkbox"] {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    height: 2.75rem;
+    height: var(--topbar-height);
     padding: 0 0.75rem;
     border-bottom: 2px solid var(--accent);
     background: var(--surface);
@@ -206,6 +208,24 @@ main {
     padding: 0.75rem 1rem 1.5rem;
 }
 
+.footer {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    height: var(--footer-height);
+    padding: 0 0.75rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 @media (min-width: 840px) {
     .page.nav-toggled .sidebar {
         width: 0;
@@ -216,8 +236,8 @@ main {
 @media (max-width: 839px) {
     .sidebar {
         position: fixed;
-        top: 2.75rem;
-        bottom: 0;
+        top: var(--topbar-height);
+        bottom: var(--footer-height);
         left: 0;
         z-index: 20;
         transform: translateX(-100%);
@@ -231,7 +251,7 @@ main {
     .page.nav-toggled .nav-backdrop {
         display: block;
         position: fixed;
-        inset: 2.75rem 0 0 0;
+        inset: var(--topbar-height) 0 var(--footer-height) 0;
         z-index: 15;
         margin: 0;
         padding: 0;

@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using System.Reflection
 @using Microsoft.AspNetCore.Components.Authorization
 @implements IDisposable
 @inject NavigationManager Navigation
@@ -54,9 +55,16 @@
             @Body
         </main>
     </div>
+    <footer class="footer">@_informationalVersion</footer>
 </div>
 
 @code {
+    private static readonly string _informationalVersion =
+        typeof(Program).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+        ?? "unknown";
+
     private bool _navToggled;
 
     protected override void OnInitialized()

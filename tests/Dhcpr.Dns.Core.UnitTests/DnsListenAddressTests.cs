@@ -31,6 +31,7 @@ public class DnsListenAddressTests
     [InlineData("")]
     [InlineData("127.0.0.1:53")]
     [InlineData("http://127.0.0.1:53")]
+    [InlineData("tls://127.0.0.1:853")]
     [InlineData("udp://")]
     [InlineData("interface://")]
     public void RejectsInvalidListenUris(string value)

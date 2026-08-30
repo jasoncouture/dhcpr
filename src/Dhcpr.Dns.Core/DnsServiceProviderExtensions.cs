@@ -100,8 +100,11 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
         // Process-bound: options validators are resolved from the root provider.
         services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<TlsConfiguration>, TlsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()
             .BindConfiguration("DNS");
+        services.AddOptionsWithValidateOnStart<TlsConfiguration>()
+            .BindConfiguration("TLS");
         services.AddOptionsWithValidateOnStart<RootServerConfiguration>()
             .BindConfiguration("DNS:RootServers")
             .Validate(static o => o.Validate(), "Invalid DNS root server configuration");

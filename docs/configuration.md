@@ -56,8 +56,10 @@ Default port is 53 when omitted. Host may be a name, IPv4, or `[IPv6]`.
 
 ### Routes (conditional forwarders)
 
-`DNS:Routes` is a map: **suffix → upstreams**. Longest suffix wins. Names that
-match no route go to the recursive resolver (root hints).
+`DNS:Routes` is a map: **suffix → upstreams**. Longest suffix of the QNAME
+wins. The key `"."` is a catch-all after every suffix miss. Names that match
+no route go to the recursive resolver (root hints). A loaded `{DataPath}/zones`
+file for that name **skips** the forwarder.
 
 ```json
 "Routes": {
@@ -136,18 +138,23 @@ Client behavior when enabled:
 
 ### Root servers
 
-`DNS:RootServers`:
+`DNS:RootServers` — only **`Addresses`** is used at runtime. `Enabled`,
+`Download`, `LoadFromSystem`, and `DownloadUrls` are bound and validated but
+the bootstrap/refresh services do not read them. The image’s
+`DNS__ROOTSERVERS__DOWNLOAD=true` is therefore a no-op.
 
-| Key | Default in code | Meaning |
-|-----|-----------------|---------|
-| `Enabled` | `true` | Use root hints |
-| `Download` | `true` | Refresh `named.root` / `root.zone` |
-| `LoadFromSystem` | `true` | Seed from the OS resolver if needed |
-| `Addresses` | empty | IPv4/IPv6 of root servers |
-| `DownloadUrls` | Internic + IANA HTTP | Where to pull `named.root` |
+| Key | Default in code | What actually happens |
+|-----|-----------------|------------------------|
+| `Addresses` | empty | If non-empty, these IPs (optional `:port`, default 53) **are** the root tips. No `named.root` fetch. |
+| `Enabled` / `Download` / `LoadFromSystem` / `DownloadUrls` | `true` / `true` / `true` / Internic URIs | Validated only |
 
-The image sets `DNS__ROOTSERVERS__DOWNLOAD=true`. Cache files live under
-`{DataPath}/cache/`.
+When `Addresses` is empty:
+
+1. Load `{DataPath}/cache/root-servers.txt` if present
+2. Else fetch `named.root` from hardcoded Internic / `192.0.46.9` URLs and cache the IPs
+3. `root.zone` is always pulled from `https://www.internic.net/domain/root.zone` on a SOA-based timer (needs outbound HTTPS; InterNIC wants a User-Agent)
+
+Cache files live under `{DataPath}/cache/`.
 
 ### Designated resolvers (DDR)
 
@@ -227,8 +234,8 @@ See [Dynamic DNS](dyndns.md).
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `Enabled` | `false` (image: `DHCP__ENABLED=false`) | Bind the DHCP socket |
-| `Subnets` | empty | See [DHCP](dhcp.md) |
+| `Enabled` | `false` (image: `DHCP__ENABLED=false`) | Only switch that is honored: bind UDP 67 |
+| `Subnets` | empty | Bound but **not used** — lease pool is hardcoded (see [DHCP](dhcp.md)) |
 
 ## `Authentication:Keycloak`
 

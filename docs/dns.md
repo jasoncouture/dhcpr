@@ -41,8 +41,10 @@ falls through; a hit does not go to public DNS.
 ## Conditional forwarders
 
 `DNS:Routes` is a map of **DNS suffix → upstreams**. Longest suffix that matches
-the QNAME wins. If that route has `Clients` and the querier is outside those
-CIDRs, the route is skipped (another suffix or recursion may still apply).
+the QNAME wins. Key `"."` is a catch-all after every suffix miss. If that route
+has `Clients` and the querier is outside those CIDRs, the route is skipped
+(another suffix or recursion may still apply). A name that sits in a loaded
+`*.bind` zone is **not** forwarded.
 
 ```json
 "Routes": {
@@ -103,8 +105,9 @@ can hide these rows.
 ## Recursion and cache
 
 If no overlay or route applies, the server walks from root hints
-(`DNS:RootServers`). Hints and `root.zone` are cached under `{DataPath}/cache/`
-and refreshed when `Download` is true (the container image sets this).
+(`DNS:RootServers:Addresses`, or a downloaded `named.root`). `root.zone` is
+always fetched from InterNIC and cached under `{DataPath}/cache/` (SOA refresh
+timer). The `Download` flag is not read — see [configuration](configuration.md).
 
 Answers are cached in-process (about **100 000** entries, then compaction).
 Blackhole, `resolver.arpa`, DynDNS, and some internal hops are not cached.

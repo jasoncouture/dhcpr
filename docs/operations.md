@@ -11,8 +11,10 @@
 | 67 | UDP | DHCP (only if `Dhcp:Enabled`) |
 | 11111 / 30000 | TCP | Orleans silo / gateway (cluster-internal) |
 
-Dockerfile `EXPOSE`s 8080, 443, 853. The image sets `DOTNET_URLS=http://+:8080`
-and `DataPath=/data`.
+Dockerfile `EXPOSE`s 8080, 443, 853 (not 53 — Helm and compose still map it).
+The image sets `DOTNET_URLS=http://+:8080` and `DataPath=/data`. Published
+binaries load `appsettings` from `AppContext.BaseDirectory` (next to the
+exe), not the repo tree.
 
 ## Health
 
@@ -74,8 +76,8 @@ Chart `serviceMonitor` scrapes this on the `http` port.
 ```
 
 Back up `settings.json`, `dynamic-dns.json`, `zones/`, and
-`dataprotection-keys/`. `cache/` can be rebuilt when `DNS:RootServers:Download`
-is true.
+`dataprotection-keys/`. `cache/` is rebuilt from InterNIC on the next start
+if `Addresses` is empty (the `Download` flag is unused).
 
 ## Logging
 
@@ -130,6 +132,17 @@ restarts the pod.
 - Cache is per process (Orleans publishes invalidation events)
 
 ## Local image
+
+[`compose.yaml`](../compose.yaml) maps host **8080** and **65353→53**, with a
+named volume on `/data`. It does not pass TLS or listen-address overrides
+(the image’s Production appsettings already bind 53 inside the container).
+
+```bash
+docker compose up --build
+dig @127.0.0.1 -p 65353 example.com A
+```
+
+Or without compose:
 
 ```bash
 docker build -t dhcpr .

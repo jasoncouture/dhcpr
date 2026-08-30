@@ -27,8 +27,9 @@ Rollout default: `RollingUpdate`, `maxUnavailable: 0`, `maxSurge: 3`.
 
 ## Required DNS bind env
 
-Production `appsettings` may bind DNS to loopback. The chart default `env`
-overrides that so the pod listens on all interfaces:
+`appsettings.Production.json` already binds `0.0.0.0` / `[::]:53`. The chart
+repeats that in `env` so a Development-based image or a loopback override
+cannot hide the Service:
 
 ```yaml
 env:

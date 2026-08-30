@@ -59,6 +59,16 @@ export DNS__ListenAddresses__3='tcp://[::]:53'
 UDP and TCP). There is no `tls://` scheme; DoT is the `TLS` section
 ([encrypted DNS](encrypted-dns.md)).
 
+## Docker Compose
+
+[`compose.yaml`](../compose.yaml) builds the image and maps UI **8080** plus
+DNS **65353→53**:
+
+```bash
+docker compose up --build
+dig @127.0.0.1 -p 65353 example.com A
+```
+
 ## Next
 
 - [Configuration](configuration.md) — routes, records, DNSSEC, TLS

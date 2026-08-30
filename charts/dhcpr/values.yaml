@@ -116,6 +116,22 @@ persistence:
   storageClassName: ""
   accessMode: ReadWriteMany
 
+# Operator UI OpenID Connect (Keycloak). Off by default — the UI is open.
+# When enabled, authority and clientId are required.
+authentication:
+  enabled: false
+  authority: ""
+  clientId: ""
+  responseType: code
+  usePkce: true
+  saveTokens: true
+  roleClaimType: groups
+  scopes:
+    - openid
+    - profile
+    - email
+    - roles
+
 # Raw container env entries — standard Kubernetes EnvVar shape.
 # Production appsettings bind DNS to loopback; override for in-cluster listen.
 env:

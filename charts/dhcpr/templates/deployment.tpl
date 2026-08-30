@@ -124,6 +124,34 @@ spec:
             - name: DNS__DesignatedResolvers__1__DohPath
               value: "/dns-query{?dns}"
             {{- end }}
+            {{- with .Values.authentication }}
+            {{- if .enabled }}
+            {{- if not .authority }}
+            {{- fail "authentication.authority is required when authentication.enabled" }}
+            {{- end }}
+            {{- if not .clientId }}
+            {{- fail "authentication.clientId is required when authentication.enabled" }}
+            {{- end }}
+            - name: Authentication__Enabled
+              value: "true"
+            - name: Authentication__Keycloak__Authority
+              value: {{ .authority | quote }}
+            - name: Authentication__Keycloak__ClientId
+              value: {{ .clientId | quote }}
+            - name: Authentication__Keycloak__ResponseType
+              value: {{ .responseType | default "code" | quote }}
+            - name: Authentication__Keycloak__UsePkce
+              value: {{ .usePkce | quote }}
+            - name: Authentication__Keycloak__SaveTokens
+              value: {{ .saveTokens | quote }}
+            - name: Authentication__Keycloak__TokenValidationParameters__RoleClaimType
+              value: {{ .roleClaimType | default "groups" | quote }}
+            {{- range $i, $scope := .scopes }}
+            - name: Authentication__Keycloak__Scope__{{ $i }}
+              value: {{ $scope | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}

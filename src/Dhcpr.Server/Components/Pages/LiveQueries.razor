@@ -22,7 +22,10 @@
         <tr>
             <th>Time</th>
             <th>Cache</th>
-            <th>Client</th>
+            <th class="endpoints">
+                <span class="listen">Server</span>
+                <span>Client</span>
+            </th>
             <th>Type</th>
             <th>Name</th>
             <th>RCODE</th>
@@ -36,7 +39,10 @@
             <tr class="@(row.ResponseCode is DomainResponseCode.NoError ? null : "error")">
                 <td>@row.Timestamp.ToString("HH:mm:ss.fff")</td>
                 <td>@(row.CacheHit ? "HIT" : "MISS")</td>
-                <td>@(row.Client?.ToString() ?? "—")</td>
+                <td class="endpoints">
+                    <span class="listen">@(row.Server?.ToString() ?? "—")</span>
+                    <span>@(row.Client?.ToString() ?? "—")</span>
+                </td>
                 <td>@row.Type</td>
                 <td>@row.Name</td>
                 <td>@row.ResponseCode</td>

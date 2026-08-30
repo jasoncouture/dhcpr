@@ -282,11 +282,22 @@ main {
 .query-table th,
 .query-table td {
     text-align: left;
+    vertical-align: top;
     padding: 0.35rem 0.5rem;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.query-table th:nth-child(1),
+.query-table td:nth-child(1) {
+    width: calc(12ch + 1rem);
+}
+
+.query-table th:nth-child(2),
+.query-table td:nth-child(2) {
+    width: calc(5ch + 1rem);
 }
 
 .query-table th {
@@ -310,6 +321,35 @@ main {
 .query-table th:nth-child(8),
 .query-table td:nth-child(8) {
     width: 28%;
+}
+
+.query-table th.endpoints,
+.query-table td.endpoints {
+    white-space: normal;
+    overflow: hidden;
+}
+
+.endpoints {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.endpoints span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.endpoints .listen {
+    color: var(--muted);
+    font-size: 0.8em;
+}
+
+.query-table tr.error .listen {
+    color: inherit;
 }
 
 .query-table tr.error td {

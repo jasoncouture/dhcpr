@@ -20,34 +20,30 @@
     <table class="query-table">
         <thead>
         <tr>
-            <th>Time</th>
-            <th>Cache</th>
-            <th class="endpoints">
-                <span class="listen">Server</span>
-                <span>Client</span>
-            </th>
+            <th class="col-time">Time</th>
+            <th class="col-cache">Cache</th>
+            <th>Server</th>
+            <th>Client</th>
             <th>Type</th>
-            <th>Name</th>
+            <th class="col-wrap">Name</th>
             <th>RCODE</th>
             <th>Via</th>
-            <th>Answers</th>
+            <th class="col-wrap col-answers">Answers</th>
         </tr>
         </thead>
         <tbody>
         @foreach (var row in VisibleRows())
         {
             <tr class="@(row.ResponseCode is DomainResponseCode.NoError ? null : "error")">
-                <td>@row.Timestamp.ToString("HH:mm:ss.fff")</td>
-                <td>@(row.CacheHit ? "HIT" : "MISS")</td>
-                <td class="endpoints">
-                    <span class="listen">@(row.Server?.ToString() ?? "—")</span>
-                    <span>@(row.Client?.ToString() ?? "—")</span>
-                </td>
+                <td class="col-time">@row.Timestamp.ToString("HH:mm:ss.fff")</td>
+                <td class="col-cache">@(row.CacheHit ? "HIT" : "MISS")</td>
+                <td>@(row.Server?.ToString() ?? "—")</td>
+                <td>@(row.Client?.ToString() ?? "—")</td>
                 <td>@row.Type</td>
-                <td>@row.Name</td>
+                <td class="col-wrap">@row.Name</td>
                 <td>@row.ResponseCode</td>
                 <td>@row.Middleware</td>
-                <td>@(string.IsNullOrEmpty(row.Answers) ? "—" : row.Answers)</td>
+                <td class="col-wrap col-answers">@(string.IsNullOrEmpty(row.Answers) ? "—" : row.Answers)</td>
             </tr>
         }
         </tbody>

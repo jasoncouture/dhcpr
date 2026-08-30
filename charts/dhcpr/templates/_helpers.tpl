@@ -22,10 +22,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
-{{- define "dhcpr.dotSecretName" -}}
-{{- if .Values.dot.existingSecret }}
-{{- .Values.dot.existingSecret }}
+{{- define "dhcpr.secureDnsSecretName" -}}
+{{- $secureDns := index .Values "secure-dns" -}}
+{{- if $secureDns.existingSecret }}
+{{- $secureDns.existingSecret }}
 {{- else }}
-{{- .Values.dot.certManager.secretName | default (printf "%s-dot-tls" (include "dhcpr.fullname" .)) }}
+{{- $secureDns.certManager.secretName | default (printf "%s-secure-dns-tls" (include "dhcpr.fullname" .)) }}
 {{- end }}
 {{- end }}

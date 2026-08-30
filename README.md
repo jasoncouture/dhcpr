@@ -6,19 +6,22 @@ GitHub is a read-only mirror. Issues, PRs, and CI belong on git.alertr.info.
 Recursive DNS resolver (and optional DHCP server) with a small operator UI.
 .NET 10, in-process DoT/DoH, validating DNSSEC, and a Helm chart for Kubernetes.
 
+**How to use it:** [docs/](docs/README.md) — start with the
+[quickstart](docs/quickstart.md).
+
 ## What it does
 
 - Classic DNS on UDP/TCP 53
 - DNS-over-TLS (RFC 7858) on 853 and DNS-over-HTTPS (RFC 8484) on `/dns-query`
 - DDR: SVCB at `_dns.resolver.arpa` advertises DoT (`alpn=dot`) and DoH (`alpn=h2`)
 - Validating recursive DNSSEC
-- Conditional forwarders (`DNS:Routes`), overlay records, blackhole suffixes, RFC 2136 DynDNS
+- Conditional forwarders (`DNS:Routes`), overlay records, blackhole suffixes, HTTP DynDNS
 - Blazor UI (live queries, settings) and Prometheus `/metrics`
 - Optional DHCP (off by default)
 
 ## Build and run
 
-Requires the .NET 10 SDK.
+Requires the .NET 10 SDK. Details: [quickstart](docs/quickstart.md).
 
 ```bash
 dotnet test
@@ -29,8 +32,12 @@ Development listens on `http://localhost:5187` (UI) and DNS `127.0.0.1:65353` /
 `[::1]:65353`. Production images listen on `8080` (HTTP probes/UI), `53`, `443`,
 and `853`.
 
-Configuration is standard ASP.NET Core (`appsettings.json`, environment
-variables). DNS bind addresses are `DNS:ListenAddresses` (`udp://`, `tcp://`,
+## Configuration
+
+ASP.NET Core (`appsettings.json`, environment variables). Full key reference:
+[docs/configuration.md](docs/configuration.md).
+
+DNS bind addresses are `DNS:ListenAddresses` (`udp://`, `tcp://`,
 `interface://` only). TLS is a separate `TLS` section:
 
 ```
@@ -47,7 +54,8 @@ is filled from the certificate hostname.
 ## Container and Helm
 
 Images: `harbor.instigaterevolution.com/instigaterevolution/dhcpr/dns`.
-Chart: `charts/dhcpr`. Versioning is [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning)
+Chart: `charts/dhcpr` — [docs/helm.md](docs/helm.md).
+Versioning is [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning)
 (`version.json`).
 
 ```bash

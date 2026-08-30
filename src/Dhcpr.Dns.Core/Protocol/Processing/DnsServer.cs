@@ -171,7 +171,13 @@ public sealed partial class DnsServer : BackgroundService
         }
     }
 
-    public async Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
+    public Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
+        => HandleStreamClientAsync(client, client.GetStream(), cancellationToken);
+
+    internal async Task HandleStreamClientAsync(
+        TcpClient client,
+        Stream stream,
+        CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -184,13 +190,17 @@ public sealed partial class DnsServer : BackgroundService
                 cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(10));
                 var idleCancellationToken = cancellationTokenSource.Token;
 
-                await ReadExactAsync(client.Client, buffer.AsMemory(0, 2), idleCancellationToken);
+                await ReadExactAsync(stream, buffer.AsMemory(0, 2), idleCancellationToken);
                 var length = BitConverter.ToUInt16(buffer.AsSpan(0, 2)).ToHostByteOrder();
                 if (length == 0 || length > buffer.Length)
                     return;
 
-                await ReadExactAsync(client.Client, buffer.AsMemory(0, length), idleCancellationToken);
-                var pending = CreateContextAndQueueForProcessing(client, buffer.AsSpan(0, length).ToArray(), cancellationToken);
+                await ReadExactAsync(stream, buffer.AsMemory(0, length), idleCancellationToken);
+                var pending = CreateContextAndQueueForProcessing(
+                    client,
+                    stream,
+                    buffer.AsSpan(0, length).ToArray(),
+                    cancellationToken);
                 if (pending is not null)
                     pendingReplies.Add(pending);
 
@@ -227,12 +237,12 @@ public sealed partial class DnsServer : BackgroundService
         }
     }
 
-    private static async Task ReadExactAsync(Socket socket, Memory<byte> buffer, CancellationToken cancellationToken)
+    private static async Task ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         var offset = 0;
         while (offset < buffer.Length)
         {
-            var received = await socket.ReceiveAsync(buffer[offset..], cancellationToken);
+            var received = await stream.ReadAsync(buffer[offset..], cancellationToken);
             if (received == 0)
                 throw new IOException("DNS TCP client closed the connection.");
             offset += received;
@@ -241,6 +251,7 @@ public sealed partial class DnsServer : BackgroundService
 
     private Task? CreateContextAndQueueForProcessing(
         TcpClient tcpClient,
+        Stream stream,
         byte[] buffer,
         CancellationToken cancellationToken
     )
@@ -259,7 +270,7 @@ public sealed partial class DnsServer : BackgroundService
             NameserverTips = new NameserverTipCache()
         };
 
-        var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient);
+        var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient, stream);
         _messageQueue.Enqueue(messageToQueue, cancellationToken);
         return messageToQueue.SendCompleted.Task;
     }

@@ -151,7 +151,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             TcpDnsPacketReceivedMessage tcpMessage =>
                 SendResponseAsync(
                     segment,
-                    tcpMessage.Client,
+                    tcpMessage.Stream,
                     cancellationToken
                 ),
             UdpDnsPacketReceivedMessage { Context.ClientEndPoint: { } clientEndPoint } udpMessage =>
@@ -226,10 +226,10 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         await client.SendAsync(segment.AsMemory(), clientEndPoint, cancellationToken);
     }
 
-    private static async Task SendResponseAsync(ArraySegment<byte> segment, TcpClient socket,
+    private static async Task SendResponseAsync(ArraySegment<byte> segment, Stream stream,
         CancellationToken cancellationToken)
     {
-        await socket.Client.SendAsync(segment, cancellationToken);
+        await stream.WriteAsync(segment, cancellationToken);
     }
 
     public void Dispose()

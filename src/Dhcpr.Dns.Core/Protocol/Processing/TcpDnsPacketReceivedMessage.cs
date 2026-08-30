@@ -2,8 +2,10 @@
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed record TcpDnsPacketReceivedMessage
-    (DomainMessageContext Context, TcpClient Client) : DnsPacketReceivedMessage(Context)
+public sealed record TcpDnsPacketReceivedMessage(
+    DomainMessageContext Context,
+    TcpClient Client,
+    Stream Stream) : DnsPacketReceivedMessage(Context)
 {
     public TaskCompletionSource SendCompleted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

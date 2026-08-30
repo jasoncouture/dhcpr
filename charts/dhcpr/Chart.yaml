@@ -3,4 +3,4 @@ name: dhcpr
 description: DHCP/DNS recursive resolver
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
+appVersion: "2.0.0"

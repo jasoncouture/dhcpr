@@ -42,7 +42,7 @@ public static class OidcAuthenticationExtensions
             // Scheme so UseAuthentication does not throw; nobody is signed in.
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie();
-            builder.Services.AddSingleton<IAuthorizationHandler, OpenAuthorizationHandler>();
+            builder.Services.AddScoped<IAuthorizationHandler, OpenAuthorizationHandler>();
             return builder;
         }
 

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
 
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;

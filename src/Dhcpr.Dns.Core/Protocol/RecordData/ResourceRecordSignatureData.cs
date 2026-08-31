@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol.Parser;

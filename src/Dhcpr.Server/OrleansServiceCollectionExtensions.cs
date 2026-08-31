@@ -9,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.Kubernetes;
 using Orleans.Configuration;
 using Orleans.Dashboard;
-using Orleans.Hosting;
 
 namespace Dhcpr.Server;
 

@@ -1,10 +1,6 @@
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Server.Orleans.Cache;
 
-using Microsoft.Extensions.Hosting;
-
-using Orleans.Runtime;
-
 namespace Dhcpr.Server.Cache;
 
 /// <summary>

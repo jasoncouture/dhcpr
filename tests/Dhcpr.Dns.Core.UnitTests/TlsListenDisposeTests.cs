@@ -5,7 +5,6 @@ using System.Security.Authentication;
 
 using Dhcpr.Core;
 using Dhcpr.Core.Queue;
-using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;

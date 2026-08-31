@@ -1,5 +1,3 @@
-using Dhcpr.Dns.Core.Protocol.Zone;
-
 namespace Dhcpr.Dns.Core.Authoritative;
 
 public interface IAuthoritativeZoneStore

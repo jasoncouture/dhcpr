@@ -2,8 +2,6 @@ using System.Threading.Channels;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
 
-using Microsoft.Extensions.Hosting;
-
 namespace Dhcpr.Server.Orleans.LiveQueries;
 
 /// <summary>

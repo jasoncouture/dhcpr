@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 
-using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging;

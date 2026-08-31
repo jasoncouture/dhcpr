@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
 
-using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;

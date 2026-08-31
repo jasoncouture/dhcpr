@@ -3,7 +3,6 @@ using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Dns.Core;
 
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Server;

@@ -7,8 +7,6 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 
 using MessagePipe;
 
-using Microsoft.Extensions.Hosting;
-
 namespace Dhcpr.Server.LiveQueries;
 
 /// <summary>

@@ -4,7 +4,6 @@ using System.Net;
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
-using Dhcpr.Dns.Core.Protocol.Zone;
 using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Logging;

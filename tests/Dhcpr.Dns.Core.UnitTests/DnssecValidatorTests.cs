@@ -1,8 +1,6 @@
-using System;
-using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
-using Dhcpr.Dns.Core;
+
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Validation;
@@ -10,8 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
-
-using Xunit;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 

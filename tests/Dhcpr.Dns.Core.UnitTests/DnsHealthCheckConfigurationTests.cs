@@ -1,5 +1,3 @@
-using Dhcpr.Dns.Core;
-
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnsHealthCheckConfigurationTests

@@ -1,5 +1,3 @@
-using Dhcpr.Dns.Core;
-
 using Microsoft.Extensions.Options;
 
 using NSubstitute;

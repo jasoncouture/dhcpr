@@ -1,9 +1,6 @@
-using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Immutable;
-using System.Text;
-using Dhcpr.Core;
+
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.RecordData;

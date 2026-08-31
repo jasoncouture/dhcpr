@@ -2,9 +2,7 @@ using System.Buffers;
 using System.Net;
 
 using Dhcpr.Core.Queue;
-using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
-using Dhcpr.Dns.Core.Validation;
 
 using Microsoft.Extensions.Options;
 

@@ -1,7 +1,5 @@
 using System.Net;
 
-using Dhcpr.Dns.Core;
-
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class TlsConfigurationTests

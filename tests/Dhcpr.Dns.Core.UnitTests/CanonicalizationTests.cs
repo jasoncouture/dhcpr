@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Immutable;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
-using Xunit;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 

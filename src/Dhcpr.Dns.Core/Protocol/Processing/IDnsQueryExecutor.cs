@@ -1,7 +1,5 @@
 using System.Net;
 
-using Dhcpr.Dns.Core.Protocol;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public interface IDnsQueryExecutor

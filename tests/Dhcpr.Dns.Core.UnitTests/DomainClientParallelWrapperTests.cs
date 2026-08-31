@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 

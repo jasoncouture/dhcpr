@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
 
-using Dhcpr.Dns.Core.Protocol;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>Authenticated DNSKEY set for a zone apex.</summary>

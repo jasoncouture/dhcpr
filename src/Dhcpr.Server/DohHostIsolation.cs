@@ -2,8 +2,6 @@ using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Dns.Core;
 
-using Microsoft.AspNetCore.Http;
-
 namespace Dhcpr.Server;
 
 public static class DohHostIsolation

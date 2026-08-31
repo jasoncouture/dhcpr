@@ -3,10 +3,6 @@ using Dhcpr.Server.Orleans.LiveQueries;
 
 using MessagePipe;
 
-using Microsoft.Extensions.Hosting;
-
-using Orleans.Runtime;
-
 namespace Dhcpr.Server.LiveQueries;
 
 public sealed partial class LiveQueryOrleansBridge : IHostedService

@@ -1,4 +1,3 @@
-using System;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 

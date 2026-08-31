@@ -1,5 +1,3 @@
-using Dhcpr.Dns.Core.Protocol;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class RecursionAvailableMiddleware : IDomainMessageMiddleware

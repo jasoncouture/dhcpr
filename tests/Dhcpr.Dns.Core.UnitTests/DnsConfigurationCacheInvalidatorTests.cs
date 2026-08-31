@@ -1,4 +1,3 @@
-using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 
 using Microsoft.Extensions.Options;

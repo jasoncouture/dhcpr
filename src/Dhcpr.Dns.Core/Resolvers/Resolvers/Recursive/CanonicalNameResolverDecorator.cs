@@ -1,7 +1,6 @@
 ﻿using System.Collections.Immutable;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;

@@ -1,8 +1,6 @@
-using System.Linq;
 using System.Net;
 
 using Dhcpr.Core.Linq;
-using Dhcpr.Dns.Core.Protocol;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 

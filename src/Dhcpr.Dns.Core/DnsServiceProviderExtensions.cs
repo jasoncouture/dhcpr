@@ -10,8 +10,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 using Dhcpr.Dns.Core.RootZone;
 using Dhcpr.Dns.Core.Validation;
 
-using MessagePipe;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.ObjectPool;

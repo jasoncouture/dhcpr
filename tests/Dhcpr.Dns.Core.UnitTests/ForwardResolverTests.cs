@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Net;
 
-using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;

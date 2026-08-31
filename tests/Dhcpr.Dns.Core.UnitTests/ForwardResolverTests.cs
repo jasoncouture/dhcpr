@@ -8,7 +8,6 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -279,8 +278,7 @@ public class ForwardResolverTests
         return new ForwardResolver(
             Monitor(configuration),
             internalClient,
-            new AuthoritativeZoneStore(),
-            NullLogger<ForwardResolver>.Instance);
+            new AuthoritativeZoneStore());
     }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

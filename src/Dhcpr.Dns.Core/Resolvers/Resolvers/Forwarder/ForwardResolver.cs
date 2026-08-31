@@ -5,7 +5,6 @@ using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
@@ -15,29 +14,20 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 /// Unmatched names fall through to recursive resolution.
 /// Loaded authoritative zones win over forward routes.
 /// </summary>
-public sealed partial class ForwardResolver : IDomainMessageMiddleware, IDisposable
+public sealed class ForwardResolver : IDomainMessageMiddleware
 {
     private readonly IInternalDomainClient _internalClient;
     private readonly IAuthoritativeZoneStore _authoritativeZones;
-    private readonly ILogger<ForwardResolver> _logger;
-    private DnsConfiguration _configuration;
-    private readonly IDisposable? _subscription;
+    private readonly IOptionsMonitor<DnsConfiguration> _options;
 
     public ForwardResolver(
         IOptionsMonitor<DnsConfiguration> options,
         IInternalDomainClient internalClient,
-        IAuthoritativeZoneStore authoritativeZones,
-        ILogger<ForwardResolver> logger)
+        IAuthoritativeZoneStore authoritativeZones)
     {
         _internalClient = internalClient;
         _authoritativeZones = authoritativeZones;
-        _logger = logger;
-        _configuration = options.CurrentValue;
-        _subscription = options.OnChange(c =>
-        {
-            _configuration = c;
-            LogRoutesChanged(_logger);
-        });
+        _options = options;
     }
 
     public async ValueTask<DomainMessage?> ProcessAsync(
@@ -67,7 +57,7 @@ public sealed partial class ForwardResolver : IDomainMessageMiddleware, IDisposa
 
     private IPEndPoint[]? MatchRoute(DomainLabels name, IPAddress? client)
     {
-        var routes = _configuration.GetParsedRoutes();
+        var routes = _options.CurrentValue.GetParsedRoutes();
         if (routes.Count == 0)
             return null;
 
@@ -84,11 +74,6 @@ public sealed partial class ForwardResolver : IDomainMessageMiddleware, IDisposa
         return null;
     }
 
-    public void Dispose() => _subscription?.Dispose();
-
     public string Name { get; } = "Forward Resolver";
     public int Priority { get; } = 500;
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Forwarder routes configuration changed")]
-    private static partial void LogRoutesChanged(ILogger logger);
 }

@@ -11,7 +11,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -310,8 +309,7 @@ public class AuthoritativeZoneTests
         var forwarder = new ForwardResolver(
             Monitor(configuration),
             client.Client,
-            store,
-            NullLogger<ForwardResolver>.Instance);
+            store);
 
         var result = await forwarder.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.foo.bar")),

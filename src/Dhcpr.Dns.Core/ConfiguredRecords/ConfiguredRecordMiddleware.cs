@@ -1,6 +1,5 @@
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
-using Dhcpr.Dns.Core.Resolvers.Caching;
 
 using Microsoft.Extensions.Options;
 
@@ -10,21 +9,15 @@ namespace Dhcpr.Dns.Core.ConfiguredRecords;
 /// Sparse config-record overlay (AA A/AAAA/CNAME/NS + wildcards).
 /// Runs before DynDNS so hard-set records win.
 /// </summary>
-public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware, IDisposable
+public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
 {
     public const int MiddlewarePriority = 150;
 
-    private readonly IDnsResponseCache _cache;
-    private readonly IDisposable? _subscription;
-    private ParsedConfiguredRecordIndex _index;
+    private readonly IOptionsMonitor<DnsConfiguration> _options;
 
-    public ConfiguredRecordMiddleware(
-        IOptionsMonitor<DnsConfiguration> options,
-        IDnsResponseCache cache)
+    public ConfiguredRecordMiddleware(IOptionsMonitor<DnsConfiguration> options)
     {
-        _cache = cache;
-        _index = options.CurrentValue.GetParsedRecords();
-        _subscription = options.OnChange(OnOptionsChanged);
+        _options = options;
     }
 
     public string Name => "Configured Records";
@@ -39,19 +32,12 @@ public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware, IDisp
         if (context.UpstreamEndpoints is { Length: > 0 })
             return null;
 
-        var answer = _index.TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address);
+        var answer = _options.CurrentValue.GetParsedRecords()
+            .TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address);
         if (answer is null)
             return null;
 
         context.DoNotCacheResponse = true;
         return answer with { Id = context.DomainMessage.Id };
-    }
-
-    public void Dispose() => _subscription?.Dispose();
-
-    private void OnOptionsChanged(DnsConfiguration configuration)
-    {
-        _index = configuration.GetParsedRecords();
-        _cache.Clear();
     }
 }

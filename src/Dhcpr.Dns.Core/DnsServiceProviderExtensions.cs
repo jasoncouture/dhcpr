@@ -38,10 +38,9 @@ public static class DnsServiceProviderExtensions
 
         services.AddHttpClient(nameof(NamedRootHttpClient), ConfigureInternicHttpClient);
         services.AddHttpClient(nameof(RootZoneHttpClient), ConfigureInternicHttpClient);
-        // Process-bound: stateless IHttpClientFactory wrappers.
-        services.AddSingleton<INamedRootHttpClient, NamedRootHttpClient>();
-        services.AddSingleton<IRootZoneHttpClient, RootZoneHttpClient>();
-        // Process-bound: shared mutable root/zone/dyn-dns state.
+        services.AddScoped<INamedRootHttpClient, NamedRootHttpClient>();
+        services.AddScoped<IRootZoneHttpClient, RootZoneHttpClient>();
+        // Process-bound mutable state.
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();
@@ -51,19 +50,20 @@ public static class DnsServiceProviderExtensions
         services.AddHostedService<RootZoneRefreshService>();
         services.AddHostedService<AuthoritativeZoneLoader>();
         services.AddHostedService<DynamicDnsLoader>();
+        // Process-bound: OnChange → shared cache.Clear().
+        services.AddHostedService<DnsConfigurationCacheInvalidator>();
 
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
-        // Process-bound: shared pipeline. ForwardResolver holds IOptionsMonitor.OnChange.
-        services.AddSingleton<IDomainMessageMiddleware, RootZoneMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, ConfiguredRecordMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, DynamicDnsMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();
-        services.AddSingleton<IDomainMessageMiddleware, ForwardResolver>();
-        services.AddSingleton<IDomainMessageMiddleware, RecursiveRootResolver>();
-        services.AddSingleton<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, RootZoneMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, ConfiguredRecordMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, DynamicDnsMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware, ForwardResolver>();
+        services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
+        services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
         // Outermost last: Logging → Metrics → Blackhole → Unsupported → Shuffle → Dnssec → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
@@ -84,22 +84,22 @@ public static class DnsServiceProviderExtensions
         // Outermost logging so Unsupported/Blackhole answers are still recorded.
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
 
-        // Process-bound: process-wide live-query dispatch (MessagePipe).
+        // Process-bound: MessagePipe live-query dispatch (Orleans replaces this).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
 
-        // Process-bound: shared by the process-wide middleware pipeline.
-        services.AddSingleton<IReferralWalker, ReferralWalker>();
-        services.AddSingleton<IInternalDomainClient, InternalDomainClient>();
-        services.AddSingleton<IDnsQueryExecutor, DnsQueryExecutor>();
-        services.AddSingleton<IDomainClientFactory, DomainClientFactory>();
-        services.AddSingleton<IEdnsProtocolService, EdnsProtocolService>();
-        services.AddSingleton<IDnssecValidator, DnssecValidator>();
-        services.AddSingleton<IDnssecMessageValidator, DnssecMessageValidator>();
-        services.AddSingleton<ISocketFactory, SocketFactory>();
+        services.AddScoped<IReferralWalker, ReferralWalker>();
+        services.AddScoped<IInternalDomainClient, InternalDomainClient>();
+        services.AddScoped<IDnsQueryExecutor, DnsQueryExecutor>();
+        services.AddScoped<IDomainClientFactory, DomainClientFactory>();
+        services.AddScoped<IEdnsProtocolService, EdnsProtocolService>();
+        services.AddScoped<IDnssecValidator, DnssecValidator>();
+        services.AddScoped<IDnssecMessageValidator, DnssecMessageValidator>();
+        services.AddScoped<ISocketFactory, SocketFactory>();
         // Process-bound: shared StringBuilder pool.
         services.AddSingleton(ObjectPool.Create(new StringBuilderPooledObjectPolicy()));
-        // Process-bound: options validators are resolved from the root provider.
+        // Process-bound: in-memory cert + mtime (Kestrel / DnsServer read it).
         services.AddSingleton<ITlsServerCertificateProvider, FileTlsServerCertificateProvider>();
+        // Process-bound: options validation is resolved from the root provider.
         services.AddSingleton<IValidateOptions<DnsConfiguration>, DnsConfigurationValidator>();
         services.AddSingleton<IValidateOptions<TlsConfiguration>, TlsConfigurationValidator>();
         services.AddOptionsWithValidateOnStart<DnsConfiguration>()

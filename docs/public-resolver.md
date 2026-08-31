@@ -17,9 +17,9 @@ want to depend on another resolver to look up the hostname.
 | 853 | DNS-over-TLS (RFC 7858), certificate `CN=dns.alertr.info` |
 | 443 | HTTPS — DNS-over-HTTPS at `/dns-query` (RFC 8484) |
 
-The operator UI on this host is behind OpenID Connect; it is not a public
-admin panel. `/health` and `/metrics` stay on cluster-internal HTTP 8080 and
-are not published here.
+`dns.alertr.info` is DoH-only on HTTPS: paths other than `/dns-query` return
+**404**. The operator UI is not on this name. `/health` and `/metrics` stay
+on cluster-internal HTTP 8080.
 
 ## Classic DNS
 

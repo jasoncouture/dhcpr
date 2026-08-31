@@ -204,7 +204,7 @@ cert paths are ignored.
 | `Listeners` | empty | `IP` or `IP:port` (default port **853**) |
 | `CertificatePath` | | PEM cert (required if enabled) |
 | `PrivateKeyPath` | | PEM key (required if enabled) |
-| `HttpsPort` | `443` | Kestrel HTTPS (DoH + UI). Files need not exist at validation time |
+| `HttpsPort` | `443` | Kestrel HTTPS (DoH). Files need not exist at validation time. The advertised DoH hostname 404s every path except `/dns-query`. |
 
 TLS 1.2/1.3, ALPN `dot` advertised on 853. No client certificates. The same PEM
 is used for Kestrel HTTPS. Cert files are re-read when mtime changes (no

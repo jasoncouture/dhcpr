@@ -12,7 +12,7 @@ listen scheme.
 | `TLS:Listeners` | `IP` or `IP:port` (default port **853**) |
 | `TLS:CertificatePath` | PEM certificate |
 | `TLS:PrivateKeyPath` | PEM private key |
-| `TLS:HttpsPort` | Kestrel HTTPS port for DoH and the UI (default 443) |
+| `TLS:HttpsPort` | Kestrel HTTPS port for DoH (default 443) |
 
 Same certificate for DoT and HTTPS. Files are re-read when mtime changes.
 TLS 1.2 and 1.3; ALPN `dot` is advertised on 853. No client certificates.
@@ -29,8 +29,13 @@ and drops the HTTP probe port.
 - Image default: `DOTNET_URLS=http://+:8080`
 - With TLS (Helm `secureDns`): `DOTNET_URLS=http://+:8080;https://+:443`
 
-Probes and `/metrics` stay on **8080**. Clients use **443** for DoH/UI (or
+Probes and `/metrics` stay on **8080**. Clients use **443** for DoH (or
 whatever `HttpsPort` / `secureDns.dohPort` is).
+
+The DoH hostname (configured `DNS:DesignatedResolvers` targets, else the
+certificate SAN/CN) answers **only** `/dns-query`. Any other path on that
+`Host` is **404**, including the operator UI. Serve the UI on a different
+name (or on 8080).
 
 ## DNS-over-TLS (853)
 

@@ -87,10 +87,15 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
+
 app.UseDhcprForwardedHeaders();
+
+// DNS Middleware
 app.MapDnsOverHttp();
 app.MapDynDnsUpdate();
 app.UseDohHostIsolation();
+
+// Infrastructure middleware
 app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 

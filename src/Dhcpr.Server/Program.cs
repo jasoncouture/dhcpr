@@ -27,11 +27,7 @@ ThreadPool.GetMinThreads(out var workerMinThreads, out _);
 ThreadPool.SetMaxThreads(workerMaxThreads, 16384);
 ThreadPool.SetMinThreads(workerMinThreads, 256);
 
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-{
-    Args = args,
-    ContentRootPath = AppContext.BaseDirectory,
-});
+var builder = WebApplication.CreateBuilder();
 
 builder.Services.Configure<HostOptions>(options =>
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);

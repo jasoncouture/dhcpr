@@ -155,8 +155,9 @@ serviceMonitor:
 ## Orleans
 
 Pods are labeled `orleans/serviceId=dhcpr` and `orleans/clusterId=dhcpr`.
-Silo and gateway ports are on the pod spec only. Kubernetes clustering is
-assumed (the image is built for that). Dashboard: `/orleans` (admin role).
+Silo and gateway ports are on the pod spec only. In-cluster the process uses
+kube membership. Outside the cluster, set `Orleans:UseConsul` — see
+[configuration](configuration.md#orleans). Dashboard: `/orleans` (admin role).
 
 ## Public VIP
 

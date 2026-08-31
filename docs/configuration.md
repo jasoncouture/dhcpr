@@ -5,7 +5,7 @@ then environment variables. Nested keys use `__` in the environment
 (`DNS__ListenAddresses__0`).
 
 The process **fails to start** if validation fails (`ValidateOnStart` for `DNS`,
-`TLS`, and `DataPath`).
+`TLS`, `DataPath`, and `Orleans`).
 
 Runtime edits from the UI (routes, records, blackhole, DNSSEC knobs, health
 check, DynDNS) are written to `{DataPath}/settings.json` and override the
@@ -260,6 +260,27 @@ When enabled, roles come from the token `groups` claim
 
 See [UI](ui.md).
 
+## `Orleans`
+
+Membership. In a Kubernetes pod the process uses kube clustering and ignores
+this section. Anywhere else it needs Consul, or a Debug build falls back to
+localhost.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `UseConsul` | `false` | Join Consul when not in-cluster |
+| `Consul:Address` | | Required when `UseConsul` is true. `http` or `https` URI |
+| `Consul:Token` | | Optional ACL token |
+| `Consul:KvRootFolder` | | Optional KV prefix; empty uses the provider default |
+| `AdvertisedIP` | first non-loopback address | IP other silos use to reach this process |
+| `SiloPort` | `11111` | Silo-to-silo |
+| `GatewayPort` | `30000` | Client gateway |
+
+Set `AdvertisedIP` when auto-detect picks the wrong NIC (or there is none).
+Silo and gateway listen on all interfaces.
+
+`ClusterId` and `ServiceId` are `dhcpr` (same as the Helm labels).
+
 ## Environment cheat sheet
 
 ```bash
@@ -287,4 +308,9 @@ DHCP__ENABLED=false
 Authentication__Enabled=true
 Authentication__Keycloak__Authority=https://auth.alertr.info/realms/master
 Authentication__Keycloak__ClientId=dhcpr
+
+# Consul (outside Kubernetes)
+Orleans__UseConsul=true
+Orleans__Consul__Address=http://consul:8500
+Orleans__AdvertisedIP=10.0.0.8
 ```

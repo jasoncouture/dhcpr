@@ -47,14 +47,16 @@ public class ResolverArpaMiddlewareTests
             Target = "dns.example.com"
         });
         var request = DomainMessage.CreateRequest(qname, type);
+        var context = Context(request);
 
-        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
         Assert.Empty(result.Records.Answers);
         Assert.True(result.Flags.Authoritative);
         Assert.True(result.Flags.RecursionAvailable);
+        Assert.True(context.CacheHit);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
@@ -97,6 +99,7 @@ public class ResolverArpaMiddlewareTests
         Assert.NotNull(result);
         Assert.Equal("resolver.arpa", context.AnsweredBy);
         Assert.True(context.DoNotCacheResponse);
+        Assert.True(context.CacheHit);
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
         var svcb = Assert.IsType<SvcbData>(Assert.Single(result.Records.Answers).Data);
         Assert.Equal((ushort)1, svcb.Priority);

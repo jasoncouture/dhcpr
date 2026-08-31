@@ -51,6 +51,8 @@ public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
 
         context.AnsweredBy = "resolver.arpa";
         context.DoNotCacheResponse = true;
+        // Local zone — never forwarded. Log/metrics treat it as a cache hit.
+        context.CacheHit = true;
 
         var response = question.Type is DomainRecordType.SVCB && IsDiscoveryName(question.Name)
             ? CreateDiscoveryResponse(context.DomainMessage)

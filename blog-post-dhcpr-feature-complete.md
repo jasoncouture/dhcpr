@@ -18,7 +18,7 @@ Classic DNS on 53 (UDP and TCP), DNS-over-TLS on 853, DNS-over-HTTPS on 443 at `
 dig @dns.alertr.info cloudflare.com A +dnssec
 ```
 
-You want `ad` in the flags and an RRSIG in the answer. If you query `127.0.0.53`, that is systemd-resolved, not this box — it will happily hide the AD bit.
+You want `ad` in the flags and an RRSIG in the answer.
 
 ## What “done” means here
 
@@ -56,12 +56,6 @@ DoT (hostname must be `dns.alertr.info`):
 ```bash
 dig @dns.alertr.info +tls example.com A
 ```
-
-**systemd-resolved:** `DNS=23.162.92.54#dns.alertr.info` and/or the v6 address, `DNSOverTLS=yes`.
-
-**Unbound:** `forward-addr: 23.162.92.54@853#dns.alertr.info`
-
-**Android:** Private DNS hostname `dns.alertr.info`
 
 DoH is `https://dns.alertr.info/dns-query` (RFC 8484, `application/dns-message`). Clients that implement DDR can query `_dns.resolver.arpa` `SVCB` and get DoT (`alpn=dot`) and DoH (`alpn=h2`, `dohpath=/dns-query{?dns}`).
 

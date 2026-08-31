@@ -88,6 +88,13 @@ builder.Services.AddOpenTelemetry()
 var app = builder.Build();
 
 app.UseDhcprForwardedHeaders();
+app.MapDnsOverHttp();
+app.MapDynDnsUpdate();
+app.UseDohHostIsolation();
+app.MapPrometheusScrapingEndpoint();
+app.MapDhcprHealthChecks();
+
+// UI middleware
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -100,12 +107,7 @@ app.MapRazorComponents<App>()
 
 app.MapOrleansDashboard(routePrefix: "/orleans")
     .RequireAuthorization(OidcAuthenticationExtensions.DnsAdminPolicy);
-app.MapPrometheusScrapingEndpoint();
-app.MapDhcprHealthChecks();
-app.MapDnsOverHttp();
-app.MapDynDnsUpdate();
 
-Console.WriteLine("Application configuration complete, starting services.");
 app.Run();
 
 public partial class Program;

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Validation;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -83,6 +84,32 @@ public class CanonicalizationTests
         Assert.Equal(7, canonicalWire[24]);
         Assert.Equal((byte)'e', canonicalWire[25]);
         // ... verified it lowercases correctly
+    }
+
+    [Fact]
+    public void RrsetOrderIsByRdataNotRdlength()
+    {
+        // RFC 4034 §6.3: compare RDATA only. a0…info is longer than b0…org, so
+        // sorting the whole RR (RDLENGTH first) would put b0 first and break the signature.
+        var a0 = new DomainResourceRecord(
+            new DomainLabels("org"),
+            DomainRecordType.NS,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(3600),
+            new NameData(new DomainLabels("a0.org.afilias-nst.info")));
+        var b0 = new DomainResourceRecord(
+            new DomainLabels("org"),
+            DomainRecordType.NS,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(3600),
+            new NameData(new DomainLabels("b0.org.afilias-nst.org")));
+
+        var canonical = DnssecRrsetVerifier.BuildCanonicalRrset([b0, a0], 3600);
+
+        var a0Wire = a0.ToCanonicalWireFormat(3600);
+        var b0Wire = b0.ToCanonicalWireFormat(3600);
+        Assert.True(a0Wire.Length > b0Wire.Length);
+        Assert.Equal(a0Wire.Concat(b0Wire).ToArray(), canonical);
     }
 
     [Fact]

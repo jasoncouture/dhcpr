@@ -62,8 +62,13 @@ public static class DnssecRrsetVerifier
         byte? rrsigLabels = null)
     {
         using var parts = ListPool<byte[]>.Default.Get();
-        foreach (var record in rrset.OrderBy(r => r.ToCanonicalWireFormat(originalTtl, rrsigLabels), ByteArrayComparer.Instance))
+        foreach (var record in rrset)
             parts.Add(record.ToCanonicalWireFormat(originalTtl, rrsigLabels));
+
+        // RFC 4034 §6.3: order by RDATA only. Sorting the whole RR puts
+        // RDLENGTH first and breaks NS/DNSKEY sets whose RDATA lengths differ.
+        parts.Sort(static (left, right) =>
+            ByteArrayComparer.Instance.Compare(CanonicalRdata(left), CanonicalRdata(right)));
 
         var total = parts.Sum(static p => p.Length);
         var buffer = new byte[total];
@@ -75,6 +80,29 @@ public static class DnssecRrsetVerifier
         }
 
         return buffer;
+    }
+
+    /// <summary>RDATA of a canonical RR (owner + type + class + TTL + RDLENGTH skipped).</summary>
+    internal static byte[] CanonicalRdata(ReadOnlySpan<byte> canonicalRr)
+    {
+        var index = 0;
+        while (index < canonicalRr.Length)
+        {
+            var labelLength = canonicalRr[index];
+            if (labelLength == 0)
+            {
+                index++;
+                break;
+            }
+
+            index += 1 + labelLength;
+        }
+
+        index += sizeof(ushort) + sizeof(ushort) + sizeof(uint) + sizeof(ushort);
+        if (index > canonicalRr.Length)
+            return [];
+
+        return canonicalRr[index..].ToArray();
     }
 
     public static byte[] EncodeRrsigWithoutSignature(ResourceRecordSignatureData rrsig)

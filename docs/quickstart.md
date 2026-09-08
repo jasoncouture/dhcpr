@@ -77,4 +77,4 @@ dig @127.0.0.1 -p 65353 example.com A
 
 - [Configuration](configuration.md) — routes, records, DNSSEC, TLS
 - [Helm](helm.md) — run it on Kubernetes
-- [Operations](operations.md) — `/health`, `/metrics`, `DataPath`
+- [Operations](operations.md) — `/health`, `/metrics`, OTLP, `DataPath`

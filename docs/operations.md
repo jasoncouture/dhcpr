@@ -39,11 +39,19 @@ on the live-query page.
 
 ## Metrics
 
-`GET /metrics` — OpenTelemetry Prometheus exporter. No auth.
+`GET /metrics` — OpenTelemetry Prometheus exporter. No auth. Also exports
+ASP.NET, HttpClient, and runtime meters.
 
-Meter `Dhcpr.Dns`, counter `dns.queries` (`{query}`).
+### DNS
 
-Labels:
+Meter `Dhcpr.Dns`.
+
+| Instrument | Unit | When |
+|------------|------|------|
+| `dns.queries` (counter) | `{query}` | Client-facing answers |
+| `dns.query.duration` (histogram) | `s` | Same queries as `dns.queries` |
+
+`dns.queries` labels:
 
 | Label | Values |
 |-------|--------|
@@ -54,10 +62,32 @@ Labels:
 | `query_class` | usually `IN` |
 | `answered_by` | middleware name, or `resolver` |
 
-Directed internal hops (`BypassCache`) are not counted. Blackhole and NOTIMP
-**are** counted.
+`dns.query.duration` uses `cache_hit`, `error`, `rcode`, `query_type`,
+`answered_by`. Directed internal hops (`BypassCache`) are not counted.
+Blackhole and NOTIMP **are** counted.
 
-Chart `serviceMonitor` scrapes this on the `http` port.
+### DHCP
+
+Meter `Dhcpr.Dhcp`, counter `dhcp.messages` (`{message}`). Labels:
+`message_type`, `cancelled`, `replied`.
+
+Chart `serviceMonitor` scrapes `/metrics` on the `http` port.
+
+## Tracing and OTLP
+
+OTLP traces, metrics, and logs use the OpenTelemetry SDK defaults
+(`OTEL_*`). `/metrics` stays on for Prometheus.
+
+| Source | Span | Kind |
+|--------|------|------|
+| `Dhcpr.Dns` | `dns.query` | server (UDP/TCP/DoH) |
+| `Dhcpr.Dns` | `dns.internal` | internal pipeline hop |
+| `Dhcpr.Dns` | `dns.upstream` | outbound UDP/TCP to a nameserver |
+| `Dhcpr.Dhcp` | `dhcp.message` | server |
+
+DNS spans carry `dns.question.name` / `type` / `class`, `dns.response.code`,
+cache hit, and peer addresses. `/health` and `/metrics` HTTP spans are
+dropped. Query names are PII on a public resolver.
 
 ## Data directory
 
@@ -81,7 +111,9 @@ if `Addresses` is empty (the `Download` flag is unused).
 
 ## Logging
 
-Console, single-line, with scopes. Useful categories:
+Console, single-line, with scopes. The OpenTelemetry logger provider
+exports the same stream (trace-correlated on DNS/DHCP work). Useful
+categories:
 
 - `Dhcpr.*` — DNS/DHCP/server
 - `Dhcpr.Server.Orleans.LiveQueries` — default Warning in sample appsettings

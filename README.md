@@ -18,7 +18,7 @@ see [docs/public-resolver.md](docs/public-resolver.md).
 - DDR: SVCB at `_dns.resolver.arpa` advertises DoT (`alpn=dot`) and DoH (`alpn=h2`)
 - Validating recursive DNSSEC
 - Conditional forwarders (`DNS:Routes`), overlay records, blackhole suffixes, HTTP DynDNS
-- Blazor UI (live queries, settings) and Prometheus `/metrics`
+- Blazor UI (live queries, settings), Prometheus `/metrics`, and OpenTelemetry (OTLP via `OTEL_*`)
 - Optional DHCP (off by default)
 
 ## Build and run

@@ -18,6 +18,6 @@ ships a Helm chart.
 | [Dynamic DNS](dyndns.md) | HTTP update API (`/nic/update`) |
 | [DHCP](dhcp.md) | Optional DHCP server |
 | [Helm](helm.md) | Kubernetes chart, ports, `secureDns` |
-| [Operations](operations.md) | Health, metrics, data directory, versions |
+| [Operations](operations.md) | Health, metrics, OTLP, data directory, versions |
 
 License: [AGPL-3.0](../LICENSE).

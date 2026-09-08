@@ -314,3 +314,6 @@ Orleans__UseConsul=true
 Orleans__Consul__Address=http://consul:8500
 Orleans__AdvertisedIP=10.0.0.8
 ```
+
+OpenTelemetry is the SDK’s `OTEL_*` variables. No `appsettings` section.
+See [operations](operations.md#tracing-and-otlp).

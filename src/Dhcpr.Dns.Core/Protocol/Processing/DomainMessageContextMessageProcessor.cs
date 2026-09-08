@@ -1,5 +1,7 @@
 ﻿using System.Buffers;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -18,25 +20,33 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
     private readonly IEdnsProtocolService _ednsProtocolService;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
+    private readonly Histogram<double> _duration;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
         IEdnsProtocolService ednsProtocolService,
         ILiveQueryEventPublisher liveQueryPublisher,
-        ILogger<DomainMessageContextMessageProcessor> logger)
+        ILogger<DomainMessageContextMessageProcessor> logger,
+        IMeterFactory meterFactory)
     {
         _logger = logger;
         _ednsProtocolService = ednsProtocolService;
         _liveQueryPublisher = liveQueryPublisher;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
+        _duration = meterFactory.Create(DnsMetrics.MeterName).CreateHistogram<double>(
+            DnsMetrics.DurationInstrumentName,
+            unit: "s",
+            description: "DNS query processing duration");
     }
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
         var awaitable = message as IAwaitableDnsRequest;
+        using var activity = DnsInstrumentation.StartQuery(message);
+        var started = Stopwatch.GetTimestamp();
+        DomainMessage? response = null;
         try
         {
-            DomainMessage? response = null;
             IDomainMessageMiddleware? answeredBy = null;
             foreach (var middleware in _middlewareChain)
             {
@@ -49,6 +59,16 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                     break;
                 }
             }
+
+            if (message.Context.AnsweredBy is null && answeredBy is not null)
+                message.Context.AnsweredBy = answeredBy.Name;
+
+            DnsInstrumentation.CompleteQuery(activity, message.Context, response);
+            DnsInstrumentation.RecordDuration(
+                _duration,
+                message.Context,
+                response,
+                Stopwatch.GetElapsedTime(started));
 
             // This is a directive to ignore the message.
             // The middleware may have responded to it, or may be blocking this client.
@@ -82,6 +102,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             if (awaitable is not null)
             {
                 awaitable.TaskCompletionSource.TrySetException(ex);

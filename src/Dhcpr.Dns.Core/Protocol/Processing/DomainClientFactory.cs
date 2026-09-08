@@ -78,6 +78,12 @@ public sealed class DomainClientFactory : IDomainClientFactory
             clients[0] = new DomainClientTimeoutWrapper(clients[0], options.TimeOut);
         }
 
+        if (options.Type.HasFlag(DomainClientType.Udp) || options.Type.HasFlag(DomainClientType.Tcp))
+        {
+            var transport = options.Type.HasFlag(DomainClientType.Udp) ? "udp" : "tcp";
+            clients[0] = new TracingDomainClient(clients[0], options.EndPoint, transport);
+        }
+
         return clients[0];
     }
 }

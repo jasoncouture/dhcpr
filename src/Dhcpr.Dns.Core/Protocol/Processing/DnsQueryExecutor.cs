@@ -88,7 +88,8 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             BypassCache = bypassCache,
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
-            NameserverTips = new NameserverTipCache()
+            NameserverTips = new NameserverTipCache(),
+            ParentTraceContext = DnsInstrumentation.CaptureContext()
         };
 
         var queued = new HttpDnsPacketReceivedMessage(context);

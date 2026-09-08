@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Net;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
@@ -76,4 +77,10 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// live-query UI uses this label instead of the inner CoR leaf name.
     /// </summary>
     public string? AnsweredBy { get; set; }
+
+    /// <summary>
+    /// Parent span captured before the query is queued. Internal hops and DoH
+    /// inherit the inbound activity across the worker queue.
+    /// </summary>
+    public ActivityContext ParentTraceContext { get; init; }
 }

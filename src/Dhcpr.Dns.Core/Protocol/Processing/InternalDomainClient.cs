@@ -23,7 +23,8 @@ public class InternalDomainClient : IInternalDomainClient
             new DomainMessageContext(_internalEndPoint, _internalEndPoint, domainMessage)
             {
                 IsInternal = true,
-                InternalHopDepth = 1
+                InternalHopDepth = 1,
+                ParentTraceContext = DnsInstrumentation.CaptureContext()
             },
             cancellationToken);
 
@@ -67,7 +68,8 @@ public class InternalDomainClient : IInternalDomainClient
             // Directed hops are "ask these nameservers". A cache keyed only by
             // QNAME+QTYPE would replay a parent referral when we later ask the child
             // the same NS/SOA/DNSKEY question (google.com NS → no ANSWER, no AD).
-            BypassCache = parentContext.BypassCache || directed
+            BypassCache = parentContext.BypassCache || directed,
+            ParentTraceContext = DnsInstrumentation.CaptureContext()
         };
 
         return await EnqueueAsync(context, cancellationToken);

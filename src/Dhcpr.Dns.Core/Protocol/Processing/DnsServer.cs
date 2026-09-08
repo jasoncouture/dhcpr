@@ -362,7 +362,8 @@ public sealed partial class DnsServer : BackgroundService
         {
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
-            NameserverTips = new NameserverTipCache()
+            NameserverTips = new NameserverTipCache(),
+            ParentTraceContext = DnsInstrumentation.CaptureContext()
         };
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient, stream);
@@ -390,7 +391,8 @@ public sealed partial class DnsServer : BackgroundService
             {
                 DnssecScope = new DnssecScope(),
                 WorkBudget = new QueryWorkBudget(),
-                NameserverTips = new NameserverTipCache()
+                NameserverTips = new NameserverTipCache(),
+                ParentTraceContext = DnsInstrumentation.CaptureContext()
             };
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);

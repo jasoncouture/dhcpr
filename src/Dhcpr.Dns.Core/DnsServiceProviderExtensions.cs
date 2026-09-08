@@ -62,7 +62,7 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IDomainMessageMiddleware, ForwardResolver>();
         services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → Blackhole → Unsupported → Shuffle → Dnssec → …
+        // Outermost last: Logging → Metrics → resolver.arpa → RFC 6303 → Blackhole → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
@@ -75,6 +75,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
+        // RFC 6303 empty reverse zones — NXDOMAIN locally, no public leak/SERVFAIL.
+        services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
         // RFC 9462: resolver.arpa is locally served (never cached or forwarded).
         services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.

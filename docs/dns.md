@@ -12,14 +12,18 @@ Order (outermost first):
 2. **Metrics** — increments `dns.queries` (see [operations](operations.md)).
 3. **`resolver.arpa`** — served locally, never cached, never forwarded
    ([encrypted DNS](encrypted-dns.md)).
-4. **Blackhole** — configured suffixes return **NXDOMAIN**.
-5. **Unsupported QTYPE** — `ANY` (255) and other unknown types return **NOTIMP**.
-6. **Shuffle** — A/AAAA answer order is rotated per query (including cache hits).
-7. **DNSSEC** — validate the assembled answer; may SERVFAIL (see below).
-8. **RA** — set Recursion Available on the response.
-9. **CNAME chase** — follow CNAMEs and assemble the final set.
-10. **Cache** — replay a previous answer unless the handler marked it uncacheable.
-11. **SERVFAIL retry** — one more pass on some failures.
+4. **RFC 6303 empty reverse zones** — RFC1918 / link-local / ULA `in-addr.arpa`
+   and `ip6.arpa` names are NXDOMAIN locally (no public leak, no DNSSEC
+   SERVFAIL). A loaded zone, overlay record, or specific forwarder route still
+   wins.
+5. **Blackhole** — configured suffixes return **NXDOMAIN**.
+6. **Unsupported QTYPE** — `ANY` (255) and other unknown types return **NOTIMP**.
+7. **Shuffle** — A/AAAA answer order is rotated per query (including cache hits).
+8. **DNSSEC** — validate the assembled answer; may SERVFAIL (see below).
+9. **RA** — set Recursion Available on the response.
+10. **CNAME chase** — follow CNAMEs and assemble the final set.
+11. **Cache** — replay a previous answer unless the handler marked it uncacheable.
+12. **SERVFAIL retry** — one more pass on some failures.
 
 Then the inner handlers, first match wins:
 

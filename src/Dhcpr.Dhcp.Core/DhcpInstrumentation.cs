@@ -17,7 +17,7 @@ public static class DhcpInstrumentation
 
     public static Activity? StartMessage(DhcpRequestContext context)
     {
-        var activity = Start();
+        var activity = ActivitySource.StartActivity(MessageSpanName, ActivityKind.Server);
         if (activity is null)
             return null;
 
@@ -45,17 +45,6 @@ public static class DhcpInstrumentation
             new KeyValuePair<string, object?>("message_type", MessageTypeName(context.Message)),
             new KeyValuePair<string, object?>("cancelled", context.Cancel),
             new KeyValuePair<string, object?>("replied", context.Response is not null));
-    }
-
-    private static Activity? Start()
-    {
-        if (Activity.Current is { Recorded: true } current)
-            return ActivitySource.StartActivity(MessageSpanName, ActivityKind.Server, current.Context);
-
-        if (Activity.Current is not null)
-            Activity.Current = null;
-
-        return ActivitySource.StartActivity(MessageSpanName, ActivityKind.Server);
     }
 
     public static string MessageTypeName(DhcpMessage message)

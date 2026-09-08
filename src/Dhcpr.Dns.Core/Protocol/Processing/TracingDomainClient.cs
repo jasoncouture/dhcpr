@@ -25,6 +25,12 @@ public sealed class TracingDomainClient : IDomainClient
             DnsInstrumentation.CompleteUpstream(activity, response);
             return response;
         }
+        catch (OperationCanceledException)
+        {
+            // Parallel NS race cancels the losers; that is not a failed lookup.
+            activity?.SetTag("dhcpr.cancelled", true);
+            throw;
+        }
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);

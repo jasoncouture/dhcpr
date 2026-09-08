@@ -155,6 +155,35 @@ public class DnsInstrumentationTests
         Assert.True(started.Value);
     }
 
+    [Fact]
+    public async Task TracingDomainClientCancellationIsNotError()
+    {
+        Activity? stopped = null;
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == DnsInstrumentation.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity =>
+            {
+                if (activity.OperationName == DnsInstrumentation.UpstreamSpanName)
+                    stopped = activity;
+            }
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var inner = Substitute.For<IDomainClient>();
+        inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns<DomainMessage>(_ => throw new OperationCanceledException());
+
+        var client = new TracingDomainClient(inner, new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53), "udp");
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await client.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None));
+
+        Assert.NotNull(stopped);
+        Assert.Equal(ActivityStatusCode.Unset, stopped!.Status);
+        Assert.Equal(true, stopped.GetTagItem("dhcpr.cancelled"));
+    }
+
     private sealed class Started
     {
         public bool Value;

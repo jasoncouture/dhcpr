@@ -3,6 +3,7 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace Dhcpr.Server;
@@ -12,6 +13,7 @@ public static class OpenTelemetryServiceCollectionExtensions
     public static WebApplicationBuilder AddDhcprOpenTelemetry(this WebApplicationBuilder builder)
     {
         builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService("dhcpr"))
             .WithMetrics(metrics =>
             {
                 metrics.AddMeter(DnsMetrics.MeterName);

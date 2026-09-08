@@ -17,8 +17,6 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
-using OpenTelemetry.Metrics;
-
 using Orleans.Dashboard;
 
 ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
@@ -73,12 +71,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.AddDhcprAuthentication();
 
-builder.Services.AddOpenTelemetry()
-    .WithMetrics(metrics =>
-    {
-        metrics.AddMeter(DnsMetrics.MeterName);
-        metrics.AddPrometheusExporter();
-    });
+builder.AddDhcprOpenTelemetry();
 
 var app = builder.Build();
 

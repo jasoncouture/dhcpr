@@ -63,6 +63,49 @@ public class DnsInstrumentationTests
     }
 
     [Fact]
+    public void StartQueryStartsRootWhenAmbientIsUnrecorded()
+    {
+        using var listener = ListenFor(DnsInstrumentation.QuerySpanName, new Started());
+
+        var ambient = new Activity("unrecorded");
+        ambient.ActivityTraceFlags = ActivityTraceFlags.None;
+        ambient.Start();
+        try
+        {
+            var request = DomainMessage.CreateRequest("example.com");
+            var context = new DomainMessageContext(
+                new IPEndPoint(IPAddress.Loopback, 53000),
+                new IPEndPoint(IPAddress.Loopback, 53),
+                request);
+            using var activity = DnsInstrumentation.StartQuery(new HttpDnsPacketReceivedMessage(context));
+
+            Assert.NotNull(activity);
+            Assert.NotEqual(ambient.TraceId, activity!.TraceId);
+            Assert.Equal(default, activity.ParentSpanId);
+        }
+        finally
+        {
+            ambient.Stop();
+        }
+    }
+
+    [Fact]
+    public void CaptureContextIgnoresUnrecordedAmbient()
+    {
+        var ambient = new Activity("unrecorded");
+        ambient.ActivityTraceFlags = ActivityTraceFlags.None;
+        ambient.Start();
+        try
+        {
+            Assert.Equal(default, DnsInstrumentation.CaptureContext());
+        }
+        finally
+        {
+            ambient.Stop();
+        }
+    }
+
+    [Fact]
     public void StartQueryUsesParentTraceContext()
     {
         using var listener = ListenFor(DnsInstrumentation.InternalSpanName, new Started());

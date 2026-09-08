@@ -13,16 +13,14 @@ public static class DnsInstrumentation
     public static ActivitySource ActivitySource { get; } = new(ActivitySourceName);
 
     public static ActivityContext CaptureContext()
-        => Activity.Current?.Context ?? default;
+        => Recorded(Activity.Current?.Context ?? default);
 
     public static Activity? StartQuery(DnsPacketReceivedMessage message)
     {
         var context = message.Context;
         var name = context.IsInternal ? InternalSpanName : QuerySpanName;
         var kind = context.IsInternal ? ActivityKind.Internal : ActivityKind.Server;
-        var activity = context.ParentTraceContext != default
-            ? ActivitySource.StartActivity(name, kind, context.ParentTraceContext)
-            : ActivitySource.StartActivity(name, kind);
+        var activity = Start(name, kind, context.ParentTraceContext);
         if (activity is null)
             return null;
 
@@ -67,7 +65,7 @@ public static class DnsInstrumentation
 
     public static Activity? StartUpstream(System.Net.IPEndPoint target, string transport, DomainMessage message)
     {
-        var activity = ActivitySource.StartActivity(UpstreamSpanName, ActivityKind.Client);
+        var activity = Start(UpstreamSpanName, ActivityKind.Client, parent: default);
         if (activity is null)
             return null;
 
@@ -108,6 +106,31 @@ public static class DnsInstrumentation
             new KeyValuePair<string, object?>("query_type", question?.Type.ToString("G") ?? "none"),
             new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"));
     }
+
+    private static Activity? Start(string name, ActivityKind kind, ActivityContext parent)
+    {
+        parent = Recorded(parent);
+        if (parent != default)
+            return ActivitySource.StartActivity(name, kind, parent);
+
+        if (Activity.Current is { Recorded: true } current)
+            return ActivitySource.StartActivity(name, kind, current.Context);
+
+        // ParentBased(AlwaysOn) treats an unrecorded Activity.Current as
+        // localParentNotSampled → AlwaysOff. ASP.NET's hosting Activity and
+        // Orleans diagnostics often sit there without Recorded set, so
+        // StartActivity(name, kind) returns null and nothing reaches Tempo.
+        if (Activity.Current is not null)
+            Activity.Current = null;
+
+        return ActivitySource.StartActivity(name, kind);
+    }
+
+    private static ActivityContext Recorded(ActivityContext context)
+        => context != default &&
+           (context.TraceFlags & ActivityTraceFlags.Recorded) != 0
+            ? context
+            : default;
 
     private static void SetQuestionTags(Activity activity, DomainMessage message)
     {

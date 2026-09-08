@@ -1,4 +1,6 @@
 ﻿using System.Buffers;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -14,19 +16,26 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
 {
     private readonly IEnumerable<IDhcpRequestHandler> _handlers;
     private readonly ILogger<DhcpMessageQueueProcessor> _logger;
+    private readonly Counter<long> _messages;
 
     public DhcpMessageQueueProcessor(IEnumerable<IDhcpRequestHandler> handlers,
-        ILogger<DhcpMessageQueueProcessor> logger)
+        ILogger<DhcpMessageQueueProcessor> logger,
+        IMeterFactory meterFactory)
     {
         _handlers = handlers.OrderByDescending(i => i.Priority)
             .ThenBy(i => i.Name)
             .ToArray();
         _logger = logger;
+        _messages = meterFactory.Create(DhcpInstrumentation.MeterName).CreateCounter<long>(
+            DhcpInstrumentation.MessagesInstrumentName,
+            unit: "{message}",
+            description: "DHCP messages processed");
     }
 
     public async Task ProcessMessageAsync(QueuedDhcpMessage message, CancellationToken cancellationToken)
     {
         var (udpClient, requestContext) = message;
+        using var activity = DhcpInstrumentation.StartMessage(requestContext);
         try
         {
             using (_logger.BeginScope("{macAddress}", requestContext.Message.HardwareAddress))
@@ -48,6 +57,7 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
                     }
                     catch (Exception ex)
                     {
+                        activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                         _logger.LogError(ex,
                             "DHCP Handler {name} threw an exception, cancelling further processing",
                             handler.Name);
@@ -56,11 +66,14 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
                 }
 
                 await EncodeAndSendAsync(requestContext, udpClient, cancellationToken);
+                DhcpInstrumentation.CompleteMessage(activity, requestContext);
+                DhcpInstrumentation.RecordMessage(_messages, requestContext);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogWarning(ex,
                 "Something went wrong when processing a DHCP message for {macAddress}, here's the network information: {networkInfo}",
                 requestContext.Message.HardwareAddress, requestContext.NetworkInformation);

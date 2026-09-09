@@ -1,4 +1,5 @@
 ARG BUILDPLATFORM
+# FROM --platform=${BUILDPLATFORM} harbor.instigaterevolution.com/microsoft/dotnet/sdk:10.0-alpine AS build
 FROM --platform=${BUILDPLATFORM} mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 ARG TARGETARCH
 WORKDIR /src

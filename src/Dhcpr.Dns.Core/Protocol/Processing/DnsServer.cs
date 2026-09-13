@@ -24,7 +24,7 @@ public sealed partial class DnsServer : BackgroundService
     /// A client must deliver a complete length-prefixed DNS message within
     /// this interval or the TCP/DoT connection is closed.
     /// </summary>
-    public static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(5);
 
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
@@ -288,7 +288,7 @@ public sealed partial class DnsServer : BackgroundService
         {
             while (client.Connected && !cancellationTokenSource.IsCancellationRequested)
             {
-                // Full length-prefixed DNS message must arrive within 1s (Slowloris).
+                // Full length-prefixed DNS message must arrive within 5s (Slowloris).
                 cancellationTokenSource.CancelAfter(TcpReadTimeout);
                 var idleCancellationToken = cancellationTokenSource.Token;
 

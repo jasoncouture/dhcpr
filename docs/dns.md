@@ -147,7 +147,7 @@ additional sections. Clients retry over TCP. Client EDNS payload sizes above
 response at a victim.
 
 TCP, DoT, and DoH are not capped this way. A TCP/DoT client must send a
-complete length-prefixed message within **1 second** or the connection is
+complete length-prefixed message within **5 seconds** or the connection is
 closed (Slowloris).
 
 ## Rate limit

@@ -70,7 +70,7 @@ public class TcpListenDisposeTests
     }
 
     [Fact]
-    public async Task ClosesConnectionIfFullPacketNotReadWithinOneSecond()
+    public async Task ClosesConnectionIfFullPacketNotReadWithinTimeout()
     {
         var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
         var server = new DnsServer(
@@ -93,7 +93,7 @@ public class TcpListenDisposeTests
             // One byte of the 2-byte length prefix — not a full packet.
             await queryClient.GetStream().WriteAsync(new byte[] { 0x00 });
 
-            await handleTask.WaitAsync(TimeSpan.FromSeconds(3));
+            await handleTask.WaitAsync(DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
             Assert.True(IsDisposed(accepted));
             queue.DidNotReceive().Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>());
         }

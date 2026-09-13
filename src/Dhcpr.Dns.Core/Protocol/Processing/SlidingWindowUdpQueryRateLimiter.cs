@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Two sliding windows for external queries: client+QNAME+QTYPE (soft REFUSED
+/// Two sliding windows for classic DNS (UDP/TCP): client+QNAME+QTYPE (soft REFUSED
 /// then drop), and client IP over a window <see cref="IpLimitMultiplier"/>
 /// times as long. At or above the per-question rate on that longer window is
 /// abuse: no reply. IPv6 is /64. Idle keys expire. Loopback is not limited.

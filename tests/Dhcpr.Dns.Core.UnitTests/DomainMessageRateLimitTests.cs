@@ -22,8 +22,7 @@ public class DomainMessageRateLimitTests
     [Theory]
     [InlineData("udp")]
     [InlineData("tcp")]
-    [InlineData("doh")]
-    public async Task RefusesExternalIngress(string transport)
+    public async Task RefusesClassicDns(string transport)
     {
         var limiter = Substitute.For<IUdpQueryRateLimiter>();
         limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
@@ -48,8 +47,7 @@ public class DomainMessageRateLimitTests
     [Theory]
     [InlineData("udp")]
     [InlineData("tcp")]
-    [InlineData("doh")]
-    public async Task DropsExternalIngress(string transport)
+    public async Task DropsClassicDns(string transport)
     {
         var limiter = Substitute.For<IUdpQueryRateLimiter>();
         limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
@@ -100,14 +98,44 @@ public class DomainMessageRateLimitTests
         var middleware = PassthroughMiddleware();
         using var processor = Create(limiter, middleware);
         var request = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
-        var context = new DomainMessageContext(Client, Server, request) { BypassCache = true };
-        var message = new HttpDnsPacketReceivedMessage(context);
+        using var udp = new UdpClient();
+        var context = new DomainMessageContext(Client, Server, request)
+        {
+            BypassCache = true,
+            Source = DnsQuerySource.Udp
+        };
+        var message = new UdpDnsPacketReceivedMessage(context, udp);
 
         await processor.ProcessMessageAsync(message, CancellationToken.None);
 
         await middleware.DidNotReceive()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
-        Assert.Equal(DomainResponseCode.Refused, (await message.TaskCompletionSource.Task)!.Flags.ResponseCode);
+        Assert.Equal("UdpRateLimit", context.AnsweredBy);
+    }
+
+    [Theory]
+    [InlineData("dot")]
+    [InlineData("doh")]
+    public async Task DoesNotLimitDotOrDoh(string transport)
+    {
+        var limiter = Substitute.For<IUdpQueryRateLimiter>();
+        limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
+            .Returns(UdpRateLimitAction.Drop);
+        var middleware = PassthroughMiddleware();
+        using var processor = Create(limiter, middleware);
+        using var hold = CreateMessage(transport, out var message, out var context);
+
+        await processor.ProcessMessageAsync(message, CancellationToken.None);
+
+        await middleware.Received(1)
+            .ProcessAsync(context, Arg.Any<CancellationToken>());
+        limiter.DidNotReceive()
+            .Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>());
+        if (message is IAwaitableDnsRequest awaitable)
+        {
+            var response = await awaitable.TaskCompletionSource.Task;
+            Assert.Equal(DomainResponseCode.NoError, response!.Flags.ResponseCode);
+        }
     }
 
     [Fact]
@@ -121,7 +149,7 @@ public class DomainMessageRateLimitTests
         await using var tcpStream = new MemoryStream();
 
         var first = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
-        var firstContext = new DomainMessageContext(Client, Server, first);
+        var firstContext = new DomainMessageContext(Client, Server, first) { Source = DnsQuerySource.Udp };
         await processor.ProcessMessageAsync(
             new UdpDnsPacketReceivedMessage(firstContext, udpClient),
             CancellationToken.None);
@@ -130,7 +158,7 @@ public class DomainMessageRateLimitTests
 
         middleware.ClearReceivedCalls();
         var second = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
-        var secondContext = new DomainMessageContext(Client, Server, second);
+        var secondContext = new DomainMessageContext(Client, Server, second) { Source = DnsQuerySource.Tcp };
         await processor.ProcessMessageAsync(
             new TcpDnsPacketReceivedMessage(secondContext, tcpClient, tcpStream),
             CancellationToken.None);
@@ -195,7 +223,15 @@ public class DomainMessageRateLimitTests
         out DomainMessageContext context)
     {
         var request = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
-        context = new DomainMessageContext(Client, Server, request);
+        var source = transport switch
+        {
+            "udp" => DnsQuerySource.Udp,
+            "tcp" => DnsQuerySource.Tcp,
+            "dot" => DnsQuerySource.Dot,
+            "doh" => DnsQuerySource.Doh,
+            _ => throw new ArgumentOutOfRangeException(nameof(transport), transport, null)
+        };
+        context = new DomainMessageContext(Client, Server, request) { Source = source };
         switch (transport)
         {
             case "udp":
@@ -205,6 +241,7 @@ public class DomainMessageRateLimitTests
                 return client;
             }
             case "tcp":
+            case "dot":
             {
                 var client = new TcpClient();
                 var stream = new MemoryStream();

@@ -102,8 +102,8 @@ matches `www.example.com`).
 
 ### Rate limit
 
-`DNS:UdpRateLimit` — sliding window for every external ingress (UDP, TCP,
-DoT, DoH). Internal hops are not limited. The section name is historical.
+`DNS:UdpRateLimit` — sliding window for classic DNS (UDP and TCP). DoT,
+DoH, and internal hops are not limited. The section name is historical.
 
 | Key | Default | Meaning |
 |-----|---------|---------|

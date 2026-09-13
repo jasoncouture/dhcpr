@@ -60,7 +60,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            if (!message.Context.IsInternal &&
+            if (ShouldRateLimit(message.Context) &&
                 TryApplyRateLimit(message.Context, out response))
             {
                 // Rate-limit answers never enter MetricsDomainMessageMiddleware.
@@ -204,9 +204,17 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     }
 
     /// <summary>
-    /// Returns <see langword="true"/> when an external client is over the
+    /// Classic DNS only (UDP and TCP). DoT, DoH, and internal hops are not
+    /// limited.
+    /// </summary>
+    private static bool ShouldRateLimit(DomainMessageContext context)
+        => !context.IsInternal &&
+           context.Source is DnsQuerySource.Udp or DnsQuerySource.Tcp;
+
+    /// <summary>
+    /// Returns <see langword="true"/> when a UDP/TCP client is over the
     /// sliding window. <paramref name="response"/> is a REFUSED message, or
-    /// null to drop. Internal pipeline hops are not limited.
+    /// null to drop.
     /// </summary>
     private bool TryApplyRateLimit(DomainMessageContext context, out DomainMessage? response)
     {

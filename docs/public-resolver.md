@@ -13,7 +13,7 @@ want to depend on another resolver to look up the hostname.
 
 | Port | Protocol |
 |------|----------|
-| 53 | Classic DNS, UDP and TCP. UDP answers over 1232 bytes are TC (retry on TCP). UDP is rate-limited (REFUSED, then silence). |
+| 53 | Classic DNS, UDP and TCP. UDP answers over 1232 bytes are TC (retry on TCP). UDP and TCP are rate-limited (REFUSED, then silence). DoT and DoH are not. |
 | 853 | DNS-over-TLS (RFC 7858), certificate `CN=dns.alertr.info` |
 | 443 | HTTPS — DNS-over-HTTPS at `/dns-query` (RFC 8484) |
 

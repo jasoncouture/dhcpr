@@ -175,6 +175,107 @@ public class DnssecPhase5Tests
     }
 
     [Fact]
+    public async Task SignedChildWithoutParentDs_IsInsecureNotServFail()
+    {
+        // qualia.id: child publishes DNSKEY/RRSIG, parent NODATA DS (NSEC, no DS bit).
+        var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");
+        var (childKey, childPrivate) = CreateEcdsaDnsKey("child.example.com");
+
+        var aRecord = A("www.child.example.com", "192.0.2.77");
+        var aSig = SignRrset(childPrivate, childKey, [aRecord], DomainRecordType.A);
+        var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
+
+        var internalClient = ScriptedInternalClient(request =>
+        {
+            var q = request.Questions[0];
+            var name = q.Name.ToString();
+            if (q.Type is DomainRecordType.DNSKEY && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return DomainMessage.CreateResponse(request, answers: [parentKey, parentDnsKeySig], responseCode: DomainResponseCode.NoError);
+            if (q.Type is DomainRecordType.DS && name.Equals("child.example.com", StringComparison.OrdinalIgnoreCase))
+                return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.NoError);
+            return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+        });
+
+        var request = DomainMessage.CreateRequest("www.child.example.com");
+        var response = DomainMessage.CreateResponse(
+            request, answers: [aRecord, aSig], responseCode: DomainResponseCode.NoError);
+
+        var options = Options(new DnsConfiguration
+        {
+            TrustAnchors =
+            [
+                new TrustAnchorConfiguration
+                {
+                    Name = "example.com",
+                    KeyTag = CalculateKeyTag(parentKey),
+                    Algorithm = (byte)DnssecAlgorithmType.EcdsaP256Sha256,
+                    DigestType = (byte)DelegationSignerDigestType.Sha256,
+                    DigestHex = ComputeDsDigestHex(parentKey)
+                }
+            ]
+        });
+
+        var middleware = CreateMiddleware(response, options, internalClient);
+        var scope = new DnssecScope();
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request) { DnssecScope = scope },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.False(result.Flags.Authentic);
+        Assert.Equal(DnssecValidationStatus.Insecure, scope.Status);
+        Assert.True(scope.IsInsecureCutOrBelow("child.example.com"));
+        Assert.True(scope.IsInsecureCutOrBelow("www.child.example.com"));
+    }
+
+    [Fact]
+    public async Task DsServFail_StillServFailsSignedChild()
+    {
+        var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");
+        var (childKey, childPrivate) = CreateEcdsaDnsKey("child.example.com");
+        var aRecord = A("www.child.example.com", "192.0.2.77");
+        var aSig = SignRrset(childPrivate, childKey, [aRecord], DomainRecordType.A);
+        var parentDnsKeySig = SignRrset(parentPrivate, parentKey, [parentKey], DomainRecordType.DNSKEY);
+
+        var internalClient = ScriptedInternalClient(request =>
+        {
+            var q = request.Questions[0];
+            var name = q.Name.ToString();
+            if (q.Type is DomainRecordType.DNSKEY && name.Equals("example.com", StringComparison.OrdinalIgnoreCase))
+                return DomainMessage.CreateResponse(request, answers: [parentKey, parentDnsKeySig], responseCode: DomainResponseCode.NoError);
+            return DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+        });
+
+        var request = DomainMessage.CreateRequest("www.child.example.com");
+        var response = DomainMessage.CreateResponse(
+            request, answers: [aRecord, aSig], responseCode: DomainResponseCode.NoError);
+        var options = Options(new DnsConfiguration
+        {
+            TrustAnchors =
+            [
+                new TrustAnchorConfiguration
+                {
+                    Name = "example.com",
+                    KeyTag = CalculateKeyTag(parentKey),
+                    Algorithm = (byte)DnssecAlgorithmType.EcdsaP256Sha256,
+                    DigestType = (byte)DelegationSignerDigestType.Sha256,
+                    DigestHex = ComputeDsDigestHex(parentKey)
+                }
+            ]
+        });
+
+        var middleware = CreateMiddleware(response, options, internalClient);
+        var scope = new DnssecScope();
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request) { DnssecScope = scope },
+            CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
+        Assert.Equal(DnssecValidationStatus.Bogus, scope.Status);
+    }
+
+    [Fact]
     public async Task MultiHop_TamperedAnswer_ServFailsWhenCdClear()
     {
         var (parentKey, parentPrivate) = CreateEcdsaDnsKey("example.com");

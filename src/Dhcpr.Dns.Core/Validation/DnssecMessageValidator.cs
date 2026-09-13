@@ -176,6 +176,14 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                     return DnssecValidationStatus.Indeterminate;
                 }
 
+                // Signed child under a parent NODATA DS is insecure, not bogus
+                // (qualia.id: RRSIGs exist, id. NSEC proves no DS).
+                if (scope.IsInsecureCutOrBelow(signer))
+                {
+                    LogInsecureUnsignedCut(_logger, signer);
+                    return DnssecValidationStatus.Insecure;
+                }
+
                 LogNoAuthenticatedKeysForSigner(_logger, signer);
                 return DnssecValidationStatus.Bogus;
             }
@@ -588,8 +596,12 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
 
         if (dsRecords.Count == 0)
         {
-            // No DS → insecure delegation (not bogus).
+            // No DS → insecure delegation (not bogus). Only NODATA/NXDOMAIN
+            // prove absence; SERVFAIL/timeout must not fail open.
             LogNoDsUnsignedCut(_logger, zone, dsResponse.Flags.ResponseCode);
+            if (dsResponse.Flags.ResponseCode is DomainResponseCode.NoError
+                or DomainResponseCode.NameError)
+                scope.MarkInsecureCut(zone);
             return false;
         }
 
@@ -750,6 +762,9 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC bogus: no authenticated keys for signer {Signer}")]
     private static partial void LogNoAuthenticatedKeysForSigner(ILogger logger, string signer);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC insecure cut: no DS for signer {Signer}")]
+    private static partial void LogInsecureUnsignedCut(ILogger logger, string signer);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC bogus: keys missing after ensure for {Signer}")]
     private static partial void LogKeysMissingAfterEnsure(ILogger logger, string signer);

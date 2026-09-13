@@ -14,6 +14,9 @@ public sealed class DnssecScope
     private readonly ConcurrentDictionary<string, AuthenticatedDelegation> _delegations =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly ConcurrentDictionary<string, byte> _insecureCuts =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public DnssecValidationStatus Status { get; private set; } = DnssecValidationStatus.Unchecked;
 
     /// <summary>True while fetching DS/DNSKEY so nested validation does not re-enter fetch loops.</summary>
@@ -92,6 +95,27 @@ public sealed class DnssecScope
 
     public void SetDelegation(AuthenticatedDelegation delegation)
         => _delegations[NormalizeZone(delegation.Zone)] = delegation;
+
+    /// <summary>
+    /// Parent proved there is no DS (NODATA). The child is an insecure
+    /// delegation even if it publishes DNSKEY/RRSIG.
+    /// </summary>
+    public void MarkInsecureCut(string zone)
+        => _insecureCuts[NormalizeZone(zone)] = 0;
+
+    public bool IsInsecureCutOrBelow(string zone)
+    {
+        var current = NormalizeZone(zone);
+        while (true)
+        {
+            if (_insecureCuts.ContainsKey(current))
+                return true;
+            var parent = ParentZone(current);
+            if (parent is null)
+                return false;
+            current = parent;
+        }
+    }
 
     public void Observe(DnssecValidationStatus outcome)
     {

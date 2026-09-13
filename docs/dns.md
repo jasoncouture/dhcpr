@@ -128,6 +128,7 @@ When enabled:
 - Secure answers with the client AD bit requested → response `AD=1`
 - Bogus answers with `CD=0` → **SERVFAIL**
 - Insecure / unchecked → no AD bit
+- Signed child with no parent DS (NODATA) → **insecure**, not SERVFAIL
 
 When disabled: never set AD, never SERVFAIL solely because validation failed.
 

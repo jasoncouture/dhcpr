@@ -148,6 +148,17 @@ response at a victim.
 
 TCP, DoT, and DoH are not capped this way.
 
+## UDP rate limit
+
+Classic DNS over UDP is also limited per client (IPv4 address, or IPv6 `/64`)
+with a sliding window (`DNS:UdpRateLimit`, default 1 s / 10 segments):
+
+1. Up to **RefuseLimit** (100) — answered normally
+2. Up to **DropLimit** (200) — **REFUSED** (policy reject, no recursion)
+3. Above that — **no reply**
+
+Loopback is not limited. TCP, DoT, and DoH are not limited.
+
 ## Query from a client
 
 The public instance is [dns.alertr.info](public-resolver.md)

@@ -86,6 +86,7 @@ public static class DnsServiceProviderExtensions
 
         // Process-bound: MessagePipe live-query dispatch (Orleans replaces this).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
+        services.AddSingleton<IUdpQueryRateLimiter, SlidingWindowUdpQueryRateLimiter>();
 
         services.AddScoped<IReferralWalker, ReferralWalker>();
         services.AddScoped<IInternalDomainClient, InternalDomainClient>();

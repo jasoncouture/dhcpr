@@ -25,16 +25,19 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
+    private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly Histogram<double> _duration;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
         ILiveQueryEventPublisher liveQueryPublisher,
+        IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
         IMeterFactory meterFactory)
     {
         _logger = logger;
         _liveQueryPublisher = liveQueryPublisher;
+        _udpRateLimiter = udpRateLimiter;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
         _duration = meterFactory.Create(DnsMetrics.MeterName).CreateHistogram<double>(
             DnsMetrics.DurationInstrumentName,
@@ -51,15 +54,23 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            foreach (var middleware in _middlewareChain)
+            if (message is UdpDnsPacketReceivedMessage &&
+                TryApplyUdpRateLimit(message.Context, out response))
             {
-                response = await middleware.ProcessAsync(message.Context, cancellationToken);
-                if (message.Context.Cancel) // This is intended for things that want to ignore the request.
-                    break;
-                if (response is not null) // This is intended for things to say "I don't handle this, try next"
+                // REFUSED or silent drop — skip the resolver pipeline.
+            }
+            else
+            {
+                foreach (var middleware in _middlewareChain)
                 {
-                    answeredBy = middleware;
-                    break;
+                    response = await middleware.ProcessAsync(message.Context, cancellationToken);
+                    if (message.Context.Cancel) // This is intended for things that want to ignore the request.
+                        break;
+                    if (response is not null) // This is intended for things to say "I don't handle this, try next"
+                    {
+                        answeredBy = middleware;
+                        break;
+                    }
                 }
             }
 
@@ -183,6 +194,45 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     }
 
     /// <summary>
+    /// Returns <see langword="true"/> when the UDP client is over the sliding
+    /// window. <paramref name="response"/> is a REFUSED message, or null to drop.
+    /// </summary>
+    private bool TryApplyUdpRateLimit(DomainMessageContext context, out DomainMessage? response)
+    {
+        var action = _udpRateLimiter.Record(context.ClientEndPoint?.Address);
+        if (action is UdpRateLimitAction.Allow)
+        {
+            response = null;
+            return false;
+        }
+
+        context.AnsweredBy = "UdpRateLimit";
+        var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
+        if (action is UdpRateLimitAction.Drop)
+        {
+            context.Cancel = true;
+            LogUdpRateLimitDrop(
+                _logger,
+                context.ClientEndPoint,
+                question?.Type ?? default,
+                question?.Name ?? DomainLabels.Empty);
+            response = null;
+            return true;
+        }
+
+        LogUdpRateLimitRefuse(
+            _logger,
+            context.ClientEndPoint,
+            question?.Type ?? default,
+            question?.Name ?? DomainLabels.Empty);
+        response = DomainMessage.CreateResponse(
+            context.DomainMessage,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.Refused);
+        return true;
+    }
+
+    /// <summary>
     /// If the assembled answer would exceed <see cref="UdpResponseSizeLimit"/>
     /// on UDP, return TC with empty RRsets so the datagram stays tiny.
     /// Legitimate clients retry over TCP.
@@ -286,6 +336,24 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to process message due to an exception")]
     private static partial void LogProcessMessageFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "UDP rate limit REFUSED {Name}/{QueryType} from {Client}")]
+    private static partial void LogUdpRateLimitRefuse(
+        ILogger logger,
+        IPEndPoint? client,
+        DomainRecordType queryType,
+        DomainLabels name);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "UDP rate limit drop {Name}/{QueryType} from {Client}")]
+    private static partial void LogUdpRateLimitDrop(
+        ILogger logger,
+        IPEndPoint? client,
+        DomainRecordType queryType,
+        DomainLabels name);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

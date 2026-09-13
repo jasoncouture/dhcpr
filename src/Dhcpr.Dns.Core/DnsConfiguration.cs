@@ -55,6 +55,9 @@ public sealed class DnsConfiguration : IValidateSelf
     [ConfigurationKeyName("DOH")]
     public DnsOverHttpConfiguration DnsOverHttp { get; set; } = new();
 
+    /// <summary>Two-tier sliding-window limit for classic DNS over UDP.</summary>
+    public UdpRateLimitConfiguration UdpRateLimit { get; set; } = new();
+
     public DnsListenEndpoint[] GetListenEndpoints() => ListenAddresses.GetListenEndpoints();
 
     /// <summary>
@@ -168,6 +171,10 @@ public sealed class DnsConfiguration : IValidateSelf
             error = "DNS:DOH:MaxRequestBytes must be between 1 and 65535";
             return false;
         }
+
+        UdpRateLimit ??= new UdpRateLimitConfiguration();
+        if (!UdpRateLimit.TryValidate(out error))
+            return false;
 
         BlackholeDomains ??= Array.Empty<string>();
         for (var i = 0; i < BlackholeDomains.Length; i++)

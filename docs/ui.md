@@ -80,7 +80,7 @@ change appsettings — edit the file or the UI, not both casually.
 
 | Page | Keys |
 |------|------|
-| `/settings/routes` | `DNS:Routes` |
+| `/settings/routes` | `DNS:Routes` (suffix `.` is the catch-all forwarder) |
 | `/settings/records` | `DNS:Records` |
 | `/settings/blackhole` | `DNS:BlackholeDomains` |
 | `/settings/dnssec` | `DNS:Dnssec` |

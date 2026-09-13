@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Dhcpr.Dns.Core;
 
 /// <summary>
@@ -14,4 +16,26 @@ public sealed class DnsRouteConfiguration
     /// Empty = unrestricted.
     /// </summary>
     public string[] Clients { get; set; } = [];
+
+    /// <summary>
+    /// Strips a trailing FQDN dot, but keeps <c>.</c> as the catch-all route.
+    /// </summary>
+    public static bool TryNormalizeSuffix(string? suffix, [NotNullWhen(true)] out string? normalized)
+    {
+        var raw = suffix?.Trim() ?? "";
+        if (raw is ".")
+        {
+            normalized = ".";
+            return true;
+        }
+
+        normalized = raw.TrimEnd('.');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            normalized = null;
+            return false;
+        }
+
+        return true;
+    }
 }

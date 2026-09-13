@@ -86,13 +86,19 @@ public sealed class DnsConfiguration : IValidateSelf
 
         foreach (var route in routes)
         {
+            if (!DnsRouteConfiguration.TryNormalizeSuffix(route.Key, out var suffix))
+            {
+                error = $"DNS:Routes[\"{route.Key}\"] is not a domain suffix";
+                return false;
+            }
+
             var config = route.Value ?? new DnsRouteConfiguration();
             config.Upstreams ??= [];
             config.Clients ??= [];
 
             if (config.Upstreams.Length == 0)
             {
-                error = $"DNS:Routes[\"{route.Key}\"] is missing or empty";
+                error = $"DNS:Routes[\"{suffix}\"] is missing or empty";
                 return false;
             }
 
@@ -101,7 +107,7 @@ public sealed class DnsConfiguration : IValidateSelf
             {
                 if (!config.Upstreams[i].TryGetEndPoint(53, out var endpoint))
                 {
-                    error = $"DNS:Routes[\"{route.Key}\"] contains an invalid endpoint URI: {config.Upstreams[i]}";
+                    error = $"DNS:Routes[\"{suffix}\"] contains an invalid endpoint URI: {config.Upstreams[i]}";
                     return false;
                 }
 
@@ -113,14 +119,18 @@ public sealed class DnsConfiguration : IValidateSelf
             {
                 if (!ParsedDnsRoute.TryParseClientNetwork(config.Clients[i], out var network))
                 {
-                    error = $"DNS:Routes[\"{route.Key}\"].Clients[{i}] is not a CIDR or IP: {config.Clients[i]}";
+                    error = $"DNS:Routes[\"{suffix}\"].Clients[{i}] is not a CIDR or IP: {config.Clients[i]}";
                     return false;
                 }
 
                 clients[i] = network;
             }
 
-            _parsedRoutes[route.Key] = new ParsedDnsRoute(endpoints, clients);
+            if (!_parsedRoutes.TryAdd(suffix, new ParsedDnsRoute(endpoints, clients)))
+            {
+                error = $"DNS:Routes[\"{suffix}\"] is duplicated";
+                return false;
+            }
         }
 
         Records ??= [];

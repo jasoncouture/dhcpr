@@ -9,8 +9,8 @@
     {
         <div class="card">
             <label>
-                Suffix
-                <input @bind="route.Suffix" />
+                Suffix (<code>.</code> = all names)
+                <input @bind="route.Suffix" placeholder="example.com or ." />
             </label>
             <label>
                 Upstreams (one host:port per line)
@@ -62,10 +62,9 @@
             var routes = new Dictionary<string, DnsRouteConfiguration>(StringComparer.OrdinalIgnoreCase);
             foreach (var route in _routes)
             {
-                var suffix = route.Suffix.Trim().TrimEnd('.');
-                if (string.IsNullOrWhiteSpace(suffix))
+                if (!DnsRouteConfiguration.TryNormalizeSuffix(route.Suffix, out var suffix))
                 {
-                    _error = "Each route needs a domain suffix";
+                    _error = "Each route needs a domain suffix (use . for a catch-all)";
                     return;
                 }
 

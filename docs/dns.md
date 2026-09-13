@@ -138,6 +138,16 @@ When disabled: never set AD, never SERVFAIL solely because validation failed.
 Trust anchors are `DNS:TrustAnchors` (DS records). The compiled default is the
 current root KSK (key tag 20326). Override only when you intend to.
 
+## UDP size (amplification)
+
+Classic DNS over UDP is capped at **1232** bytes. Larger answers (TXT, DNSSEC
+assemblies, and similar) are returned as **TC** with empty answer / authority /
+additional sections. Clients retry over TCP. Client EDNS payload sizes above
+1232 are ignored so a spoofed source cannot bounce a multi-kilobyte UDP
+response at a victim.
+
+TCP, DoT, and DoH are not capped this way.
+
 ## Query from a client
 
 The public instance is [dns.alertr.info](public-resolver.md)

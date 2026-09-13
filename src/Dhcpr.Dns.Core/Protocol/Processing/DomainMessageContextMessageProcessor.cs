@@ -16,21 +16,24 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed partial class DomainMessageContextMessageProcessor : IQueueMessageProcessor<DnsPacketReceivedMessage>, IDisposable
 {
+    /// <summary>
+    /// Hard UDP payload cap. Client EDNS sizes above this are ignored so a
+    /// spoofed cisco.com TXT cannot be used as an amplifier.
+    /// </summary>
+    public const int UdpResponseSizeLimit = 1232;
+
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
-    private readonly IEdnsProtocolService _ednsProtocolService;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly Histogram<double> _duration;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
-        IEdnsProtocolService ednsProtocolService,
         ILiveQueryEventPublisher liveQueryPublisher,
         ILogger<DomainMessageContextMessageProcessor> logger,
         IMeterFactory meterFactory)
     {
         _logger = logger;
-        _ednsProtocolService = ednsProtocolService;
         _liveQueryPublisher = liveQueryPublisher;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
         _duration = meterFactory.Create(DnsMetrics.MeterName).CreateHistogram<double>(
@@ -98,7 +101,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                 return;
             }
 
-            await SendResponseAsync(message, response, _ednsProtocolService, cancellationToken);
+            await SendResponseAsync(message, response, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -121,7 +124,6 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private static async Task SendResponseAsync(
         DnsPacketReceivedMessage message,
         DomainMessage response,
-        IEdnsProtocolService ednsProtocolService,
         CancellationToken cancellationToken
     )
     {
@@ -130,22 +132,14 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         var lengthPrefix = isTcp ? 2 : 0;
         var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize) + lengthPrefix);
 
-        var udpLimit = 512;
-        var optRecord = message.Context.DomainMessage.Records.Additional.FirstOrDefault(r => r.Type == DomainRecordType.OPT);
-        if (optRecord is not null)
-        {
-            var requestedSize = ednsProtocolService.GetUdpPayloadSize(optRecord);
-            if (requestedSize >= 512)
-            {
-                udpLimit = requestedSize;
-            }
-        }
+        if (!isTcp)
+            response = ApplyUdpAmplificationGuard(response);
 
         try
         {
             var byteCount = TruncateAndEncodeMessage(
                 response,
-                isTcp ? int.MaxValue : udpLimit,
+                isTcp ? int.MaxValue : UdpResponseSizeLimit,
                 buffer.AsSpan(lengthPrefix)
             );
             if (isTcp)
@@ -185,6 +179,23 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         })
             .IgnoreExceptionsAsync(cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// If the assembled answer would exceed <see cref="UdpResponseSizeLimit"/>
+    /// on UDP, return TC with empty RRsets so the datagram stays tiny.
+    /// Legitimate clients retry over TCP.
+    /// </summary>
+    public static DomainMessage ApplyUdpAmplificationGuard(DomainMessage response)
+    {
+        if (response.EstimatedSize <= UdpResponseSizeLimit)
+            return response;
+
+        return response with
+        {
+            Flags = response.Flags with { Truncated = true },
+            Records = DomainResourceRecords.Empty
+        };
     }
 
     private static ImmutableArray<DomainResourceRecord>? TryTruncateRecords(

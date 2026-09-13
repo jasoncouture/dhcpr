@@ -112,8 +112,9 @@ matches `www.example.com`).
 | `WindowMilliseconds` | `1000` | Sliding window length (100–60000) |
 | `SegmentsPerWindow` | `10` | Buckets in the window (2–100). More = smoother |
 
-Two windows: client+QNAME+QTYPE at these limits, and client IP (IPv4 or
-IPv6 `/64`) at **5×**. The harsher action wins. Loopback is exempt.
+Two windows: client+QNAME+QTYPE at these limits over `WindowMilliseconds`,
+and client IP (IPv4 or IPv6 `/64`) at **5×** those counts over a window
+**5×** as long. The harsher action wins. Loopback is exempt.
 
 ### DNSSEC
 

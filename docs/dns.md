@@ -150,17 +150,17 @@ TCP, DoT, and DoH are not capped this way.
 
 ## UDP rate limit
 
-Classic DNS over UDP has two sliding windows (`DNS:UdpRateLimit`, default
-1 s / 10 segments). The harsher action wins.
+Classic DNS over UDP has two sliding windows (`DNS:UdpRateLimit`). The
+harsher action wins.
 
-Per **client + QNAME + QTYPE**:
+Per **client + QNAME + QTYPE** (1 s / 10 segments):
 
 1. Up to **RefuseLimit** (20) — answered normally
 2. Up to **DropLimit** (40) — **REFUSED** (policy reject, no recursion)
 3. Above that — **no reply**
 
 Per **client IP** (IPv4 address or IPv6 `/64`), the same tiers at **5×**
-those limits (100 / 200 by default).
+those limits over a **5 s** window (100 / 200 per 5 seconds by default).
 
 Loopback is not limited. TCP, DoT, and DoH are not limited.
 

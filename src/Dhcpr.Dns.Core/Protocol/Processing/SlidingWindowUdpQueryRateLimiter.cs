@@ -8,7 +8,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
 /// Two sliding windows for UDP: client+QNAME+QTYPE, and client IP alone at
-/// <see cref="IpLimitMultiplier"/> times those thresholds. IPv6 is /64.
+/// <see cref="IpLimitMultiplier"/> times those thresholds over a window
+/// that many times longer. IPv6 is /64.
 /// Idle keys expire. Loopback is not limited (health checks).
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
@@ -40,9 +41,16 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
 
         var prefix = PartitionKey(client);
         var window = TimeSpan.FromMilliseconds(limit.WindowMilliseconds);
-        var questionCount = Counter($"{prefix}\0{name.ToString().ToLowerInvariant()}\0{(ushort)type}", window, limit)
+        var questionCount = Counter(
+                $"{prefix}\0{name.ToString().ToLowerInvariant()}\0{(ushort)type}",
+                window,
+                limit.SegmentsPerWindow)
             .Record();
-        var ipCount = Counter(prefix, window, limit).Record();
+        var ipCount = Counter(
+                prefix,
+                window * IpLimitMultiplier,
+                limit.SegmentsPerWindow * IpLimitMultiplier)
+            .Record();
 
         var question = Classify(questionCount, limit.RefuseLimit, limit.DropLimit);
         var ip = Classify(
@@ -52,11 +60,11 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         return question > ip ? question : ip;
     }
 
-    private SlidingWindowCounter Counter(string key, TimeSpan window, UdpRateLimitConfiguration limit)
+    private SlidingWindowCounter Counter(string key, TimeSpan window, int segmentsPerWindow)
         => _cache.GetOrCreate(key, entry =>
         {
             entry.SlidingExpiration = window + window;
-            return new SlidingWindowCounter(window, limit.SegmentsPerWindow);
+            return new SlidingWindowCounter(window, segmentsPerWindow);
         })!;
 
     private static UdpRateLimitAction Classify(int count, int refuseLimit, int dropLimit)

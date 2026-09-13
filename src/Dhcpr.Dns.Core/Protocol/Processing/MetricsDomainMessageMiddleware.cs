@@ -30,24 +30,7 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
         if (result is null)
             return null;
 
-        // Directed hops set BypassCache so a parent referral is never stored or
-        // replayed. They cannot hit and must not appear in cache_hit rate.
-        if (context.BypassCache)
-            return result;
-
-        var error = result.Flags.ResponseCode is not DomainResponseCode.NoError;
-        foreach (var question in context.DomainMessage.Questions)
-        {
-            _queries.Add(
-                1,
-                new KeyValuePair<string, object?>("cache_hit", context.CacheHit),
-                new KeyValuePair<string, object?>("error", error),
-                new KeyValuePair<string, object?>("rcode", result.Flags.ResponseCode.ToString("G")),
-                new KeyValuePair<string, object?>("query_type", question.Type.ToString("G")),
-                new KeyValuePair<string, object?>("query_class", question.Class.ToString("G")),
-                new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"));
-        }
-
+        DnsMetrics.RecordQueries(_queries, context, result);
         return result;
     }
 }

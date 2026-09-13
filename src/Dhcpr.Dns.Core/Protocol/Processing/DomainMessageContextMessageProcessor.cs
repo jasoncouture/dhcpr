@@ -27,6 +27,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly Histogram<double> _duration;
+    private readonly Counter<long> _queries;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
@@ -39,10 +40,15 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         _liveQueryPublisher = liveQueryPublisher;
         _udpRateLimiter = udpRateLimiter;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
-        _duration = meterFactory.Create(DnsMetrics.MeterName).CreateHistogram<double>(
+        var meter = meterFactory.Create(DnsMetrics.MeterName);
+        _duration = meter.CreateHistogram<double>(
             DnsMetrics.DurationInstrumentName,
             unit: "s",
             description: "DNS query processing duration");
+        _queries = meter.CreateCounter<long>(
+            DnsMetrics.QueriesInstrumentName,
+            unit: "{query}",
+            description: "DNS queries answered by a middleware handler");
     }
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
@@ -57,7 +63,9 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             if (message is UdpDnsPacketReceivedMessage &&
                 TryApplyUdpRateLimit(message.Context, out response))
             {
-                // REFUSED or silent drop — skip the resolver pipeline.
+                // REFUSED never enters MetricsDomainMessageMiddleware.
+                if (response is not null)
+                    DnsMetrics.RecordQueries(_queries, message.Context, response);
             }
             else
             {

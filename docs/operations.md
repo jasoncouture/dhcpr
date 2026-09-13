@@ -64,7 +64,8 @@ Meter `Dhcpr.Dns`.
 
 `dns.query.duration` uses `cache_hit`, `error`, `rcode`, `query_type`,
 `answered_by`. Directed internal hops (`BypassCache`) are not counted.
-Blackhole and NOTIMP **are** counted.
+Blackhole, NOTIMP, and UDP rate-limit **REFUSED** (`answered_by=UdpRateLimit`)
+**are** counted. Silent rate-limit drops are not.
 
 ### DHCP
 

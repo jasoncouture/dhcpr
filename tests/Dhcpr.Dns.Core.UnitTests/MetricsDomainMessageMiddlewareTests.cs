@@ -127,6 +127,45 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
+    public void CountsUdpRateLimitRefused()
+    {
+        string? rcode = null;
+        string? answeredBy = null;
+        using var listener = CreateListener((_, tags) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "rcode")
+                    rcode = tag.Value?.ToString();
+                if (tag.Key == "answered_by")
+                    answeredBy = tag.Value?.ToString();
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        var queries = services.BuildServiceProvider()
+            .GetRequiredService<IMeterFactory>()
+            .Create(DnsMetrics.MeterName)
+            .CreateCounter<long>(DnsMetrics.QueriesInstrumentName);
+
+        var request = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.Refused);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request)
+        {
+            AnsweredBy = "UdpRateLimit"
+        };
+
+        DnsMetrics.RecordQueries(queries, context, response);
+
+        Assert.Equal(nameof(DomainResponseCode.Refused), rcode);
+        Assert.Equal("UdpRateLimit", answeredBy);
+    }
+
+    [Fact]
     public async Task TagsRcodeFromResponse()
     {
         string? rcode = null;

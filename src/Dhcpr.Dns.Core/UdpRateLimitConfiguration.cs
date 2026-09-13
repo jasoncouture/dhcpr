@@ -5,8 +5,8 @@ using Dhcpr.Core;
 namespace Dhcpr.Dns.Core;
 
 /// <summary>
-/// Two-tier sliding-window UDP rate limit under <c>DNS:UdpRateLimit</c>.
-/// TCP, DoT, and DoH are not limited.
+/// Two-tier sliding-window rate limit under <c>DNS:UdpRateLimit</c>.
+/// Applies to every external ingress (UDP, TCP, DoT, DoH). Internal hops are not limited.
 /// </summary>
 public sealed class UdpRateLimitConfiguration : IValidateSelf
 {

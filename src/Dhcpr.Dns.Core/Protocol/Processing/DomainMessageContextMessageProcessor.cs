@@ -60,8 +60,8 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            if (message is UdpDnsPacketReceivedMessage &&
-                TryApplyUdpRateLimit(message.Context, out response))
+            if (!message.Context.IsInternal &&
+                TryApplyRateLimit(message.Context, out response))
             {
                 // Rate-limit answers never enter MetricsDomainMessageMiddleware.
                 if (response is not null)
@@ -204,10 +204,11 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     }
 
     /// <summary>
-    /// Returns <see langword="true"/> when the UDP client is over the sliding
-    /// window. <paramref name="response"/> is a REFUSED message, or null to drop.
+    /// Returns <see langword="true"/> when an external client is over the
+    /// sliding window. <paramref name="response"/> is a REFUSED message, or
+    /// null to drop. Internal pipeline hops are not limited.
     /// </summary>
-    private bool TryApplyUdpRateLimit(DomainMessageContext context, out DomainMessage? response)
+    private bool TryApplyRateLimit(DomainMessageContext context, out DomainMessage? response)
     {
         var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
         var action = _udpRateLimiter.Record(
@@ -352,7 +353,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "UDP rate limit REFUSED {Name}/{QueryType} from {Client}")]
+        Message = "Rate limit REFUSED {Name}/{QueryType} from {Client}")]
     private static partial void LogUdpRateLimitRefuse(
         ILogger logger,
         IPEndPoint? client,
@@ -361,7 +362,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "UDP rate limit drop {Name}/{QueryType} from {Client}")]
+        Message = "Rate limit drop {Name}/{QueryType} from {Client}")]
     private static partial void LogUdpRateLimitDrop(
         ILogger logger,
         IPEndPoint? client,

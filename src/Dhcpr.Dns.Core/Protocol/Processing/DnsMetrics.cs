@@ -8,13 +8,13 @@ public static class DnsMetrics
     public const string QueriesInstrumentName = "dns.queries";
     public const string DurationInstrumentName = "dns.query.duration";
 
-    /// <summary>Synthetic rcode for a UDP rate-limit ignore (no wire reply).</summary>
+    /// <summary>Synthetic rcode for a rate-limit ignore (no wire reply).</summary>
     public const string DropRcode = "Drop";
 
     /// <summary>
     /// Increments <c>dns.queries</c> with the same tags as
     /// <see cref="MetricsDomainMessageMiddleware"/>. Used for answers that
-    /// never enter the decorate chain (UDP rate-limit REFUSED / Drop).
+    /// never enter the decorate chain (rate-limit REFUSED / Drop).
     /// </summary>
     public static void RecordQueries(
         Counter<long> queries,

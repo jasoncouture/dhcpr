@@ -150,22 +150,24 @@ TCP, DoT, and DoH are not capped this way. A TCP/DoT client must send a
 complete length-prefixed message within **1 second** or the connection is
 closed (Slowloris).
 
-## UDP rate limit
+## Rate limit
 
-Classic DNS over UDP has two sliding windows (`DNS:UdpRateLimit`). The
-harsher action wins.
+Every external ingress (UDP, TCP, DoT, DoH) shares two sliding windows
+(`DNS:UdpRateLimit`). The harsher action wins. Internal pipeline hops are
+not limited (they keep the client IP for logging and must not consume the
+client budget).
 
 Per **client + QNAME + QTYPE** (1 s / 10 segments):
 
 1. Up to **RefuseLimit** (10) — answered normally
 2. Up to **DropLimit** (20) — **REFUSED** (policy reject, no recursion)
-3. Above that — **no reply**
+3. Above that — **no reply** (DoH: no DNS body / 503)
 
 Per **client IP** (IPv4 address or IPv6 `/64`), a **5 s** window at the
 same rate as RefuseLimit (**10/s**, so 50 queries per 5 s). At or above
 that is abuse: **no reply**.
 
-Loopback is not limited. TCP, DoT, and DoH are not limited.
+Loopback is not limited. UDP and TCP from the same client share a bucket.
 
 ## Query from a client
 

@@ -100,13 +100,14 @@ type.
 upstream). The name itself and every subdomain match (`example.com` also
 matches `www.example.com`).
 
-### UDP rate limit
+### Rate limit
 
-`DNS:UdpRateLimit` — sliding window for classic DNS over UDP only.
+`DNS:UdpRateLimit` — sliding window for every external ingress (UDP, TCP,
+DoT, DoH). Internal hops are not limited. The section name is historical.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `Enabled` | `true` | When false, every UDP query is answered |
+| `Enabled` | `true` | When false, every query is answered |
 | `RefuseLimit` | `10` | Queries per window that still get a real answer |
 | `DropLimit` | `20` | Queries per window that still get REFUSED. Above this: no reply |
 | `WindowMilliseconds` | `1000` | Sliding window length (100–60000) |

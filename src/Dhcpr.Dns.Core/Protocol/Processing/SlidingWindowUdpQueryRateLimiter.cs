@@ -7,12 +7,14 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Sliding window for UDP keyed by client prefix, QNAME, and QTYPE.
-/// IPv4 uses the address; IPv6 uses /64. Idle keys expire.
-/// Loopback is not limited (health checks).
+/// Two sliding windows for UDP: client+QNAME+QTYPE, and client IP alone at
+/// <see cref="IpLimitMultiplier"/> times those thresholds. IPv6 is /64.
+/// Idle keys expire. Loopback is not limited (health checks).
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
 {
+    public const int IpLimitMultiplier = 5;
+
     private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly MemoryCache _cache = new(new MemoryCacheOptions
     {
@@ -36,18 +38,32 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         if (IPAddress.IsLoopback(client))
             return UdpRateLimitAction.Allow;
 
-        var key = $"{PartitionKey(client)}\0{name.ToString().ToLowerInvariant()}\0{(ushort)type}";
+        var prefix = PartitionKey(client);
         var window = TimeSpan.FromMilliseconds(limit.WindowMilliseconds);
-        var counter = _cache.GetOrCreate(key, entry =>
+        var questionCount = Counter($"{prefix}\0{name.ToString().ToLowerInvariant()}\0{(ushort)type}", window, limit)
+            .Record();
+        var ipCount = Counter(prefix, window, limit).Record();
+
+        var question = Classify(questionCount, limit.RefuseLimit, limit.DropLimit);
+        var ip = Classify(
+            ipCount,
+            limit.RefuseLimit * IpLimitMultiplier,
+            limit.DropLimit * IpLimitMultiplier);
+        return question > ip ? question : ip;
+    }
+
+    private SlidingWindowCounter Counter(string key, TimeSpan window, UdpRateLimitConfiguration limit)
+        => _cache.GetOrCreate(key, entry =>
         {
             entry.SlidingExpiration = window + window;
             return new SlidingWindowCounter(window, limit.SegmentsPerWindow);
-        });
+        })!;
 
-        var count = counter!.Record();
-        if (count <= limit.RefuseLimit)
+    private static UdpRateLimitAction Classify(int count, int refuseLimit, int dropLimit)
+    {
+        if (count <= refuseLimit)
             return UdpRateLimitAction.Allow;
-        if (count <= limit.DropLimit)
+        if (count <= dropLimit)
             return UdpRateLimitAction.Refuse;
         return UdpRateLimitAction.Drop;
     }

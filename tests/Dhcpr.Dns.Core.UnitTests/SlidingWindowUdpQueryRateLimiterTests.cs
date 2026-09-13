@@ -83,6 +83,23 @@ public class SlidingWindowUdpQueryRateLimiterTests
     }
 
     [Fact]
+    public void IpWindowIsFiveTimesQuestionWindow()
+    {
+        var limiter = Create(refuse: 1, drop: 3);
+        var client = IPAddress.Parse("203.0.113.10");
+
+        for (var i = 0; i < SlidingWindowUdpQueryRateLimiter.IpLimitMultiplier; i++)
+        {
+            var name = new DomainLabels($"n{i}.example");
+            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, name, DomainRecordType.A));
+        }
+
+        Assert.Equal(
+            UdpRateLimitAction.Refuse,
+            limiter.Record(client, new DomainLabels("overflow.example"), DomainRecordType.A));
+    }
+
+    [Fact]
     public void DisabledAllowsEveryone()
     {
         var limiter = Create(refuse: 1, drop: 2, enabled: false);

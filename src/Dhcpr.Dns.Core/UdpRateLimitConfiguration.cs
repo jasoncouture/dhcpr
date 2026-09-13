@@ -45,6 +45,12 @@ public sealed class UdpRateLimitConfiguration : IValidateSelf
             return false;
         }
 
+        if (RefuseLimit > int.MaxValue / 5 || DropLimit > int.MaxValue / 5)
+        {
+            error = "DNS:UdpRateLimit refuse/drop limits are too large for the IP-wide 5x window";
+            return false;
+        }
+
         if (WindowMilliseconds is < 100 or > 60_000)
         {
             error = "DNS:UdpRateLimit:WindowMilliseconds must be between 100 and 60000";

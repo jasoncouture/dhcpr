@@ -159,8 +159,9 @@ Per **client + QNAME + QTYPE** (1 s / 10 segments):
 2. Up to **DropLimit** (40) — **REFUSED** (policy reject, no recursion)
 3. Above that — **no reply**
 
-Per **client IP** (IPv4 address or IPv6 `/64`), the same tiers at **5×**
-those limits over a **5 s** window (100 / 200 per 5 seconds by default).
+Per **client IP** (IPv4 address or IPv6 `/64`), a **5 s** window at the
+same rate as RefuseLimit (**20/s**, so 100 queries per 5 s). At or above
+that is abuse: **no reply**.
 
 Loopback is not limited. TCP, DoT, and DoH are not limited.
 

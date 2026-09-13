@@ -7,10 +7,10 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Two sliding windows for UDP: client+QNAME+QTYPE, and client IP alone at
-/// <see cref="IpLimitMultiplier"/> times those thresholds over a window
-/// that many times longer. IPv6 is /64.
-/// Idle keys expire. Loopback is not limited (health checks).
+/// Two sliding windows for UDP: client+QNAME+QTYPE (soft REFUSED then drop),
+/// and client IP over a window <see cref="IpLimitMultiplier"/> times as long.
+/// At or above the per-question rate on that longer window is abuse: no reply.
+/// IPv6 is /64. Idle keys expire. Loopback is not limited.
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
 {
@@ -53,10 +53,10 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
             .Record();
 
         var question = Classify(questionCount, limit.RefuseLimit, limit.DropLimit);
-        var ip = Classify(
-            ipCount,
-            limit.RefuseLimit * IpLimitMultiplier,
-            limit.DropLimit * IpLimitMultiplier);
+        // Same rate as RefuseLimit, measured over the longer window (20/s × 5s = 100).
+        // At or above that rate is abuse: drop, no REFUSED band.
+        var ipBudget = limit.RefuseLimit * IpLimitMultiplier;
+        var ip = ipCount < ipBudget ? UdpRateLimitAction.Allow : UdpRateLimitAction.Drop;
         return question > ip ? question : ip;
     }
 

@@ -113,8 +113,9 @@ matches `www.example.com`).
 | `SegmentsPerWindow` | `10` | Buckets in the window (2–100). More = smoother |
 
 Two windows: client+QNAME+QTYPE at these limits over `WindowMilliseconds`,
-and client IP (IPv4 or IPv6 `/64`) at **5×** those counts over a window
-**5×** as long. The harsher action wins. Loopback is exempt.
+and client IP (IPv4 or IPv6 `/64`) over a window **5×** as long at the
+same rate as `RefuseLimit` (20/s). At or above that rate the IP gets no
+reply. The harsher action wins. Loopback is exempt.
 
 ### DNSSEC
 

@@ -150,8 +150,8 @@ TCP, DoT, and DoH are not capped this way.
 
 ## UDP rate limit
 
-Classic DNS over UDP is limited per **client + QNAME** (IPv4 address or
-IPv6 `/64`, plus the question labels) with a sliding window
+Classic DNS over UDP is limited per **client + QNAME + QTYPE** (IPv4
+address or IPv6 `/64`, plus the question labels and type) with a sliding window
 (`DNS:UdpRateLimit`, default 1 s / 10 segments):
 
 1. Up to **RefuseLimit** (20) — answered normally

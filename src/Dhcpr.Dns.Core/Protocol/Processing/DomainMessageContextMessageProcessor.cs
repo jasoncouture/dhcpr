@@ -202,7 +202,8 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
         var action = _udpRateLimiter.Record(
             context.ClientEndPoint?.Address,
-            question?.Name ?? DomainLabels.Empty);
+            question?.Name ?? DomainLabels.Empty,
+            question?.Type ?? default);
         if (action is UdpRateLimitAction.Allow)
         {
             response = null;

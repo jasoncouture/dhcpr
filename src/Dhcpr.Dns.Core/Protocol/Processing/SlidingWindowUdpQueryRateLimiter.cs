@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Sliding window for UDP keyed by client prefix <em>and</em> QNAME.
+/// Sliding window for UDP keyed by client prefix, QNAME, and QTYPE.
 /// IPv4 uses the address; IPv6 uses /64. Idle keys expire.
 /// Loopback is not limited (health checks).
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         _options = options;
     }
 
-    public UdpRateLimitAction Record(IPAddress? client, DomainLabels name)
+    public UdpRateLimitAction Record(IPAddress? client, DomainLabels name, DomainRecordType type)
     {
         var limit = _options.CurrentValue.UdpRateLimit;
         if (!limit.Enabled)
@@ -36,7 +36,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         if (IPAddress.IsLoopback(client))
             return UdpRateLimitAction.Allow;
 
-        var key = $"{PartitionKey(client)}\0{name.ToString().ToLowerInvariant()}";
+        var key = $"{PartitionKey(client)}\0{name.ToString().ToLowerInvariant()}\0{(ushort)type}";
         var window = TimeSpan.FromMilliseconds(limit.WindowMilliseconds);
         var counter = _cache.GetOrCreate(key, entry =>
         {

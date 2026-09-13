@@ -112,7 +112,7 @@ matches `www.example.com`).
 | `WindowMilliseconds` | `1000` | Sliding window length (100–60000) |
 | `SegmentsPerWindow` | `10` | Buckets in the window (2–100). More = smoother |
 
-Keyed by IPv4 address or IPv6 `/64` **and** the QNAME. Loopback is exempt.
+Keyed by IPv4 address or IPv6 `/64`, QNAME, and QTYPE. Loopback is exempt.
 
 ### DNSSEC
 

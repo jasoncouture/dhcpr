@@ -4,5 +4,5 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public interface IUdpQueryRateLimiter
 {
-    UdpRateLimitAction Record(IPAddress? client, DomainLabels name);
+    UdpRateLimitAction Record(IPAddress? client, DomainLabels name, DomainRecordType type);
 }

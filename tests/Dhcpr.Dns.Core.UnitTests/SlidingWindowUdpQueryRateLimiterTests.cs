@@ -21,11 +21,11 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var limiter = Create(refuse: 2, drop: 4);
         var client = IPAddress.Parse("203.0.113.10");
 
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Drop, limiter.Record(client, Cisco));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Drop, limiter.Record(client, Cisco, DomainRecordType.TXT));
     }
 
     [Fact]
@@ -34,9 +34,20 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var limiter = Create(refuse: 1, drop: 3);
         var client = IPAddress.Parse("203.0.113.10");
 
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco));
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Example));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Example, DomainRecordType.TXT));
+    }
+
+    [Fact]
+    public void DifferentTypesHaveIndependentWindows()
+    {
+        var limiter = Create(refuse: 1, drop: 3);
+        var client = IPAddress.Parse("203.0.113.10");
+
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.A));
     }
 
     [Fact]
@@ -45,8 +56,8 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var limiter = Create(refuse: 1, drop: 3);
         var client = IPAddress.Parse("203.0.113.10");
 
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, new DomainLabels("Cisco.COM")));
-        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, new DomainLabels("cisco.com")));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, new DomainLabels("Cisco.COM"), DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(client, new DomainLabels("cisco.com"), DomainRecordType.TXT));
     }
 
     [Fact]
@@ -55,7 +66,7 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var limiter = Create(refuse: 1, drop: 2);
 
         for (var i = 0; i < 8; i++)
-            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(IPAddress.Loopback, Cisco));
+            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(IPAddress.Loopback, Cisco, DomainRecordType.TXT));
     }
 
     [Fact]
@@ -66,9 +77,9 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var b = IPAddress.Parse("2001:db8:1:2::99");
         var other = IPAddress.Parse("2001:db8:1:3::1");
 
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(a, Cisco));
-        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(b, Cisco));
-        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(other, Cisco));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(a, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Refuse, limiter.Record(b, Cisco, DomainRecordType.TXT));
+        Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(other, Cisco, DomainRecordType.TXT));
     }
 
     [Fact]
@@ -78,7 +89,7 @@ public class SlidingWindowUdpQueryRateLimiterTests
         var client = IPAddress.Parse("203.0.113.10");
 
         for (var i = 0; i < 8; i++)
-            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco));
+            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
     }
 
     private static SlidingWindowUdpQueryRateLimiter Create(int refuse, int drop, bool enabled = true)

@@ -107,8 +107,8 @@ matches `www.example.com`).
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `Enabled` | `true` | When false, every UDP query is answered |
-| `RefuseLimit` | `100` | Queries per window that still get a real answer |
-| `DropLimit` | `200` | Queries per window that still get REFUSED. Above this: no reply |
+| `RefuseLimit` | `20` | Queries per window that still get a real answer |
+| `DropLimit` | `40` | Queries per window that still get REFUSED. Above this: no reply |
 | `WindowMilliseconds` | `1000` | Sliding window length (100–60000) |
 | `SegmentsPerWindow` | `10` | Buckets in the window (2–100). More = smoother |
 
@@ -303,8 +303,8 @@ DNS__ListenAddresses__0=udp://0.0.0.0:53
 DNS__Routes__home.arpa__Upstreams__0=192.168.1.1:53
 DNS__BlackholeDomains__0=ads.example
 DNS__Dnssec__Enabled=true
-DNS__UdpRateLimit__RefuseLimit=100
-DNS__UdpRateLimit__DropLimit=200
+DNS__UdpRateLimit__RefuseLimit=20
+DNS__UdpRateLimit__DropLimit=40
 DNS__HealthCheck__Domains__0=example.com
 
 # TLS / DoT / DoH

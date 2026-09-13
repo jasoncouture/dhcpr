@@ -154,8 +154,8 @@ Classic DNS over UDP is limited per **client + QNAME** (IPv4 address or
 IPv6 `/64`, plus the question labels) with a sliding window
 (`DNS:UdpRateLimit`, default 1 s / 10 segments):
 
-1. Up to **RefuseLimit** (100) — answered normally
-2. Up to **DropLimit** (200) — **REFUSED** (policy reject, no recursion)
+1. Up to **RefuseLimit** (20) — answered normally
+2. Up to **DropLimit** (40) — **REFUSED** (policy reject, no recursion)
 3. Above that — **no reply**
 
 Loopback is not limited. TCP, DoT, and DoH are not limited.

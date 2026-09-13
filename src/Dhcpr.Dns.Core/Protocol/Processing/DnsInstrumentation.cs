@@ -130,12 +130,23 @@ public static class DnsInstrumentation
     }
 
     private static string Transport(DnsPacketReceivedMessage message)
-        => message switch
+    {
+        if (message.Context.IsInternal)
+            return "internal";
+
+        return message.Context.Source switch
         {
-            UdpDnsPacketReceivedMessage => "udp",
-            TcpDnsPacketReceivedMessage => "tcp",
-            HttpDnsPacketReceivedMessage => "doh",
-            InternalDnsRequestReceivedMessage => "internal",
-            _ => "unknown"
+            DnsQuerySource.Udp => "udp",
+            DnsQuerySource.Tcp => "tcp",
+            DnsQuerySource.Dot => "dot",
+            DnsQuerySource.Doh => "doh",
+            _ => message switch
+            {
+                UdpDnsPacketReceivedMessage => "udp",
+                TcpDnsPacketReceivedMessage => "tcp",
+                HttpDnsPacketReceivedMessage => "doh",
+                _ => "unknown"
+            }
         };
+    }
 }

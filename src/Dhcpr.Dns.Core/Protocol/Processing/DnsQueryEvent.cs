@@ -12,4 +12,5 @@ public sealed record DnsQueryEvent(
     DomainResponseCode ResponseCode,
     bool CacheHit,
     string Answers,
-    string Middleware);
+    string Middleware,
+    DnsQuerySource Source = DnsQuerySource.Unknown);

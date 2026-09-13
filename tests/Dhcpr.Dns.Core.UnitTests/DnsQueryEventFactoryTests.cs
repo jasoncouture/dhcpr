@@ -34,7 +34,8 @@ public class DnsQueryEventFactoryTests
             new IPEndPoint(IPAddress.Loopback, 53),
             request)
         {
-            CacheHit = true
+            CacheHit = true,
+            Source = DnsQuerySource.Udp
         };
 
         await DnsQueryEventFactory.PublishAnswersAsync(
@@ -50,6 +51,7 @@ public class DnsQueryEventFactoryTests
         Assert.Equal("TestResolver", evt.Middleware);
         Assert.Equal(context.ClientEndPoint, evt.Client);
         Assert.Equal(context.ServerEndPoint, evt.Server);
+        Assert.Equal(DnsQuerySource.Udp, evt.Source);
     }
 
     [Fact]
@@ -72,6 +74,15 @@ public class DnsQueryEventFactoryTests
 
         Assert.Empty(published);
     }
+
+    [Theory]
+    [InlineData(DnsQuerySource.Udp, "UDP")]
+    [InlineData(DnsQuerySource.Tcp, "TCP")]
+    [InlineData(DnsQuerySource.Dot, "DoT")]
+    [InlineData(DnsQuerySource.Doh, "DoH")]
+    [InlineData(DnsQuerySource.Unknown, "—")]
+    public void SourceLabel(DnsQuerySource source, string expected)
+        => Assert.Equal(expected, source.ToLabel());
 
     [Fact]
     public async Task PublishesBlackholeAnsweredByLabel()

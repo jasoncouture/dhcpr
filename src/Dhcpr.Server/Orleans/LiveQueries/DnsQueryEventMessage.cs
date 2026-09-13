@@ -38,6 +38,9 @@ public sealed class DnsQueryEventMessage
     [Id(9)]
     public string Middleware { get; set; } = "";
 
+    [Id(10)]
+    public byte Source { get; set; }
+
     public static DnsQueryEventMessage From(DnsQueryEvent evt) => new()
     {
         Id = evt.Id,
@@ -49,7 +52,8 @@ public sealed class DnsQueryEventMessage
         ResponseCode = (byte)evt.ResponseCode,
         CacheHit = evt.CacheHit,
         Answers = evt.Answers,
-        Middleware = evt.Middleware
+        Middleware = evt.Middleware,
+        Source = (byte)evt.Source
     };
 
     public DnsQueryEvent ToDnsQueryEvent()
@@ -71,6 +75,7 @@ public sealed class DnsQueryEventMessage
             (DomainResponseCode)ResponseCode,
             CacheHit,
             Answers,
-            Middleware);
+            Middleware,
+            (DnsQuerySource)Source);
     }
 }

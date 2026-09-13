@@ -236,7 +236,7 @@ public sealed partial class DnsServer : BackgroundService
     }
 
     public Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
-        => HandleStreamClientAsync(client, client.GetStream(), cancellationToken);
+        => HandleStreamClientAsync(client, client.GetStream(), DnsQuerySource.Tcp, cancellationToken);
 
     public async Task HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
@@ -245,7 +245,7 @@ public sealed partial class DnsServer : BackgroundService
         {
             sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
             await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken);
-            await HandleStreamClientAsync(client, sslStream, cancellationToken);
+            await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -278,6 +278,7 @@ public sealed partial class DnsServer : BackgroundService
     internal async Task HandleStreamClientAsync(
         TcpClient client,
         Stream stream,
+        DnsQuerySource source,
         CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
@@ -301,6 +302,7 @@ public sealed partial class DnsServer : BackgroundService
                     client,
                     stream,
                     buffer.AsSpan(0, length).ToArray(),
+                    source,
                     cancellationToken);
                 if (pending is not null)
                     pendingReplies.Add(pending);
@@ -354,6 +356,7 @@ public sealed partial class DnsServer : BackgroundService
         TcpClient tcpClient,
         Stream stream,
         byte[] buffer,
+        DnsQuerySource source,
         CancellationToken cancellationToken
     )
     {
@@ -369,7 +372,8 @@ public sealed partial class DnsServer : BackgroundService
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
             NameserverTips = new NameserverTipCache(),
-            ParentTraceContext = DnsInstrumentation.CaptureContext()
+            ParentTraceContext = DnsInstrumentation.CaptureContext(),
+            Source = source
         };
 
         var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient, stream);
@@ -398,7 +402,8 @@ public sealed partial class DnsServer : BackgroundService
                 DnssecScope = new DnssecScope(),
                 WorkBudget = new QueryWorkBudget(),
                 NameserverTips = new NameserverTipCache(),
-                ParentTraceContext = DnsInstrumentation.CaptureContext()
+                ParentTraceContext = DnsInstrumentation.CaptureContext(),
+                Source = DnsQuerySource.Udp
             };
 
             var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);

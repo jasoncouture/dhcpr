@@ -83,4 +83,9 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// inherit the inbound activity across the worker queue.
     /// </summary>
     public ActivityContext ParentTraceContext { get; init; }
+
+    /// <summary>
+    /// UDP, TCP, DoT, or DoH for the originating client query.
+    /// </summary>
+    public DnsQuerySource Source { get; init; }
 }

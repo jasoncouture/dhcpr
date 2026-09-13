@@ -78,6 +78,7 @@ public class TlsListenDisposeTests
 
                 var item = await queued.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 var tcpMessage = Assert.IsType<TcpDnsPacketReceivedMessage>(item);
+                Assert.Equal(DnsQuerySource.Dot, tcpMessage.Context.Source);
 
                 Assert.False(handleTask.IsCompleted);
                 Assert.False(IsDisposed(accepted));

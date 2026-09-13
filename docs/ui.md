@@ -48,6 +48,7 @@ process-wide ring plus Orleans pub/sub so replicas see each other's traffic.
 |--------|---------|
 | Time | Local clock, `HH:mm:ss.fff` |
 | Cache | `HIT` or `MISS` |
+| Source | `UDP`, `TCP`, `DoT`, or `DoH` |
 | Server | Local socket the query arrived on |
 | Client | Remote socket |
 | Type | QTYPE |

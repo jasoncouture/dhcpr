@@ -22,6 +22,7 @@
         <tr>
             <th class="col-time">Time</th>
             <th class="col-cache">Cache</th>
+            <th class="col-source">Source</th>
             <th>Server</th>
             <th>Client</th>
             <th>Type</th>
@@ -37,6 +38,7 @@
             <tr class="@(row.ResponseCode is DomainResponseCode.NoError ? null : "error")">
                 <td class="col-time">@row.Timestamp.ToString("HH:mm:ss.fff")</td>
                 <td class="col-cache">@(row.CacheHit ? "HIT" : "MISS")</td>
+                <td class="col-source">@row.Source.ToLabel()</td>
                 <td>@(row.Server?.ToString() ?? "—")</td>
                 <td>@(row.Client?.ToString() ?? "—")</td>
                 <td>@row.Type</td>

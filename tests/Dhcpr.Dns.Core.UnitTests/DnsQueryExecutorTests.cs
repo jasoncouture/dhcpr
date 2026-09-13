@@ -74,6 +74,7 @@ public class DnsQueryExecutorTests
         Assert.Equal(1, queue.EnqueueCount);
         Assert.NotNull(queue.LastMessage);
         Assert.False(queue.LastMessage!.Context.IsInternal);
+        Assert.Equal(DnsQuerySource.Doh, queue.LastMessage.Context.Source);
         Assert.NotNull(queue.LastMessage.Context.WorkBudget);
         Assert.NotNull(queue.LastMessage.Context.DnssecScope);
         Assert.Equal(IPAddress.Parse("203.0.113.10"), queue.LastMessage.Context.ClientEndPoint!.Address);

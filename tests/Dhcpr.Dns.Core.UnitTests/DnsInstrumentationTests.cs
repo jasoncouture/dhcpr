@@ -37,6 +37,29 @@ public class DnsInstrumentationTests
     }
 
     [Fact]
+    public void StartQueryTagsDotFromContextSource()
+    {
+        var started = new Started();
+        using var listener = ListenFor(DnsInstrumentation.QuerySpanName, started);
+
+        var request = DomainMessage.CreateRequest("example.com");
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 853),
+            request)
+        {
+            Source = DnsQuerySource.Dot
+        };
+
+        using var activity = DnsInstrumentation.StartQuery(
+            new TcpDnsPacketReceivedMessage(context, new System.Net.Sockets.TcpClient(), Stream.Null));
+
+        Assert.NotNull(activity);
+        Assert.True(started.Value);
+        Assert.Equal("dot", activity!.GetTagItem("network.transport"));
+    }
+
+    [Fact]
     public void CompleteQueryMarksServFail()
     {
         using var listener = ListenFor(DnsInstrumentation.QuerySpanName, new Started());

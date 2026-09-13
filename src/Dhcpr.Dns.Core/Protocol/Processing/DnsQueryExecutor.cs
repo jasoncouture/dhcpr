@@ -89,7 +89,8 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
             NameserverTips = new NameserverTipCache(),
-            ParentTraceContext = DnsInstrumentation.CaptureContext()
+            ParentTraceContext = DnsInstrumentation.CaptureContext(),
+            Source = DnsQuerySource.Doh
         };
 
         var queued = new HttpDnsPacketReceivedMessage(context);

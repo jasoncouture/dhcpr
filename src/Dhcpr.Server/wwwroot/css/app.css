@@ -297,6 +297,10 @@ main {
     width: calc(5ch + 1rem);
 }
 
+.query-table .col-source {
+    width: calc(6ch + 1rem);
+}
+
 .query-table th {
     color: var(--muted);
     font-weight: 600;

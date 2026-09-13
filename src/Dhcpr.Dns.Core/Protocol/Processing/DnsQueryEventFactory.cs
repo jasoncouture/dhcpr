@@ -32,7 +32,8 @@ public static class DnsQueryEventFactory
                 response.Flags.ResponseCode,
                 context.CacheHit,
                 FormatAnswerAddresses(response, question.Type),
-                middlewareName);
+                middlewareName,
+                context.Source);
 
             await publisher.PublishAsync(evt, cancellationToken);
         }

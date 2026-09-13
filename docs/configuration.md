@@ -107,14 +107,14 @@ matches `www.example.com`).
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `Enabled` | `true` | When false, every UDP query is answered |
-| `RefuseLimit` | `20` | Queries per window that still get a real answer |
-| `DropLimit` | `40` | Queries per window that still get REFUSED. Above this: no reply |
+| `RefuseLimit` | `10` | Queries per window that still get a real answer |
+| `DropLimit` | `20` | Queries per window that still get REFUSED. Above this: no reply |
 | `WindowMilliseconds` | `1000` | Sliding window length (100–60000) |
 | `SegmentsPerWindow` | `10` | Buckets in the window (2–100). More = smoother |
 
 Two windows: client+QNAME+QTYPE at these limits over `WindowMilliseconds`,
 and client IP (IPv4 or IPv6 `/64`) over a window **5×** as long at the
-same rate as `RefuseLimit` (20/s). At or above that rate the IP gets no
+same rate as `RefuseLimit` (10/s, 50 per 5 s). At or above that rate the IP gets no
 reply. The harsher action wins. Loopback is exempt.
 
 ### DNSSEC
@@ -306,8 +306,8 @@ DNS__ListenAddresses__0=udp://0.0.0.0:53
 DNS__Routes__home.arpa__Upstreams__0=192.168.1.1:53
 DNS__BlackholeDomains__0=ads.example
 DNS__Dnssec__Enabled=true
-DNS__UdpRateLimit__RefuseLimit=20
-DNS__UdpRateLimit__DropLimit=40
+DNS__UdpRateLimit__RefuseLimit=10
+DNS__UdpRateLimit__DropLimit=20
 DNS__HealthCheck__Domains__0=example.com
 
 # TLS / DoT / DoH

@@ -68,6 +68,40 @@ public class TcpListenDisposeTests
         }
     }
 
+    [Fact]
+    public async Task ClosesConnectionIfFullPacketNotReadWithinOneSecond()
+    {
+        var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
+        var server = new DnsServer(
+            queue,
+            Monitor(new DnsConfiguration()),
+            Monitor(new TlsConfiguration()),
+            Substitute.For<ITlsServerCertificateProvider>(),
+            NullLogger<DnsServer>.Instance);
+
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            using var queryClient = new TcpClient();
+            var connect = queryClient.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+            using var accepted = await listener.AcceptTcpClientAsync();
+            await connect;
+
+            var handleTask = server.HandleTcpClientAsync(accepted, CancellationToken.None);
+            // One byte of the 2-byte length prefix — not a full packet.
+            await queryClient.GetStream().WriteAsync(new byte[] { 0x00 });
+
+            await handleTask.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.True(IsDisposed(accepted));
+            queue.DidNotReceive().Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private static bool IsDisposed(TcpClient client)
     {
         try

@@ -20,6 +20,12 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed partial class DnsServer : BackgroundService
 {
+    /// <summary>
+    /// A client must deliver a complete length-prefixed DNS message within
+    /// this interval or the TCP/DoT connection is closed.
+    /// </summary>
+    public static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(1);
+
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
 
@@ -281,8 +287,8 @@ public sealed partial class DnsServer : BackgroundService
         {
             while (client.Connected && !cancellationTokenSource.IsCancellationRequested)
             {
-                // Idle timeout to limit how long a client can hold the connection open.
-                cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(10));
+                // Full length-prefixed DNS message must arrive within 1s (Slowloris).
+                cancellationTokenSource.CancelAfter(TcpReadTimeout);
                 var idleCancellationToken = cancellationTokenSource.Token;
 
                 await ReadExactAsync(stream, buffer.AsMemory(0, 2), idleCancellationToken);
@@ -312,7 +318,7 @@ public sealed partial class DnsServer : BackgroundService
         }
         catch
         {
-            // Idle timeout, remote close, or malformed client — drop the connection.
+            // Read timeout, remote close, or malformed client — drop the connection.
         }
         finally
         {

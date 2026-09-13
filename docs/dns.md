@@ -146,7 +146,9 @@ additional sections. Clients retry over TCP. Client EDNS payload sizes above
 1232 are ignored so a spoofed source cannot bounce a multi-kilobyte UDP
 response at a victim.
 
-TCP, DoT, and DoH are not capped this way.
+TCP, DoT, and DoH are not capped this way. A TCP/DoT client must send a
+complete length-prefixed message within **1 second** or the connection is
+closed (Slowloris).
 
 ## UDP rate limit
 

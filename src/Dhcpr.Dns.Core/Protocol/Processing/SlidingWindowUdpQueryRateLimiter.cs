@@ -7,8 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Per-client sliding window for UDP. IPv4 is keyed by address; IPv6 by /64
-/// so a single host cannot burn a unique key per address. Idle keys expire.
+/// Sliding window for UDP keyed by client prefix <em>and</em> QNAME.
+/// IPv4 uses the address; IPv6 uses /64. Idle keys expire.
 /// Loopback is not limited (health checks).
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
@@ -24,7 +24,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         _options = options;
     }
 
-    public UdpRateLimitAction Record(IPAddress? client)
+    public UdpRateLimitAction Record(IPAddress? client, DomainLabels name)
     {
         var limit = _options.CurrentValue.UdpRateLimit;
         if (!limit.Enabled)
@@ -36,7 +36,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         if (IPAddress.IsLoopback(client))
             return UdpRateLimitAction.Allow;
 
-        var key = PartitionKey(client);
+        var key = $"{PartitionKey(client)}\0{name.ToString().ToLowerInvariant()}";
         var window = TimeSpan.FromMilliseconds(limit.WindowMilliseconds);
         var counter = _cache.GetOrCreate(key, entry =>
         {

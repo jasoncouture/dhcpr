@@ -199,7 +199,10 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     /// </summary>
     private bool TryApplyUdpRateLimit(DomainMessageContext context, out DomainMessage? response)
     {
-        var action = _udpRateLimiter.Record(context.ClientEndPoint?.Address);
+        var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
+        var action = _udpRateLimiter.Record(
+            context.ClientEndPoint?.Address,
+            question?.Name ?? DomainLabels.Empty);
         if (action is UdpRateLimitAction.Allow)
         {
             response = null;
@@ -207,7 +210,6 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         }
 
         context.AnsweredBy = "UdpRateLimit";
-        var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
         if (action is UdpRateLimitAction.Drop)
         {
             context.Cancel = true;

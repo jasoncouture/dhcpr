@@ -101,7 +101,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                 return;
             }
 
-            await SendResponseAsync(message, response, cancellationToken);
+            await SendResponseAsync(message, response, _logger, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -124,6 +124,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private static async Task SendResponseAsync(
         DnsPacketReceivedMessage message,
         DomainMessage response,
+        ILogger logger,
         CancellationToken cancellationToken
     )
     {
@@ -133,7 +134,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize) + lengthPrefix);
 
         if (!isTcp)
-            response = ApplyUdpAmplificationGuard(response);
+            response = ApplyUdpAmplificationGuard(response, logger, message.Context.ClientEndPoint);
 
         try
         {
@@ -186,10 +187,25 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     /// on UDP, return TC with empty RRsets so the datagram stays tiny.
     /// Legitimate clients retry over TCP.
     /// </summary>
-    public static DomainMessage ApplyUdpAmplificationGuard(DomainMessage response)
+    public static DomainMessage ApplyUdpAmplificationGuard(
+        DomainMessage response,
+        ILogger? logger = null,
+        IPEndPoint? client = null)
     {
         if (response.EstimatedSize <= UdpResponseSizeLimit)
             return response;
+
+        if (logger is not null)
+        {
+            var question = response.Questions is [{ } q, ..] ? q : null;
+            LogUdpAmplificationGuard(
+                logger,
+                client,
+                question?.Type ?? default,
+                question?.Name ?? DomainLabels.Empty,
+                response.EstimatedSize,
+                UdpResponseSizeLimit);
+        }
 
         return response with
         {
@@ -270,4 +286,15 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Failed to process message due to an exception")]
     private static partial void LogProcessMessageFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "UDP amplification guard truncated {Name}/{QueryType} from {Client} size={Size} limit={Limit}")]
+    private static partial void LogUdpAmplificationGuard(
+        ILogger logger,
+        IPEndPoint? client,
+        DomainRecordType queryType,
+        DomainLabels name,
+        int size,
+        int limit);
 }

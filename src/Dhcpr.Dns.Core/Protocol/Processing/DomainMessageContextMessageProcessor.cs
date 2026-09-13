@@ -63,9 +63,11 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             if (message is UdpDnsPacketReceivedMessage &&
                 TryApplyUdpRateLimit(message.Context, out response))
             {
-                // REFUSED never enters MetricsDomainMessageMiddleware.
+                // Rate-limit answers never enter MetricsDomainMessageMiddleware.
                 if (response is not null)
                     DnsMetrics.RecordQueries(_queries, message.Context, response);
+                else
+                    DnsMetrics.RecordQueries(_queries, message.Context, DnsMetrics.DropRcode, error: true);
             }
             else
             {

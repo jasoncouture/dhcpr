@@ -94,17 +94,25 @@ public static class DnsInstrumentation
         DomainMessage? response,
         TimeSpan elapsed)
     {
-        if (context.IsInternal || context.BypassCache || response is null)
+        if (context.IsInternal || context.BypassCache)
+            return;
+
+        if (response is null && context.AnsweredBy is not "UdpRateLimit")
             return;
 
         var question = context.DomainMessage.Questions.IsDefaultOrEmpty
             ? null
             : context.DomainMessage.Questions[0];
+        var rcode = response is null
+            ? DnsMetrics.DropRcode
+            : response.Flags.ResponseCode.ToString("G");
+        var error = response is null ||
+                    response.Flags.ResponseCode is not DomainResponseCode.NoError;
         duration.Record(
             elapsed.TotalSeconds,
             new KeyValuePair<string, object?>("cache_hit", context.CacheHit),
-            new KeyValuePair<string, object?>("error", response.Flags.ResponseCode is not DomainResponseCode.NoError),
-            new KeyValuePair<string, object?>("rcode", response.Flags.ResponseCode.ToString("G")),
+            new KeyValuePair<string, object?>("error", error),
+            new KeyValuePair<string, object?>("rcode", rcode),
             new KeyValuePair<string, object?>("query_type", question?.Type.ToString("G") ?? "none"),
             new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"));
     }

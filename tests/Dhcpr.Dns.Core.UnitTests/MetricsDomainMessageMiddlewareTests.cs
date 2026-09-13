@@ -166,6 +166,40 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
+    public void CountsUdpRateLimitDrop()
+    {
+        string? rcode = null;
+        using var listener = CreateListener((_, tags) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "rcode")
+                    rcode = tag.Value?.ToString();
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        var queries = services.BuildServiceProvider()
+            .GetRequiredService<IMeterFactory>()
+            .Create(DnsMetrics.MeterName)
+            .CreateCounter<long>(DnsMetrics.QueriesInstrumentName);
+
+        var request = DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request)
+        {
+            AnsweredBy = "UdpRateLimit"
+        };
+
+        DnsMetrics.RecordQueries(queries, context, DnsMetrics.DropRcode, error: true);
+
+        Assert.Equal(DnsMetrics.DropRcode, rcode);
+    }
+
+    [Fact]
     public async Task TagsRcodeFromResponse()
     {
         string? rcode = null;

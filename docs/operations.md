@@ -57,15 +57,16 @@ Meter `Dhcpr.Dns`.
 |-------|--------|
 | `cache_hit` | true / false |
 | `error` | true if RCODE is not NoError |
-| `rcode` | `NoError`, `NxDomain`, `ServFail`, … |
+| `rcode` | `NoError`, `NxDomain`, `ServFail`, `Refused`, `Drop`, … |
 | `query_type` | `A`, `AAAA`, `NS`, … |
 | `query_class` | usually `IN` |
 | `answered_by` | middleware name, or `resolver` |
 
 `dns.query.duration` uses `cache_hit`, `error`, `rcode`, `query_type`,
 `answered_by`. Directed internal hops (`BypassCache`) are not counted.
-Blackhole, NOTIMP, and UDP rate-limit **REFUSED** (`answered_by=UdpRateLimit`)
-**are** counted. Silent rate-limit drops are not.
+Blackhole, NOTIMP, and UDP rate-limit **REFUSED** / **Drop**
+(`answered_by=UdpRateLimit`) **are** counted. `Drop` is a label only (no
+wire rcode): the query was ignored.
 
 ### DHCP
 

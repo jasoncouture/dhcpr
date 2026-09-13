@@ -61,9 +61,10 @@ Meter `Dhcpr.Dns`.
 | `query_type` | `A`, `AAAA`, `NS`, … |
 | `query_class` | usually `IN` |
 | `answered_by` | middleware name, or `resolver` |
+| `source` | `UDP`, `TCP`, `DoT`, `DoH` |
 
 `dns.query.duration` uses `cache_hit`, `error`, `rcode`, `query_type`,
-`answered_by`. Directed internal hops (`BypassCache`) are not counted.
+`answered_by`, `source`. Directed internal hops (`BypassCache`) are not counted.
 Blackhole, NOTIMP, and rate-limit **REFUSED** / **Drop**
 (`answered_by=UdpRateLimit`) **are** counted. `Drop` is a label only (no
 wire rcode): the query was ignored.

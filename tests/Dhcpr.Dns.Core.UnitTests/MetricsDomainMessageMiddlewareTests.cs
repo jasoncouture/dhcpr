@@ -131,6 +131,7 @@ public class MetricsDomainMessageMiddlewareTests
     {
         string? rcode = null;
         string? answeredBy = null;
+        string? source = null;
         using var listener = CreateListener((_, tags) =>
         {
             foreach (var tag in tags)
@@ -139,6 +140,8 @@ public class MetricsDomainMessageMiddlewareTests
                     rcode = tag.Value?.ToString();
                 if (tag.Key == "answered_by")
                     answeredBy = tag.Value?.ToString();
+                if (tag.Key == "source")
+                    source = tag.Value?.ToString();
             }
         });
 
@@ -156,13 +159,15 @@ public class MetricsDomainMessageMiddlewareTests
             new IPEndPoint(IPAddress.Loopback, 53),
             request)
         {
-            AnsweredBy = "UdpRateLimit"
+            AnsweredBy = "UdpRateLimit",
+            Source = DnsQuerySource.Udp
         };
 
         DnsMetrics.RecordQueries(queries, context, response);
 
         Assert.Equal(nameof(DomainResponseCode.Refused), rcode);
         Assert.Equal("UdpRateLimit", answeredBy);
+        Assert.Equal("UDP", source);
     }
 
     [Fact]

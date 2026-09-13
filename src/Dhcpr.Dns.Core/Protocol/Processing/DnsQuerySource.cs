@@ -23,4 +23,7 @@ public static class DnsQuerySourceExtensions
         DnsQuerySource.Doh => "DoH",
         _ => "—"
     };
+
+    public static string ToMetricLabel(this DnsQuerySource source)
+        => source is DnsQuerySource.Unknown ? "unknown" : source.ToLabel();
 }

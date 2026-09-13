@@ -160,6 +160,34 @@ public class DnsInstrumentationTests
     }
 
     [Fact]
+    public void RecordDurationTagsSource()
+    {
+        string? source = null;
+        using var meterListener = CreateDurationListener((_, tags) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "source")
+                    source = tag.Value?.ToString();
+            }
+        });
+        var histogram = CreateDurationHistogram();
+        var request = DomainMessage.CreateRequest("example.com");
+        var response = DomainMessage.CreateResponse(request);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 853),
+            request)
+        {
+            Source = DnsQuerySource.Dot
+        };
+
+        DnsInstrumentation.RecordDuration(histogram, context, response, TimeSpan.FromMilliseconds(25));
+
+        Assert.Equal("DoT", source);
+    }
+
+    [Fact]
     public async Task TracingDomainClientCreatesUpstreamSpan()
     {
         var started = new Started();
@@ -238,6 +266,10 @@ public class DnsInstrumentationTests
     }
 
     private static MeterListener CreateDurationListener(Action<double> onMeasurement)
+        => CreateDurationListener((measurement, _) => onMeasurement(measurement));
+
+    private static MeterListener CreateDurationListener(
+        Action<double, ReadOnlySpan<KeyValuePair<string, object?>>> onMeasurement)
     {
         var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, meterListener) =>
@@ -248,7 +280,8 @@ public class DnsInstrumentationTests
                 meterListener.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<double>((_, measurement, _, _) => onMeasurement(measurement));
+        listener.SetMeasurementEventCallback<double>((_, measurement, tags, _) =>
+            onMeasurement(measurement, tags));
         listener.Start();
         return listener;
     }

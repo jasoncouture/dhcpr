@@ -60,6 +60,7 @@ public static class DnsMetrics
             new("rcode", rcode),
             new("query_type", queryType),
             new("query_class", queryClass),
-            new("answered_by", context.AnsweredBy ?? "resolver")
+            new("answered_by", context.AnsweredBy ?? "resolver"),
+            new("source", context.Source.ToMetricLabel())
         ];
 }

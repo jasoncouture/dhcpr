@@ -114,7 +114,8 @@ public static class DnsInstrumentation
             new KeyValuePair<string, object?>("error", error),
             new KeyValuePair<string, object?>("rcode", rcode),
             new KeyValuePair<string, object?>("query_type", question?.Type.ToString("G") ?? "none"),
-            new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"));
+            new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"),
+            new KeyValuePair<string, object?>("source", context.Source.ToMetricLabel()));
     }
 
     private static void SetQuestionTags(Activity activity, DomainMessage message)

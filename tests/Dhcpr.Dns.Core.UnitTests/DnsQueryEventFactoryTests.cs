@@ -84,6 +84,13 @@ public class DnsQueryEventFactoryTests
     public void SourceLabel(DnsQuerySource source, string expected)
         => Assert.Equal(expected, source.ToLabel());
 
+    [Theory]
+    [InlineData(DnsQuerySource.Udp, "UDP")]
+    [InlineData(DnsQuerySource.Dot, "DoT")]
+    [InlineData(DnsQuerySource.Unknown, "unknown")]
+    public void SourceMetricLabel(DnsQuerySource source, string expected)
+        => Assert.Equal(expected, source.ToMetricLabel());
+
     [Fact]
     public async Task PublishesBlackholeAnsweredByLabel()
     {

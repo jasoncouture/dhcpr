@@ -66,6 +66,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
+        // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
+        services.Decorate<IDomainMessageMiddleware, AddressPrefetchMiddleware>();
         // Outside CNAME so chased assemblies still get RA (previously stamped before chase).
         services.Decorate<IDomainMessageMiddleware, RecursionAvailableMiddleware>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();

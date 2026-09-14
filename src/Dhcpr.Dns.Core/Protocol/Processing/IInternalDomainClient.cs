@@ -24,4 +24,13 @@ public interface IInternalDomainClient : IDomainClient
         DomainMessageContext parentContext,
         DomainMessage message,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Re-enter the pipeline to fill the A/AAAA sibling cache. Own DNSSEC
+    /// scope and work budget. Sets <see cref="DomainMessageContext.SuppressAddressPrefetch"/>.
+    /// </summary>
+    ValueTask<DomainMessage> SendPrefetchAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        CancellationToken cancellationToken);
 }

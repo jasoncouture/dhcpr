@@ -67,6 +67,12 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public bool BypassCache { get; init; }
 
     /// <summary>
+    /// Address-type prefetch hop. Must not schedule another A/AAAA prefetch
+    /// (A → AAAA → A would loop).
+    /// </summary>
+    public bool SuppressAddressPrefetch { get; init; }
+
+    /// <summary>
     /// Human-readable reason when the pipeline is about to return SERVFAIL.
     /// Surfaced by query logging at Error level.
     /// </summary>

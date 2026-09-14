@@ -25,9 +25,12 @@ Order (outermost first):
 8. **Shuffle** — A/AAAA answer order is rotated per query (including cache hits).
 9. **DNSSEC** — validate the assembled answer; may SERVFAIL (see below).
 10. **RA** — set Recursion Available on the response.
-11. **CNAME chase** — follow CNAMEs and assemble the final set.
-12. **Cache** — replay a previous answer unless the handler marked it uncacheable.
-13. **SERVFAIL retry** — one more pass on some failures.
+11. **A/AAAA prefetch** — after an external IN A or AAAA answer, resolve the
+    sibling type into cache. Internal and prefetch hops do not prefetch
+    (no A ⇄ AAAA loop).
+12. **CNAME chase** — follow CNAMEs and assemble the final set.
+13. **Cache** — replay a previous answer unless the handler marked it uncacheable.
+14. **SERVFAIL retry** — one more pass on some failures.
 
 Then the inner handlers, first match wins:
 

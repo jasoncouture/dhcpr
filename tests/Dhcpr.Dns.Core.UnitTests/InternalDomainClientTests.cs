@@ -117,6 +117,43 @@ public class InternalDomainClientTests
         Assert.Equal(0, queue.EnqueueCount);
     }
 
+    [Fact]
+    public async Task SendPrefetchAsync_UsesOwnScopeAndSetsSuppressAddressPrefetch()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue.Queue);
+        var parentScope = new DnssecScope();
+        var parentBudget = new QueryWorkBudget(limit: 0);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            InternalHopDepth = InternalDomainClient.MaxInternalHops,
+            DnssecScope = parentScope,
+            WorkBudget = parentBudget
+        };
+
+        var sendTask = client.SendPrefetchAsync(
+            parent,
+            DomainMessage.CreateRequest("example.com", DomainRecordType.AAAA),
+            CancellationToken.None).AsTask();
+
+        Assert.Equal(1, queue.EnqueueCount);
+        Assert.NotNull(queue.LastMessage);
+        Assert.True(queue.LastMessage!.Context.IsInternal);
+        Assert.True(queue.LastMessage.Context.SuppressAddressPrefetch);
+        Assert.Equal(1, queue.LastMessage.Context.InternalHopDepth);
+        Assert.NotSame(parentScope, queue.LastMessage.Context.DnssecScope);
+        Assert.NotSame(parentBudget, queue.LastMessage.Context.WorkBudget);
+        Assert.False(queue.LastMessage.Context.BypassCache);
+
+        queue.LastMessage.TaskCompletionSource.TrySetResult(
+            DomainMessage.CreateResponse(
+                queue.LastMessage.Context.DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.NoError));
+
+        await sendTask;
+    }
+
     private sealed class CountingQueue
     {
         public IMessageQueue<DnsPacketReceivedMessage> Queue { get; }

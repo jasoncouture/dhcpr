@@ -90,19 +90,25 @@ public class BindChaosMiddlewareTests
         await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task OtherChaosNamePassesThrough()
+    [Theory]
+    [InlineData("foo.bind")]
+    [InlineData("example.com")]
+    public async Task OtherChaosNamesAreLocalNxdomain(string qname)
     {
-        var request = DomainMessage.CreateRequest("foo.bind", DomainRecordType.TXT, DomainRecordClass.CH);
-        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
-        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
         var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest(qname, DomainRecordType.TXT, DomainRecordClass.CH);
+        var context = Context(request);
 
-        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Same(response, result);
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Empty(result.Records.Answers);
+        Assert.True(result.Flags.Authoritative);
+        Assert.Equal("bind-chaos", context.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     private static DomainMessageContext Context(DomainMessage request)

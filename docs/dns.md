@@ -10,10 +10,10 @@ Order (outermost first):
 
 1. **Log** — every answer is recorded for the live-query UI (`Via` column).
 2. **Metrics** — increments `dns.queries` (see [operations](operations.md)).
-3. **BIND CHAOS** — `version.bind` / `version.server` claim
-   `9.9.4-P2-RedHat-9.9.4-29.el7_2.3`; `hostname.bind` / `id.server` claim
-   `ns1`; `authors.bind` claims `Mark Andrews`. Class **CH** only. Bait,
-   not a real build. IN-class queries fall through.
+3. **BIND CHAOS** — class **CH** is never forwarded or recursed. The five
+   BIND identity names get bait TXT (`9.9.4-P2-RedHat-…` / `ns1` /
+   `Mark Andrews`); every other CH name is local **NXDOMAIN**. IN-class
+   queries fall through.
 4. **`resolver.arpa`** — served locally, never cached, never forwarded
    ([encrypted DNS](encrypted-dns.md)).
 5. **RFC 6303 empty reverse zones** — RFC1918 / link-local / ULA `in-addr.arpa`

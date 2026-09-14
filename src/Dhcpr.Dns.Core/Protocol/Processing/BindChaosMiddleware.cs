@@ -3,8 +3,8 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// BIND-style CHAOS identity names (RFC 4892). Answers look like a
-/// forgotten RHEL 7 BIND — bait, not a real version or hostname.
+/// Class CH is answered locally (never forwarded). BIND identity names
+/// (RFC 4892) look like a forgotten RHEL 7 BIND; other CH names are NXDOMAIN.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
@@ -44,16 +44,20 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         var question = context.DomainMessage.Questions[0];
-        if (question.Class is not DomainRecordClass.CH || !IsIdentityName(question.Name))
+        if (question.Class is not DomainRecordClass.CH)
             return await _inner.ProcessAsync(context, cancellationToken);
 
+        // CHAOS is local only — never forward or recurse (a "." route would
+        // otherwise send version.bind / random CH names upstream).
         context.AnsweredBy = "bind-chaos";
         context.DoNotCacheResponse = true;
         context.CacheHit = true;
 
-        var response = question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-            ? Txt(context.DomainMessage, TextFor(question.Name))
-            : Nodata(context.DomainMessage);
+        var response = !IsIdentityName(question.Name)
+            ? NxDomain(context.DomainMessage)
+            : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
+                ? Txt(context.DomainMessage, TextFor(question.Name))
+                : Nodata(context.DomainMessage);
 
         return response with
         {
@@ -96,4 +100,10 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             request,
             DomainResourceRecords.Empty,
             DomainResponseCode.NoError);
+
+    private static DomainMessage NxDomain(DomainMessage request)
+        => DomainMessage.CreateResponse(
+            request,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.NameError);
 }

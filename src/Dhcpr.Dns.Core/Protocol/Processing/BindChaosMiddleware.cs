@@ -3,8 +3,8 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Class CH is answered locally (never forwarded). BIND identity names
-/// (RFC 4892) look like a forgotten RHEL 7 BIND; other CH names are NXDOMAIN.
+/// Only class IN is forwarded or recursed. CH is answered locally (BIND
+/// identity bait or NXDOMAIN). Every other class is NOTIMP.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
@@ -44,29 +44,28 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         var question = context.DomainMessage.Questions[0];
-        if (question.Class is not DomainRecordClass.CH)
+        if (question.Class is DomainRecordClass.IN)
             return await _inner.ProcessAsync(context, cancellationToken);
 
-        // CHAOS is local only — never forward or recurse (a "." route would
-        // otherwise send version.bind / random CH names upstream).
-        context.AnsweredBy = "bind-chaos";
+        // Non-IN never leaves the process (a "." route would otherwise
+        // send CHAOS / Hesiod / QCLASS ANY upstream).
         context.DoNotCacheResponse = true;
         context.CacheHit = true;
 
+        if (question.Class is not DomainRecordClass.CH)
+        {
+            context.AnsweredBy = "query-class";
+            return Local(context.DomainMessage, DomainResponseCode.NotImplemented, authoritative: false);
+        }
+
+        context.AnsweredBy = "bind-chaos";
         var response = !IsIdentityName(question.Name)
             ? NxDomain(context.DomainMessage)
             : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
                 ? Txt(context.DomainMessage, TextFor(question.Name))
                 : Nodata(context.DomainMessage);
 
-        return response with
-        {
-            Flags = response.Flags with
-            {
-                Authoritative = true,
-                RecursionAvailable = true
-            }
-        };
+        return Local(response, response.Flags.ResponseCode, authoritative: true);
     }
 
     internal static bool IsIdentityName(DomainLabels name)
@@ -106,4 +105,24 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             request,
             DomainResourceRecords.Empty,
             DomainResponseCode.NameError);
+
+    private static DomainMessage Local(
+        DomainMessage message,
+        DomainResponseCode responseCode,
+        bool authoritative)
+    {
+        var response = message.Flags.Response
+            ? message
+            : DomainMessage.CreateResponse(message, DomainResourceRecords.Empty, responseCode);
+
+        return response with
+        {
+            Flags = response.Flags with
+            {
+                Authoritative = authoritative,
+                RecursionAvailable = true,
+                ResponseCode = responseCode
+            }
+        };
+    }
 }

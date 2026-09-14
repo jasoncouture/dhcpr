@@ -74,6 +74,31 @@ public class BindChaosMiddlewareTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(DomainRecordClass.HS)]
+    [InlineData(DomainRecordClass.CS)]
+    [InlineData(DomainRecordClass.Any)]
+    [InlineData(DomainRecordClass.None)]
+    [InlineData((DomainRecordClass)99)]
+    public async Task NonInternetNonChaosIsNotImplemented(DomainRecordClass @class)
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.TXT, @class);
+        var context = Context(request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NotImplemented, result!.Flags.ResponseCode);
+        Assert.False(result.Flags.Authoritative);
+        Assert.True(result.Flags.RecursionAvailable);
+        Assert.Empty(result.Records.Answers);
+        Assert.Equal("query-class", context.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task InternetClassPassesThrough()
     {

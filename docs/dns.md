@@ -10,10 +10,10 @@ Order (outermost first):
 
 1. **Log** — every answer is recorded for the live-query UI (`Via` column).
 2. **Metrics** — increments `dns.queries` (see [operations](operations.md)).
-3. **BIND CHAOS** — class **CH** is never forwarded or recursed. The five
+3. **Query class** — only **IN** is forwarded or recursed. Class **CH**:
    BIND identity names get bait TXT (`9.9.4-P2-RedHat-…` / `ns1` /
-   `Mark Andrews`); every other CH name is local **NXDOMAIN**. IN-class
-   queries fall through.
+   `Mark Andrews`); every other CH name is local **NXDOMAIN**. HS, CS,
+   QCLASS ANY, and unknown classes are **NOTIMP**.
 4. **`resolver.arpa`** — served locally, never cached, never forwarded
    ([encrypted DNS](encrypted-dns.md)).
 5. **RFC 6303 empty reverse zones** — RFC1918 / link-local / ULA `in-addr.arpa`

@@ -79,6 +79,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
         // RFC 9462: resolver.arpa is locally served (never cached or forwarded).
         services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
+        // BIND CHAOS identity names — joke TXT, no version leak (outside cache/DNSSEC).
+        services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.

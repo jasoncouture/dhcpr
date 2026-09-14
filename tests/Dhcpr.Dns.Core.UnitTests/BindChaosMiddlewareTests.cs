@@ -1,0 +1,113 @@
+using System.Net;
+
+using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.RecordData;
+
+using NSubstitute;
+
+namespace Dhcpr.Dns.Core.UnitTests;
+
+public class BindChaosMiddlewareTests
+{
+    [Theory]
+    [InlineData("version.bind")]
+    [InlineData("hostname.bind")]
+    [InlineData("authors.bind")]
+    [InlineData("id.server")]
+    [InlineData("version.server")]
+    [InlineData("VERSION.BIND")]
+    public async Task ChaosTxtReturnsJoke(string qname)
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest(qname, DomainRecordType.TXT, DomainRecordClass.CH);
+        var context = Context(request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.True(result.Flags.Authoritative);
+        Assert.True(result.Flags.RecursionAvailable);
+        Assert.False(result.Flags.Authentic);
+        var answer = Assert.Single(result.Records.Answers);
+        Assert.Equal(DomainRecordType.TXT, answer.Type);
+        Assert.Equal(DomainRecordClass.CH, answer.Class);
+        Assert.Equal(TimeSpan.Zero, answer.TimeToLive);
+        var text = Assert.IsType<TextData>(answer.Data);
+        Assert.Equal(BindChaosMiddleware.AnswerText, text.Text);
+        Assert.Equal("bind-chaos", context.AnsweredBy);
+        Assert.True(context.DoNotCacheResponse);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChaosAnyReturnsJokeTxt()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("id.server", DomainRecordType.ANY, DomainRecordClass.CH);
+
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var answer = Assert.Single(result!.Records.Answers);
+        Assert.Equal(DomainRecordType.TXT, answer.Type);
+        Assert.Equal(BindChaosMiddleware.AnswerText, Assert.IsType<TextData>(answer.Data).Text);
+    }
+
+    [Fact]
+    public async Task ChaosOtherTypeIsNodata()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("version.bind", DomainRecordType.A, DomainRecordClass.CH);
+
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
+        Assert.Empty(result.Records.Answers);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InternetClassPassesThrough()
+    {
+        var request = DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+        var middleware = new BindChaosMiddleware(inner);
+
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+
+        Assert.Same(response, result);
+        await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OtherChaosNamePassesThrough()
+    {
+        var request = DomainMessage.CreateRequest("foo.bind", DomainRecordType.TXT, DomainRecordClass.CH);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+        var middleware = new BindChaosMiddleware(inner);
+
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
+
+        Assert.Same(response, result);
+    }
+
+    private static DomainMessageContext Context(DomainMessage request)
+        => new(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+}

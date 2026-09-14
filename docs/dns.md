@@ -10,20 +10,23 @@ Order (outermost first):
 
 1. **Log** — every answer is recorded for the live-query UI (`Via` column).
 2. **Metrics** — increments `dns.queries` (see [operations](operations.md)).
-3. **`resolver.arpa`** — served locally, never cached, never forwarded
+3. **BIND CHAOS** — `version.bind`, `hostname.bind`, `authors.bind`,
+   `id.server`, and `version.server` in class **CH** get a local TXT
+   (`sorry, we're not running bind, nice try.`). IN-class queries fall through.
+4. **`resolver.arpa`** — served locally, never cached, never forwarded
    ([encrypted DNS](encrypted-dns.md)).
-4. **RFC 6303 empty reverse zones** — RFC1918 / link-local / ULA `in-addr.arpa`
+5. **RFC 6303 empty reverse zones** — RFC1918 / link-local / ULA `in-addr.arpa`
    and `ip6.arpa` names are NXDOMAIN locally (no public leak, no DNSSEC
    SERVFAIL). A loaded zone, overlay record, or specific forwarder route still
    wins.
-5. **Blackhole** — configured suffixes return **NXDOMAIN**.
-6. **Unsupported QTYPE** — `ANY` (255) and other unknown types return **NOTIMP**.
-7. **Shuffle** — A/AAAA answer order is rotated per query (including cache hits).
-8. **DNSSEC** — validate the assembled answer; may SERVFAIL (see below).
-9. **RA** — set Recursion Available on the response.
-10. **CNAME chase** — follow CNAMEs and assemble the final set.
-11. **Cache** — replay a previous answer unless the handler marked it uncacheable.
-12. **SERVFAIL retry** — one more pass on some failures.
+6. **Blackhole** — configured suffixes return **NXDOMAIN**.
+7. **Unsupported QTYPE** — `ANY` (255) and other unknown types return **NOTIMP**.
+8. **Shuffle** — A/AAAA answer order is rotated per query (including cache hits).
+9. **DNSSEC** — validate the assembled answer; may SERVFAIL (see below).
+10. **RA** — set Recursion Available on the response.
+11. **CNAME chase** — follow CNAMEs and assemble the final set.
+12. **Cache** — replay a previous answer unless the handler marked it uncacheable.
+13. **SERVFAIL retry** — one more pass on some failures.
 
 Then the inner handlers, first match wins:
 

@@ -3,12 +3,18 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// BIND-style CHAOS identity names (RFC 4892). Same joke TXT for every
-/// well-known name — no version, hostname, or instance id.
+/// BIND-style CHAOS identity names (RFC 4892). Answers look like a
+/// forgotten RHEL 7 BIND — bait, not a real version or hostname.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
-    public const string AnswerText = "sorry, we're not running bind, nice try.";
+    /// <summary>CVE-2016-2776 and friends. Scanners love this RPM string.</summary>
+    public const string VersionText = "9.9.4-P2-RedHat-9.9.4-29.el7_2.3";
+
+    public const string HostnameText = "ns1";
+
+    public const string AuthorsText = "Mark Andrews";
+
     internal static readonly TimeSpan Ttl = TimeSpan.Zero;
 
     private static readonly HashSet<string> IdentityNames = new(StringComparer.OrdinalIgnoreCase)
@@ -46,7 +52,7 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
         context.CacheHit = true;
 
         var response = question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-            ? Txt(context.DomainMessage)
+            ? Txt(context.DomainMessage, TextFor(question.Name))
             : Nodata(context.DomainMessage);
 
         return response with
@@ -62,7 +68,16 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
     internal static bool IsIdentityName(DomainLabels name)
         => IdentityNames.Contains(name.ToString());
 
-    private static DomainMessage Txt(DomainMessage request)
+    internal static string TextFor(DomainLabels name)
+        => name.ToString().ToLowerInvariant() switch
+        {
+            "version.bind" or "version.server" => VersionText,
+            "hostname.bind" or "id.server" => HostnameText,
+            "authors.bind" => AuthorsText,
+            _ => VersionText
+        };
+
+    private static DomainMessage Txt(DomainMessage request, string text)
         => DomainMessage.CreateResponse(
             request,
             answers:
@@ -72,7 +87,7 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
                     DomainRecordType.TXT,
                     DomainRecordClass.CH,
                     Ttl,
-                    new TextData(AnswerText))
+                    new TextData(text))
             ],
             responseCode: DomainResponseCode.NoError);
 

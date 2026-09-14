@@ -11,13 +11,13 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class BindChaosMiddlewareTests
 {
     [Theory]
-    [InlineData("version.bind")]
-    [InlineData("hostname.bind")]
-    [InlineData("authors.bind")]
-    [InlineData("id.server")]
-    [InlineData("version.server")]
-    [InlineData("VERSION.BIND")]
-    public async Task ChaosTxtReturnsJoke(string qname)
+    [InlineData("version.bind", BindChaosMiddleware.VersionText)]
+    [InlineData("version.server", BindChaosMiddleware.VersionText)]
+    [InlineData("VERSION.BIND", BindChaosMiddleware.VersionText)]
+    [InlineData("hostname.bind", BindChaosMiddleware.HostnameText)]
+    [InlineData("id.server", BindChaosMiddleware.HostnameText)]
+    [InlineData("authors.bind", BindChaosMiddleware.AuthorsText)]
+    public async Task ChaosTxtLooksLikeBind(string qname, string expected)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new BindChaosMiddleware(inner);
@@ -36,7 +36,7 @@ public class BindChaosMiddlewareTests
         Assert.Equal(DomainRecordClass.CH, answer.Class);
         Assert.Equal(TimeSpan.Zero, answer.TimeToLive);
         var text = Assert.IsType<TextData>(answer.Data);
-        Assert.Equal(BindChaosMiddleware.AnswerText, text.Text);
+        Assert.Equal(expected, text.Text);
         Assert.Equal("bind-chaos", context.AnsweredBy);
         Assert.True(context.DoNotCacheResponse);
         await inner.DidNotReceiveWithAnyArgs()
@@ -44,7 +44,7 @@ public class BindChaosMiddlewareTests
     }
 
     [Fact]
-    public async Task ChaosAnyReturnsJokeTxt()
+    public async Task ChaosAnyReturnsHostnameTxt()
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new BindChaosMiddleware(inner);
@@ -55,7 +55,7 @@ public class BindChaosMiddlewareTests
         Assert.NotNull(result);
         var answer = Assert.Single(result!.Records.Answers);
         Assert.Equal(DomainRecordType.TXT, answer.Type);
-        Assert.Equal(BindChaosMiddleware.AnswerText, Assert.IsType<TextData>(answer.Data).Text);
+        Assert.Equal(BindChaosMiddleware.HostnameText, Assert.IsType<TextData>(answer.Data).Text);
     }
 
     [Fact]

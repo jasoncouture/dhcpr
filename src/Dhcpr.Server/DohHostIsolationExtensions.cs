@@ -13,16 +13,21 @@ public static class DohHostIsolationExtensions
     {
         app.Use(static async (context, next) =>
         {
-            if (DohHostIsolation.IsDnsQueryPath(context.Request.Path))
+            var dns = context.RequestServices.GetRequiredService<IOptionsMonitor<DnsConfiguration>>().CurrentValue;
+            if (!dns.DnsOverHttp.IsolateHost)
             {
                 await next();
                 return;
             }
 
-            var dns = context.RequestServices.GetRequiredService<IOptionsMonitor<DnsConfiguration>>().CurrentValue;
             var tls = context.RequestServices.GetRequiredService<IOptionsMonitor<TlsConfiguration>>().CurrentValue;
-            var hosts = DohHostIsolation.AdvertisedHosts(dns, tls, TryLoadCertificate(context, dns, tls));
-            if (hosts.Count == 0 || !DohHostIsolation.HostMatches(context.Request.Host, hosts))
+            var certificate = TryLoadCertificate(context, dns, tls);
+            if (!DohHostIsolation.ShouldReturnNotFound(
+                    context.Request.Path,
+                    context.Request.Host,
+                    dns,
+                    tls,
+                    certificate))
             {
                 await next();
                 return;

@@ -210,6 +210,7 @@ makes the process **Unhealthy**. Kubernetes probes hit this path.
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `MaxRequestBytes` | `65535` | Max POST body or GET-decoded wire size (1–65535) |
+| `IsolateHost` | `true` | Advertised DoH hostname 404s every path except `/dns-query`. Set `false` to serve the operator UI on the same name. |
 
 ## `TLS`
 
@@ -222,7 +223,7 @@ cert paths are ignored.
 | `Listeners` | empty | `IP` or `IP:port` (default port **853**) |
 | `CertificatePath` | | PEM cert (required if enabled) |
 | `PrivateKeyPath` | | PEM key (required if enabled) |
-| `HttpsPort` | `443` | Kestrel HTTPS (DoH). Files need not exist at validation time. The advertised DoH hostname 404s every path except `/dns-query`. |
+| `HttpsPort` | `443` | Kestrel HTTPS (DoH). Files need not exist at validation time. When `DNS:DOH:IsolateHost` is true, the advertised DoH hostname 404s every path except `/dns-query`. |
 
 TLS 1.2/1.3, ALPN `dot` advertised on 853. No client certificates. The same PEM
 is used for Kestrel HTTPS. Cert files are re-read when mtime changes (no

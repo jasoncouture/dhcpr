@@ -6,7 +6,7 @@
 |------|----------|------|
 | 8080 | TCP HTTP | UI (dev/proxy), `/health`, `/metrics`, `/dns-query`, DynDNS. Always on in the image |
 | 53 | UDP/TCP | Classic DNS |
-| 443 | TCP TLS | DoH when `TLS:Enabled` / `secureDns`. UI is 404 on the DoH hostname. |
+| 443 | TCP TLS | DoH when `TLS:Enabled` / `secureDns`. UI is 404 on the DoH hostname unless `DNS:DOH:IsolateHost` is false. |
 | 853 | TCP TLS | DNS-over-TLS |
 | 67 | UDP | DHCP (only if `Dhcp:Enabled`) |
 | 11111 / 30000 | TCP | Orleans silo / gateway (cluster-internal) |

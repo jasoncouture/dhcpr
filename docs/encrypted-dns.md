@@ -33,9 +33,10 @@ Probes and `/metrics` stay on **8080**. Clients use **443** for DoH (or
 whatever `HttpsPort` / `secureDns.dohPort` is).
 
 The DoH hostname (configured `DNS:DesignatedResolvers` targets, else the
-certificate SAN/CN) answers **only** `/dns-query`. Any other path on that
-`Host` is **404**, including the operator UI. Serve the UI on a different
-name (or on 8080).
+certificate SAN/CN) answers **only** `/dns-query` when `DNS:DOH:IsolateHost`
+is true (the default). Any other path on that `Host` is **404**, including
+the operator UI. Serve the UI on a different name (or on 8080), or set
+`DNS__DOH__IsolateHost=false` to allow the UI on the same hostname.
 
 ## DNS-over-TLS (853)
 

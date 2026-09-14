@@ -13,6 +13,27 @@ public static class DohHostIsolation
                out var rest)
            && (string.IsNullOrEmpty(rest.Value) || rest.Value == "/");
 
+    /// <summary>
+    /// True when this request must 404: isolation is on, the Host is a DoH
+    /// name, and the path is not <c>/dns-query</c>.
+    /// </summary>
+    public static bool ShouldReturnNotFound(
+        PathString path,
+        HostString requestHost,
+        DnsConfiguration dns,
+        TlsConfiguration tls,
+        X509Certificate2? certificate)
+    {
+        if (!dns.DnsOverHttp.IsolateHost)
+            return false;
+
+        if (IsDnsQueryPath(path))
+            return false;
+
+        var hosts = AdvertisedHosts(dns, tls, certificate);
+        return hosts.Count > 0 && HostMatches(requestHost, hosts);
+    }
+
     public static bool HostMatches(HostString requestHost, IReadOnlyList<string> dohHosts)
     {
         var host = Normalize(requestHost.Host);

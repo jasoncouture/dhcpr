@@ -60,4 +60,38 @@ public class DohHostIsolationTests
 
         Assert.Empty(DohHostIsolation.AdvertisedHosts(dns, tls, certificate: null));
     }
+
+    [Fact]
+    public void ShouldReturnNotFoundOnAdvertisedHostForOtherPaths()
+    {
+        var dns = DohDns("dns.example.com");
+        var tls = new TlsConfiguration { Enabled = true };
+
+        Assert.True(DohHostIsolation.ShouldReturnNotFound(
+            "/", new HostString("dns.example.com"), dns, tls, certificate: null));
+        Assert.False(DohHostIsolation.ShouldReturnNotFound(
+            "/dns-query", new HostString("dns.example.com"), dns, tls, certificate: null));
+        Assert.False(DohHostIsolation.ShouldReturnNotFound(
+            "/", new HostString("ui.example.com"), dns, tls, certificate: null));
+    }
+
+    [Fact]
+    public void IsolateHostFalseNeverReturnsNotFound()
+    {
+        var dns = DohDns("dns.example.com");
+        dns.DnsOverHttp.IsolateHost = false;
+        var tls = new TlsConfiguration { Enabled = true };
+
+        Assert.False(DohHostIsolation.ShouldReturnNotFound(
+            "/", new HostString("dns.example.com"), dns, tls, certificate: null));
+        Assert.False(DohHostIsolation.ShouldReturnNotFound(
+            "/orleans", new HostString("dns.example.com"), dns, tls, certificate: null));
+    }
+
+    private static DnsConfiguration DohDns(string target)
+        => new()
+        {
+            ListenAddresses = ["udp://127.0.0.1:53"],
+            DesignatedResolvers = [new DesignatedResolverConfiguration { Target = target }]
+        };
 }

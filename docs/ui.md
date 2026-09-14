@@ -1,8 +1,10 @@
 # Operator UI
 
 Blazor Server app. DNS, DoH, DynDNS, `/health`, and `/metrics` never require
-login. The DoH hostname does **not** serve this UI — those requests 404
-except `/dns-query`. Use a different `Host` (or HTTP 8080).
+login. The DoH hostname does **not** serve this UI when
+`DNS:DOH:IsolateHost` is true (default) — those requests 404 except
+`/dns-query`. Use a different `Host` (or HTTP 8080), or set
+`DNS__DOH__IsolateHost=false`.
 
 `Authentication:Enabled` defaults to **false**. The UI is then open (live
 queries, settings, Orleans). Sign-in routes are not registered.

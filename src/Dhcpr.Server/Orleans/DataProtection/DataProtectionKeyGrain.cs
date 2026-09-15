@@ -11,8 +11,11 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
 
     private readonly List<string> _elements = [];
 
-    public Task<IReadOnlyList<string>> GetAllAsync()
-        => Task.FromResult<IReadOnlyList<string>>(_elements.ToArray());
+    public async Task<IReadOnlyList<string>> GetAllAsync()
+    {
+        await Task.Yield();
+        return _elements.ToArray();
+    }
 
     public async Task StoreAsync(string elementXml, string? friendlyName)
     {

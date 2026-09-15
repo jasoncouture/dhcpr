@@ -12,7 +12,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class ReferralWalkerGlueTests
 {
     [Fact]
-    public async Task StopsAfterOneNsNameWhenAAndAaaaSucceed()
+    public async Task AlwaysResolvesTwoNsNamesWhenAvailable()
     {
         var queries = new List<string>();
         var walker = new ReferralWalker(Client(queries, _ =>
@@ -24,9 +24,11 @@ public class ReferralWalkerGlueTests
             names,
             CancellationToken.None);
 
-        Assert.Equal(2, addresses.Count);
-        Assert.Equal(2, queries.Count);
-        Assert.Single(queries.Select(q => q.Split('/')[0]).Distinct(StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(4, addresses.Count);
+        Assert.Equal(ReferralWalker.MaxGlueNamesPerCut * 2, queries.Count);
+        Assert.Equal(
+            ReferralWalker.MaxGlueNamesPerCut,
+            queries.Select(q => q.Split('/')[0]).Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]

@@ -14,13 +14,10 @@ public sealed class ReferralWalker : IReferralWalker
 {
     /// <summary>
     /// Out-of-bailiwick cuts (pool.ntp.org → 9× ntpns.org) used to A+AAAA
-    /// every NS at once. Two names is enough to seed a race; the rest wait
-    /// until this cut actually needs another peer.
+    /// every NS at once. Always resolve two names so a single dead NS does
+    /// not empty the race; the rest wait until this cut needs another peer.
     /// </summary>
     public const int MaxGlueNamesPerCut = 2;
-
-    /// <summary>Stop resolving more NS names once we have this many addresses.</summary>
-    public const int EnoughGlueAddresses = 2;
 
     private readonly IInternalDomainClient _internalClient;
 
@@ -175,27 +172,21 @@ public sealed class ReferralWalker : IReferralWalker
             var names = nsNames.Count <= 1
                 ? nsNames
                 : nsNames.OrderBy(_ => Random.Shared.Next()).ToArray();
-            var addresses = new List<IPAddress>();
-            var tried = 0;
-            foreach (var name in names)
+            var selected = names.Count <= MaxGlueNamesPerCut
+                ? names
+                : names.Take(MaxGlueNamesPerCut).ToArray();
+            var owners = selected.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var responses = await Task.WhenAll(selected.SelectMany(name => new[]
             {
-                if (tried >= MaxGlueNamesPerCut)
-                    break;
-                tried++;
-
-                var responses = await Task.WhenAll(
-                    ResolveNsAddressAsync(context, name, DomainRecordType.A, cancellationToken),
-                    ResolveNsAddressAsync(context, name, DomainRecordType.AAAA, cancellationToken));
-                var owners = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name };
-                foreach (var nextMessage in responses)
-                {
-                    if (nextMessage is null)
-                        continue;
-                    addresses.AddRange(GetGlueAddresses(nextMessage.Records, owners));
-                }
-
-                if (addresses.Count >= EnoughGlueAddresses)
-                    break;
+                ResolveNsAddressAsync(context, name, DomainRecordType.A, cancellationToken),
+                ResolveNsAddressAsync(context, name, DomainRecordType.AAAA, cancellationToken)
+            }));
+            var addresses = new List<IPAddress>();
+            foreach (var nextMessage in responses)
+            {
+                if (nextMessage is null)
+                    continue;
+                addresses.AddRange(GetGlueAddresses(nextMessage.Records, owners));
             }
 
             return addresses;

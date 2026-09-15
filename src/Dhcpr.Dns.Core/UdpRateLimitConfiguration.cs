@@ -13,12 +13,12 @@ public sealed class UdpRateLimitConfiguration : IValidateSelf
     public bool Enabled { get; set; } = true;
 
     /// <summary>Queries per partition that still get a real answer.</summary>
-    public int RefuseLimit { get; set; } = 10;
+    public int RefuseLimit { get; set; } = 30;
 
     /// <summary>
     /// Queries per partition that still get <c>REFUSED</c>. Above this, no reply.
     /// </summary>
-    public int DropLimit { get; set; } = 20;
+    public int DropLimit { get; set; } = 60;
 
     /// <summary>Sliding window length.</summary>
     public int WindowMilliseconds { get; set; } = 1000;

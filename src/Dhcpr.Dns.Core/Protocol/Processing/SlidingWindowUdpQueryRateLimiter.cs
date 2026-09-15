@@ -53,7 +53,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
             .Record();
 
         var question = Classify(questionCount, limit.RefuseLimit, limit.DropLimit);
-        // Same rate as RefuseLimit, measured over the longer window (10/s × 5s = 50).
+        // Same rate as RefuseLimit, measured over the longer window (30/s × 5s = 150).
         // At or above that rate is abuse: drop, no REFUSED band.
         var ipBudget = limit.RefuseLimit * IpLimitMultiplier;
         var ip = ipCount < ipBudget ? UdpRateLimitAction.Allow : UdpRateLimitAction.Drop;

@@ -169,12 +169,12 @@ limited.
 
 Per **client + QNAME + QTYPE** (1 s / 10 segments):
 
-1. Up to **RefuseLimit** (10) — answered normally
-2. Up to **DropLimit** (20) — **REFUSED** (policy reject, no recursion)
+1. Up to **RefuseLimit** (30) — answered normally
+2. Up to **DropLimit** (60) — **REFUSED** (policy reject, no recursion)
 3. Above that — **no reply**
 
 Per **client IP** (IPv4 address or IPv6 `/64`), a **5 s** window at the
-same rate as RefuseLimit (**10/s**, so 50 queries per 5 s). At or above
+same rate as RefuseLimit (**30/s**, so 150 queries per 5 s). At or above
 that is abuse: **no reply**.
 
 Loopback is not limited. UDP and TCP from the same client share a bucket.

@@ -13,7 +13,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class UpstreamQueryMiddlewareTests
 {
     [Fact]
-    public async Task OpeningRaceIsAtMostTwoNameservers()
+    public async Task OpeningRaceIsAtMostMaxParallelNameservers()
     {
         var batchSizes = new List<int>();
         var answer = IPAddress.Parse("9.9.9.9");
@@ -63,7 +63,7 @@ public class UpstreamQueryMiddlewareTests
 
         var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
         var request = DomainMessage.CreateRequest("example.com");
-        // Opening race is two peers; remaining batches still reach the good one.
+        // Opening race is four peers; remaining batches still reach the good one.
         var context = new DomainMessageContext(null, null, request)
         {
             UpstreamEndpoints = ImmutableArray.Create(unreachable1, unreachable2, unreachable3, reachable)

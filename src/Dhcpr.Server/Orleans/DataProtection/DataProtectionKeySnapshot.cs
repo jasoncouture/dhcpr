@@ -13,18 +13,17 @@ internal static class DataProtectionKeySnapshot
     private static ImmutableHashSet<string> _xml = [];
     private static XElement[] _elements = [];
 
-    public static ImmutableHashSet<string> Copy() => Volatile.Read(ref _xml);
+    public static ImmutableHashSet<string> Copy() => _xml;
 
-    public static IReadOnlyCollection<XElement> Get() => Volatile.Read(ref _elements);
+    public static IReadOnlyCollection<XElement> Get() => _elements;
 
     public static void Replace(IEnumerable<string> xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
         lock (Gate)
         {
-            var set = xml.ToImmutableHashSet();
-            Volatile.Write(ref _xml, set);
-            Volatile.Write(ref _elements, Parse(set));
+            _xml = xml.ToImmutableHashSet();
+            _elements = Parse(_xml);
         }
     }
 
@@ -33,8 +32,8 @@ internal static class DataProtectionKeySnapshot
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
         lock (Gate)
         {
-            Volatile.Write(ref _xml, _xml.Add(elementXml));
-            Volatile.Write(ref _elements, Parse(_xml));
+            _xml = _xml.Add(elementXml);
+            _elements = Parse(_xml);
         }
     }
 
@@ -42,8 +41,8 @@ internal static class DataProtectionKeySnapshot
     {
         lock (Gate)
         {
-            Volatile.Write(ref _xml, []);
-            Volatile.Write(ref _elements, []);
+            _xml = [];
+            _elements = [];
         }
     }
 

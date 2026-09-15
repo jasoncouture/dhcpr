@@ -1,25 +1,31 @@
+using System.Collections.Immutable;
 using System.Xml.Linq;
 
 namespace Dhcpr.Server.Orleans.DataProtection;
 
 /// <summary>
 /// Silo-local key ring. Writes allocate; reads return the current
-/// arrays without cloning or parsing.
+/// set and parsed elements without cloning.
 /// </summary>
 internal static class DataProtectionKeySnapshot
 {
     private static readonly object Gate = new();
-    private static readonly State Empty = new([], []);
-    private static State _state = Empty;
+    private static ImmutableHashSet<string> _xml = [];
+    private static XElement[] _elements = [];
 
-    public static string[] Copy() => Volatile.Read(ref _state).Xml;
+    public static ImmutableHashSet<string> Copy() => Volatile.Read(ref _xml);
 
-    public static IReadOnlyCollection<XElement> Get() => Volatile.Read(ref _state).Elements;
+    public static IReadOnlyCollection<XElement> Get() => Volatile.Read(ref _elements);
 
     public static void Replace(IEnumerable<string> xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
-        Volatile.Write(ref _state, FromXml(xml));
+        lock (Gate)
+        {
+            var set = xml.ToImmutableHashSet();
+            Volatile.Write(ref _xml, set);
+            Volatile.Write(ref _elements, Parse(set));
+        }
     }
 
     public static void Add(string elementXml)
@@ -27,36 +33,26 @@ internal static class DataProtectionKeySnapshot
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
         lock (Gate)
         {
-            var current = _state;
-            if (Array.IndexOf(current.Xml, elementXml) >= 0)
-                return;
-            Volatile.Write(ref _state, current.Append(elementXml));
+            Volatile.Write(ref _xml, _xml.Add(elementXml));
+            Volatile.Write(ref _elements, Parse(_xml));
         }
     }
 
-    internal static void Clear() => Volatile.Write(ref _state, Empty);
-
-    private static State FromXml(IEnumerable<string> xml)
+    internal static void Clear()
     {
-        var strings = xml as string[] ?? [.. xml];
-        var elements = new XElement[strings.Length];
-        for (var i = 0; i < strings.Length; i++)
-            elements[i] = XElement.Parse(strings[i]);
-        return new State(strings, elements);
-    }
-
-    private sealed record State(string[] Xml, XElement[] Elements)
-    {
-        public State Append(string elementXml)
+        lock (Gate)
         {
-            var xml = new string[Xml.Length + 1];
-            Xml.CopyTo(xml, 0);
-            xml[^1] = elementXml;
-
-            var elements = new XElement[Elements.Length + 1];
-            Elements.CopyTo(elements, 0);
-            elements[^1] = XElement.Parse(elementXml);
-            return new State(xml, elements);
+            Volatile.Write(ref _xml, []);
+            Volatile.Write(ref _elements, []);
         }
+    }
+
+    private static XElement[] Parse(ImmutableHashSet<string> xml)
+    {
+        var elements = new XElement[xml.Count];
+        var i = 0;
+        foreach (var item in xml)
+            elements[i++] = XElement.Parse(item);
+        return elements;
     }
 }

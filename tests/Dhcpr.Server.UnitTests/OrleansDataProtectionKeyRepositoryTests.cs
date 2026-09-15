@@ -34,8 +34,8 @@ public class OrleansDataProtectionKeyRepositoryTests
         var elements = repository.GetAllElements();
 
         Assert.Equal(2, elements.Count);
-        Assert.Equal("a", elements.ElementAt(0).Attribute("id")?.Value);
-        Assert.Equal("b", elements.ElementAt(1).Attribute("id")?.Value);
+        Assert.Contains(elements, static e => e.Attribute("id")?.Value == "a");
+        Assert.Contains(elements, static e => e.Attribute("id")?.Value == "b");
         grain.DidNotReceive().GetAllAsync();
     }
 

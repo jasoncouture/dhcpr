@@ -13,6 +13,7 @@
         <TieredPGO>true</TieredPGO>
         <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
         <PublishReadyToRun>true</PublishReadyToRun>
+        <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
         <NoWarn>$(NoWarn);SYSLIB1100;SYSLIB1101</NoWarn>
     </PropertyGroup>
 

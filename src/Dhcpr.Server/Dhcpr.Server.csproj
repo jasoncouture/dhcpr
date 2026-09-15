@@ -12,6 +12,7 @@
         <ThreadPoolMaxThreads>1024</ThreadPoolMaxThreads>
         <TieredPGO>true</TieredPGO>
         <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+        <PublishReadyToRun>true</PublishReadyToRun>
         <NoWarn>$(NoWarn);SYSLIB1100;SYSLIB1101</NoWarn>
     </PropertyGroup>
 

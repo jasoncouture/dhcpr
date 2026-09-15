@@ -14,10 +14,10 @@ public sealed class ReferralWalker : IReferralWalker
 {
     /// <summary>
     /// Out-of-bailiwick cuts (pool.ntp.org → 9× ntpns.org) used to A+AAAA
-    /// every NS at once. Always resolve two names so a single dead NS does
-    /// not empty the race; the rest wait until this cut needs another peer.
+    /// every NS at once. Four names so a couple of dead NS do not empty the
+    /// race; the rest wait until this cut needs another peer.
     /// </summary>
-    public const int MaxGlueNamesPerCut = 2;
+    public const int MaxGlueNamesPerCut = 4;
 
     private readonly IInternalDomainClient _internalClient;
 

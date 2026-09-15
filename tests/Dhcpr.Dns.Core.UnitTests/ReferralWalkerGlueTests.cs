@@ -12,7 +12,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class ReferralWalkerGlueTests
 {
     [Fact]
-    public async Task AlwaysResolvesTwoNsNamesWhenAvailable()
+    public async Task AlwaysResolvesMaxGlueNamesWhenAvailable()
     {
         var queries = new List<string>();
         var walker = new ReferralWalker(Client(queries, _ =>
@@ -24,7 +24,7 @@ public class ReferralWalkerGlueTests
             names,
             CancellationToken.None);
 
-        Assert.Equal(4, addresses.Count);
+        Assert.Equal(ReferralWalker.MaxGlueNamesPerCut * 2, addresses.Count);
         Assert.Equal(ReferralWalker.MaxGlueNamesPerCut * 2, queries.Count);
         Assert.Equal(
             ReferralWalker.MaxGlueNamesPerCut,

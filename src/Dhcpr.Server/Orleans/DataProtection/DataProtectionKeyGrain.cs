@@ -76,14 +76,12 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
         return copy;
     }
 
-    private void Merge(IReadOnlyList<string>? knownKeys)
+    private void Merge(IEnumerable<string>? knownKeys)
     {
-        if (knownKeys is null || knownKeys.Count == 0)
-            return;
-        foreach (var xml in knownKeys)
+        knownKeys ??= [];
+        foreach (var xml in knownKeys.Where(i => !string.IsNullOrWhiteSpace(i)))
         {
-            if (!string.IsNullOrWhiteSpace(xml))
-                _elements.Add(xml);
+            _elements.Add(xml);
         }
     }
 }

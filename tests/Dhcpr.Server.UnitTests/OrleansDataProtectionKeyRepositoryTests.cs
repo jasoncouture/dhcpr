@@ -53,7 +53,7 @@ public class OrleansDataProtectionKeyRepositoryTests
         grain.Received(1).StoreAsync(
             Arg.Is<string>(xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'")),
             "key-c");
-        Assert.Contains(DataProtectionKeySnapshot.Copy(), xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'"));
+        Assert.Contains(DataProtectionKeySnapshot.Get(), xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'"));
     }
 }
 

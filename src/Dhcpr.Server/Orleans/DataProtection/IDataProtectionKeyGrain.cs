@@ -4,7 +4,7 @@ public interface IDataProtectionKeyGrain : IGrainWithIntegerKey
 {
     Task SubscribeAsync(
         IDataProtectionKeyObserver observer,
-        IReadOnlyList<string> knownKeys,
+        IEnumerable<string> knownKeys,
         CancellationToken cancellationToken);
 
     Task UnsubscribeAsync(IDataProtectionKeyObserver observer, CancellationToken cancellationToken);

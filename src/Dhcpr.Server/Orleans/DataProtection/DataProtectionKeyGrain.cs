@@ -25,12 +25,12 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        Merge(DataProtectionKeySnapshot.Copy());
+        Merge(DataProtectionKeySnapshot.Get());
     }
 
     public async Task SubscribeAsync(
         IDataProtectionKeyObserver observer,
-        IReadOnlyList<string> knownKeys,
+        IEnumerable<string> knownKeys,
         CancellationToken cancellationToken)
     {
         await Task.Yield();
@@ -66,12 +66,6 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     private async Task PublishAsync()
     {
         await _observers.Notify(observer => observer.OnKeysAsync(_elements, CancellationToken.None));
-    }
-
-    private string[] PersistLocal()
-    {
-        DataProtectionKeySnapshot.Replace(_elements);
-        return [.. _elements];
     }
 
     private void Merge(IEnumerable<string>? knownKeys)

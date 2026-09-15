@@ -69,6 +69,7 @@ public class InternalDomainClient : IInternalDomainClient
             // QNAME+QTYPE would replay a parent referral when we later ask the child
             // the same NS/SOA/DNSKEY question (google.com NS → no ANSWER, no AD).
             BypassCache = parentContext.BypassCache || directed,
+            Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext()
         };
 

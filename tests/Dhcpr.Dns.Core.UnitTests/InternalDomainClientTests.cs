@@ -76,7 +76,8 @@ public class InternalDomainClientTests
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
             InternalHopDepth = 3,
-            WorkBudget = budget
+            WorkBudget = budget,
+            Source = DnsQuerySource.Doh
         };
 
         var sendTask = client.SendAsync(
@@ -87,6 +88,7 @@ public class InternalDomainClientTests
         Assert.Equal(1, queue.EnqueueCount);
         Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
         Assert.False(queue.LastMessage.Context.BypassCache);
+        Assert.Equal(DnsQuerySource.Doh, queue.LastMessage.Context.Source);
         Assert.False(budget.TryConsume());
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(

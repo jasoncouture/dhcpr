@@ -64,7 +64,8 @@ Meter `Dhcpr.Dns`.
 | `source` | `UDP`, `TCP`, `DoT`, `DoH` |
 
 `dns.query.duration` uses `cache_hit`, `error`, `rcode`, `query_type`,
-`answered_by`, `source`. Directed internal hops (`BypassCache`) are not counted.
+`answered_by`, `source`. Internal hops and directed `BypassCache` hops are
+not counted (DS/DNSKEY/glue/CNAME used to inflate `source=unknown`).
 Blackhole, NOTIMP, and rate-limit **REFUSED** / **Drop**
 (`answered_by=UdpRateLimit`) **are** counted. `Drop` is a label only (no
 wire rcode): the query was ignored.

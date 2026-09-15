@@ -51,7 +51,7 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
-    public async Task CountsInternalAnswers()
+    public async Task DoesNotCountInternalAnswers()
     {
         long observed = 0;
         using var listener = CreateListener(measurement => observed += measurement);
@@ -64,12 +64,13 @@ public class MetricsDomainMessageMiddlewareTests
             new IPEndPoint(IPAddress.Loopback, 53),
             request)
         {
-            IsInternal = true
+            IsInternal = true,
+            Source = DnsQuerySource.Udp
         };
 
         await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Equal(1, observed);
+        Assert.Equal(0, observed);
     }
 
     [Fact]

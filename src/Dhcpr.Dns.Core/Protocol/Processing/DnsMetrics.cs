@@ -32,7 +32,7 @@ public static class DnsMetrics
         string rcode,
         bool error)
     {
-        if (context.BypassCache)
+        if (context.IsInternal || context.BypassCache)
             return;
 
         if (context.DomainMessage.Questions.IsDefaultOrEmpty)

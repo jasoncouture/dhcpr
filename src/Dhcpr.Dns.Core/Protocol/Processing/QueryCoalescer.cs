@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net;
-using System.Text;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -56,28 +55,6 @@ public sealed class QueryCoalescer
     public static string Key(DomainMessage message, ImmutableArray<IPEndPoint> endpoints)
     {
         var question = message.Questions[0];
-        var builder = new StringBuilder();
-        builder.Append((int)question.Class);
-        builder.Append('/');
-        builder.Append((int)question.Type);
-        builder.Append('/');
-        builder.Append(question.Name);
-        if (endpoints.IsDefaultOrEmpty)
-            return builder.ToString();
-
-        builder.Append('/');
-        var ordered = endpoints
-            .Select(static e => e.ToString())
-            .Order(StringComparer.Ordinal);
-        var first = true;
-        foreach (var endpoint in ordered)
-        {
-            if (!first)
-                builder.Append(',');
-            builder.Append(endpoint);
-            first = false;
-        }
-
-        return builder.ToString();
+        return $"{question.Class:D}/{question.Type:D}/{question.Name}/{string.Join(",", endpoints.Select(static e => e.ToString()).Order(StringComparer.Ordinal))}";
     }
 }

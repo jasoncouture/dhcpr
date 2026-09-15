@@ -41,10 +41,10 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         _udpRateLimiter = udpRateLimiter;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
         var meter = meterFactory.Create(DnsMetrics.MeterName);
-        _duration = meter.CreateHistogram<double>(
+        _duration = DnsMetrics.CreateDurationHistogram(
+            meter,
             DnsMetrics.DurationInstrumentName,
-            unit: "s",
-            description: "DNS query processing duration");
+            "DNS query processing duration");
         _queries = meter.CreateCounter<long>(
             DnsMetrics.QueriesInstrumentName,
             unit: "{query}",

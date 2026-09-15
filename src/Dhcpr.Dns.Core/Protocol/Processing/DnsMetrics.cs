@@ -10,6 +10,29 @@ public static class DnsMetrics
     public const string UpstreamQueriesInstrumentName = "dns.upstream.queries";
     public const string UpstreamDurationInstrumentName = "dns.upstream.duration";
 
+    /// <summary>
+    /// Second-scale buckets. The SDK default (5, 10, 25, …) is meant for
+    /// milliseconds — with unit <c>s</c> every real miss lands in <c>le="5"</c>
+    /// and <c>histogram_quantile</c> interpolates a multi-second p50.
+    /// </summary>
+    public static readonly double[] DurationSecondsBuckets =
+    [
+        0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+    ];
+
+    public static Histogram<double> CreateDurationHistogram(
+        Meter meter,
+        string name,
+        string description)
+        => meter.CreateHistogram<double>(
+            name,
+            unit: "s",
+            description,
+            advice: new InstrumentAdvice<double>
+            {
+                HistogramBucketBoundaries = DurationSecondsBuckets
+            });
+
     /// <summary>Synthetic rcode for a rate-limit ignore (no wire reply).</summary>
     public const string DropRcode = "Drop";
 

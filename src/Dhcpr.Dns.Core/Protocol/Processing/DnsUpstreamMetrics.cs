@@ -14,10 +14,10 @@ public sealed class DnsUpstreamMetrics
     public DnsUpstreamMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create(DnsMetrics.MeterName);
-        _duration = meter.CreateHistogram<double>(
+        _duration = DnsMetrics.CreateDurationHistogram(
+            meter,
             DnsMetrics.UpstreamDurationInstrumentName,
-            unit: "s",
-            description: "Outbound DNS nameserver query duration");
+            "Outbound DNS nameserver query duration");
         _queries = meter.CreateCounter<long>(
             DnsMetrics.UpstreamQueriesInstrumentName,
             unit: "{query}",

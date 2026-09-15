@@ -18,6 +18,12 @@ public static class OpenTelemetryServiceCollectionExtensions
             {
                 metrics.AddMeter(DnsMetrics.MeterName);
                 metrics.AddMeter(DhcpInstrumentation.MeterName);
+                var durationBuckets = new ExplicitBucketHistogramConfiguration
+                {
+                    Boundaries = DnsMetrics.DurationSecondsBuckets
+                };
+                metrics.AddView(DnsMetrics.DurationInstrumentName, durationBuckets);
+                metrics.AddView(DnsMetrics.UpstreamDurationInstrumentName, durationBuckets);
                 metrics.AddAspNetCoreInstrumentation();
                 metrics.AddHttpClientInstrumentation();
                 metrics.AddRuntimeInstrumentation();

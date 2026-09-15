@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 
 using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.UnitTests;
@@ -46,6 +47,36 @@ public class EdnsCookieTests
         var applied = EdnsCookie.Apply(request, response);
         var cookie = Assert.Single(CookieOptions(applied));
         Assert.Equal(clientCookie, cookie.Data);
+    }
+
+    [Fact]
+    public void CaptureReadsCookieOnce()
+    {
+        var cookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8);
+        var context = new DomainMessageContext(
+            null,
+            null,
+            WithOptCookie(DomainMessage.CreateRequest("example.com", DomainRecordType.A), cookie));
+
+        EdnsCookie.Capture(context);
+        Assert.True(context.ClientCookieCaptured);
+        Assert.Equal(cookie, context.ClientCookie);
+
+        context.ClientCookie = ImmutableArray.Create<byte>(9, 9, 9, 9, 9, 9, 9, 9);
+        EdnsCookie.Capture(context);
+        Assert.Equal(ImmutableArray.Create<byte>(9, 9, 9, 9, 9, 9, 9, 9), context.ClientCookie);
+    }
+
+    [Fact]
+    public void ApplyUsesCapturedCookieWithoutRereadingRequest()
+    {
+        var cookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8);
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+
+        var applied = EdnsCookie.Apply(cookie, response);
+        var echoed = Assert.Single(CookieOptions(applied));
+        Assert.Equal(cookie, echoed.Data);
     }
 
     [Fact]

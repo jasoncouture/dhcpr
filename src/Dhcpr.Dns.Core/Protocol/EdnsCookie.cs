@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 
+using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol;
@@ -13,8 +14,20 @@ public static class EdnsCookie
     public const ushort OptionCode = 10;
     public const int ClientCookieLength = 8;
 
+    public static void Capture(DomainMessageContext context)
+    {
+        if (context.ClientCookieCaptured)
+            return;
+
+        context.ClientCookie = TryGetClientCookie(context.DomainMessage);
+        context.ClientCookieCaptured = true;
+    }
+
     public static DomainMessage Apply(DomainMessage request, DomainMessage response)
-        => ReplaceCookie(response, TryGetClientCookie(request));
+        => Apply(TryGetClientCookie(request), response);
+
+    public static DomainMessage Apply(ImmutableArray<byte>? clientCookie, DomainMessage response)
+        => ReplaceCookie(response, clientCookie);
 
     public static ImmutableArray<byte>? TryGetClientCookie(DomainMessage message)
     {

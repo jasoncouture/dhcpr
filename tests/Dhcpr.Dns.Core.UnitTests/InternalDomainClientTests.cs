@@ -41,7 +41,9 @@ public class InternalDomainClientTests
         {
             InternalHopDepth = 3,
             WorkBudget = budget,
-            NameserverTips = tips
+            NameserverTips = tips,
+            ClientCookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8),
+            ClientCookieCaptured = true
         };
 
         var sendTask = client.SendAsync(
@@ -56,6 +58,8 @@ public class InternalDomainClientTests
         Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
         Assert.Same(tips, queue.LastMessage.Context.NameserverTips);
         Assert.True(queue.LastMessage.Context.BypassCache);
+        Assert.True(queue.LastMessage.Context.ClientCookieCaptured);
+        Assert.Equal(parent.ClientCookie, queue.LastMessage.Context.ClientCookie);
         Assert.True(budget.TryConsume());
 
         queue.LastMessage.TaskCompletionSource.TrySetResult(

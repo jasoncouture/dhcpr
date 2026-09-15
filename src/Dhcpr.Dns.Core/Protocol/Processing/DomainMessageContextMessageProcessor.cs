@@ -54,6 +54,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
         var awaitable = message as IAwaitableDnsRequest;
+        EdnsCookie.Capture(message.Context);
         using var activity = DnsInstrumentation.StartQuery(message);
         var started = Stopwatch.GetTimestamp();
         DomainMessage? response = null;
@@ -108,7 +109,8 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                 response = response with { Id = message.Context.DomainMessage.Id };
             }
 
-            response = EdnsCookie.Apply(message.Context.DomainMessage, response);
+            if (!message.Context.IsInternal)
+                response = EdnsCookie.Apply(message.Context.ClientCookie, response);
 
             // Publish once per external client answer (UDP/TCP/DoH), independent of decorate order.
             await DnsQueryEventFactory.PublishAnswersAsync(

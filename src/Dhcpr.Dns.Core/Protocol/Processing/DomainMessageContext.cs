@@ -94,4 +94,17 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// UDP, TCP, DoT, or DoH for the originating client query.
     /// </summary>
     public DnsQuerySource Source { get; init; }
+
+    /// <summary>
+    /// RFC 7873 client cookie from the originating query. Captured once at
+    /// pipeline entry and copied onto internal hops so CNAME/cache chains do
+    /// not walk OPT again.
+    /// </summary>
+    public ImmutableArray<byte>? ClientCookie { get; set; }
+
+    /// <summary>
+    /// True after <see cref="ClientCookie"/> has been read from the query (or
+    /// copied from the parent hop). Distinguishes "not looked up" from "no cookie".
+    /// </summary>
+    public bool ClientCookieCaptured { get; set; }
 }

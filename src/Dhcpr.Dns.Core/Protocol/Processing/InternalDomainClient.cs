@@ -70,7 +70,9 @@ public class InternalDomainClient : IInternalDomainClient
             // the same NS/SOA/DNSKEY question (google.com NS → no ANSWER, no AD).
             BypassCache = parentContext.BypassCache || directed,
             Source = parentContext.Source,
-            ParentTraceContext = DnsInstrumentation.CaptureContext()
+            ParentTraceContext = DnsInstrumentation.CaptureContext(),
+            ClientCookie = parentContext.ClientCookie,
+            ClientCookieCaptured = parentContext.ClientCookieCaptured
         };
 
         return await EnqueueAsync(context, cancellationToken);
@@ -93,7 +95,9 @@ public class InternalDomainClient : IInternalDomainClient
             NameserverTips = parentContext.NameserverTips ?? new NameserverTipCache(),
             SuppressAddressPrefetch = true,
             Source = parentContext.Source,
-            ParentTraceContext = DnsInstrumentation.CaptureContext()
+            ParentTraceContext = DnsInstrumentation.CaptureContext(),
+            ClientCookie = parentContext.ClientCookie,
+            ClientCookieCaptured = parentContext.ClientCookieCaptured
         };
 
         return await EnqueueAsync(context, cancellationToken);

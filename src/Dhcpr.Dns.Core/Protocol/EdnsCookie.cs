@@ -16,11 +16,11 @@ public static class EdnsCookie
 
     public static void Capture(DomainMessageContext context)
     {
-        if (context.ClientCookieCaptured)
+        // Internal hops already carry the parent's cookie (including null).
+        if (context.IsInternal)
             return;
 
         context.ClientCookie = TryGetClientCookie(context.DomainMessage);
-        context.ClientCookieCaptured = true;
     }
 
     public static DomainMessage Apply(DomainMessage request, DomainMessage response)
@@ -75,6 +75,9 @@ public static class EdnsCookie
 
     private static DomainMessage ReplaceCookie(DomainMessage response, ImmutableArray<byte>? clientCookie)
     {
+        if (clientCookie is not { Length: >= ClientCookieLength } cookie)
+            return response;
+
         var additional = response.Records.Additional;
         var optIndex = -1;
         for (var i = 0; i < additional.Length; i++)
@@ -88,15 +91,12 @@ public static class EdnsCookie
 
         if (optIndex < 0)
         {
-            if (clientCookie is null)
-                return response;
-
             var opt = new DomainResourceRecord(
                 DomainLabels.Empty,
                 DomainRecordType.OPT,
                 (DomainRecordClass)1232,
                 TimeSpan.Zero,
-                new OptionData(ImmutableArray.Create(new EdnsOption(OptionCode, clientCookie.Value))));
+                new OptionData(ImmutableArray.Create(new EdnsOption(OptionCode, cookie))));
             return response with
             {
                 Records = response.Records with { Additional = additional.Add(opt) }
@@ -106,13 +106,7 @@ public static class EdnsCookie
         var existingOpt = additional[optIndex];
         var existing = existingOpt.Data as OptionData ?? new OptionData(ImmutableArray<EdnsOption>.Empty);
         var kept = existing.Options.Where(static o => o.Code != OptionCode).ToImmutableArray();
-        if (clientCookie is { } cookie)
-            kept = kept.Add(new EdnsOption(OptionCode, cookie));
-
-        if (kept.Length == existing.Options.Length &&
-            clientCookie is null &&
-            existing.Options.All(static o => o.Code != OptionCode))
-            return response;
+        kept = kept.Add(new EdnsOption(OptionCode, cookie));
 
         var additionalBuilder = additional.ToBuilder();
         additionalBuilder[optIndex] = existingOpt with { Data = new OptionData(kept) };

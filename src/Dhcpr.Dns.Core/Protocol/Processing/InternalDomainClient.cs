@@ -71,8 +71,7 @@ public class InternalDomainClient : IInternalDomainClient
             BypassCache = parentContext.BypassCache || directed,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
-            ClientCookie = parentContext.ClientCookie,
-            ClientCookieCaptured = parentContext.ClientCookieCaptured
+            ClientCookie = parentContext.ClientCookie
         };
 
         return await EnqueueAsync(context, cancellationToken);
@@ -96,8 +95,7 @@ public class InternalDomainClient : IInternalDomainClient
             SuppressAddressPrefetch = true,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
-            ClientCookie = parentContext.ClientCookie,
-            ClientCookieCaptured = parentContext.ClientCookieCaptured
+            ClientCookie = parentContext.ClientCookie
         };
 
         return await EnqueueAsync(context, cancellationToken);

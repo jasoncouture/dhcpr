@@ -25,7 +25,7 @@ public class EdnsCookieTests
     }
 
     [Fact]
-    public void ApplyStripsCookieWhenRequestHasNone()
+    public void ApplyLeavesResponseAloneWhenCookieIsNull()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(
@@ -33,8 +33,8 @@ public class EdnsCookieTests
             additional: [OptWithCookie(ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8))],
             responseCode: DomainResponseCode.NoError);
 
-        var applied = EdnsCookie.Apply(request, response);
-        Assert.Empty(CookieOptions(applied));
+        var applied = EdnsCookie.Apply((ImmutableArray<byte>?)null, response);
+        Assert.Same(response, applied);
     }
 
     [Fact]
@@ -50,6 +50,18 @@ public class EdnsCookieTests
     }
 
     [Fact]
+    public void CaptureSetsNullWhenRequestHasNoCookie()
+    {
+        var context = new DomainMessageContext(
+            null,
+            null,
+            DomainMessage.CreateRequest("example.com", DomainRecordType.A));
+
+        EdnsCookie.Capture(context);
+        Assert.Null(context.ClientCookie);
+    }
+
+    [Fact]
     public void CaptureReadsCookieOnce()
     {
         var cookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8);
@@ -59,12 +71,15 @@ public class EdnsCookieTests
             WithOptCookie(DomainMessage.CreateRequest("example.com", DomainRecordType.A), cookie));
 
         EdnsCookie.Capture(context);
-        Assert.True(context.ClientCookieCaptured);
         Assert.Equal(cookie, context.ClientCookie);
 
-        context.ClientCookie = ImmutableArray.Create<byte>(9, 9, 9, 9, 9, 9, 9, 9);
-        EdnsCookie.Capture(context);
-        Assert.Equal(ImmutableArray.Create<byte>(9, 9, 9, 9, 9, 9, 9, 9), context.ClientCookie);
+        var internalContext = context with
+        {
+            IsInternal = true,
+            ClientCookie = null
+        };
+        EdnsCookie.Capture(internalContext);
+        Assert.Null(internalContext.ClientCookie);
     }
 
     [Fact]

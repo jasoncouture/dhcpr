@@ -9,10 +9,9 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 {
-    // Dual-stack NS plus amazonaws/ELB liars: a batch of 3 often has no honest
-    // peer, so the next batch waits out a 250ms UDP timeout. 8 fits a typical
-    // 4-name × A/AAAA cut in one race; first NOERROR wins.
-    private const int MaxParallelNameservers = 8;
+    // Dual-stack NS plus amazonaws/ELB liars: a wide opening race creates a
+    // span per loser. Two at a time; remaining peers are the next batch.
+    public const int MaxParallelNameservers = 2;
 
     private readonly IDomainClientFactory _clientFactory;
     private readonly IEdnsProtocolService _ednsProtocolService;

@@ -13,6 +13,36 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class UpstreamQueryMiddlewareTests
 {
     [Fact]
+    public async Task OpeningRaceIsAtMostTwoNameservers()
+    {
+        var batchSizes = new List<int>();
+        var answer = IPAddress.Parse("9.9.9.9");
+        var factory = Substitute.For<IDomainClientFactory>();
+        factory.GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var options = callInfo.ArgAt<IEnumerable<DomainClientOptions>>(0).ToArray();
+                batchSizes.Add(options.Length);
+                var clients = options.Select(o => CreateClient(o.EndPoint, [], answer)).ToArray();
+                return new ValueTask<IDomainClient>(new DomainClientParallelWrapper(clients));
+            });
+
+        var endpoints = Enumerable.Range(1, 8)
+            .Select(i => new IPEndPoint(IPAddress.Parse($"192.0.2.{i}"), 53))
+            .ToImmutableArray();
+        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var request = DomainMessage.CreateRequest("example.com");
+        var context = new DomainMessageContext(null, null, request)
+        {
+            UpstreamEndpoints = endpoints
+        };
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Equal(UpstreamQueryMiddleware.MaxParallelNameservers, Assert.Single(batchSizes));
+    }
+
+    [Fact]
     public async Task TransportFailureOnFirstBatchTriesRemainingEndpoints()
     {
         var unreachable1 = new IPEndPoint(IPAddress.Parse("2001:db8::1"), 53);
@@ -33,7 +63,7 @@ public class UpstreamQueryMiddlewareTests
 
         var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
         var request = DomainMessage.CreateRequest("example.com");
-        // First opening race (up to 8) includes the reachable peer.
+        // Opening race is two peers; remaining batches still reach the good one.
         var context = new DomainMessageContext(null, null, request)
         {
             UpstreamEndpoints = ImmutableArray.Create(unreachable1, unreachable2, unreachable3, reachable)

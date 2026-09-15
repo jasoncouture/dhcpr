@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 using Dhcpr.Core;
@@ -13,6 +12,16 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 public sealed class ReferralWalker : IReferralWalker
 {
+    /// <summary>
+    /// Out-of-bailiwick cuts (pool.ntp.org → 9× ntpns.org) used to A+AAAA
+    /// every NS at once. Two names is enough to seed a race; the rest wait
+    /// until this cut actually needs another peer.
+    /// </summary>
+    public const int MaxGlueNamesPerCut = 2;
+
+    /// <summary>Stop resolving more NS names once we have this many addresses.</summary>
+    public const int EnoughGlueAddresses = 2;
+
     private readonly IInternalDomainClient _internalClient;
 
     public ReferralWalker(IInternalDomainClient internalClient)
@@ -163,27 +172,30 @@ public sealed class ReferralWalker : IReferralWalker
             context.DnssecScope?.PushIgnoreStatus();
         try
         {
-            using var nameserverQueries = nsNames
-                .SelectMany([SuppressMessage("ReSharper", "AccessToDisposedClosure")] (name) =>
-                    new[]
-                    {
-                        _internalClient
-                            .SendAsync(context, DomainMessage.CreateRequest(name, DomainRecordType.A),
-                                cancellationToken).AsTask(),
-                        _internalClient
-                            .SendAsync(context, DomainMessage.CreateRequest(name, DomainRecordType.AAAA),
-                                cancellationToken).AsTask()
-                    })
-                .Select(i => i.OperationCancelledToNull().ConvertExceptionsToNull())
-                .ToPooledList();
-
-            var responses = await Task.WhenAll(nameserverQueries);
-            var nsNameSet = nsNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var names = nsNames.Count <= 1
+                ? nsNames
+                : nsNames.OrderBy(_ => Random.Shared.Next()).ToArray();
             var addresses = new List<IPAddress>();
-            foreach (var nextMessage in responses)
+            var tried = 0;
+            foreach (var name in names)
             {
-                if (nextMessage is null) continue;
-                addresses.AddRange(GetGlueAddresses(nextMessage.Records, nsNameSet));
+                if (tried >= MaxGlueNamesPerCut)
+                    break;
+                tried++;
+
+                var responses = await Task.WhenAll(
+                    ResolveNsAddressAsync(context, name, DomainRecordType.A, cancellationToken),
+                    ResolveNsAddressAsync(context, name, DomainRecordType.AAAA, cancellationToken));
+                var owners = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name };
+                foreach (var nextMessage in responses)
+                {
+                    if (nextMessage is null)
+                        continue;
+                    addresses.AddRange(GetGlueAddresses(nextMessage.Records, owners));
+                }
+
+                if (addresses.Count >= EnoughGlueAddresses)
+                    break;
             }
 
             return addresses;
@@ -194,6 +206,17 @@ public sealed class ReferralWalker : IReferralWalker
                 context.DnssecScope?.PopIgnoreStatus();
         }
     }
+
+    private async Task<DomainMessage?> ResolveNsAddressAsync(
+        DomainMessageContext context,
+        string name,
+        DomainRecordType type,
+        CancellationToken cancellationToken)
+        => await _internalClient
+            .SendAsync(context, DomainMessage.CreateRequest(name, type), cancellationToken)
+            .AsTask()
+            .OperationCancelledToNull()
+            .ConvertExceptionsToNull();
 
     public IEnumerable<string> GetNameserverNames(IEnumerable<DomainResourceRecord> records)
     {

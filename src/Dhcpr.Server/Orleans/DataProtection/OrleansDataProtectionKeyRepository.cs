@@ -19,13 +19,7 @@ public sealed class OrleansDataProtectionKeyRepository : IXmlRepository
     }
 
     public IReadOnlyCollection<XElement> GetAllElements()
-    {
-        var xml = DataProtectionKeySnapshot.Copy();
-        var elements = new List<XElement>(xml.Length);
-        foreach (var item in xml)
-            elements.Add(XElement.Parse(item));
-        return elements;
-    }
+        => DataProtectionKeySnapshot.Get();
 
     public void StoreElement(XElement element, string friendlyName)
     {

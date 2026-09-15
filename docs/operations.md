@@ -50,6 +50,8 @@ Meter `Dhcpr.Dns`.
 |------------|------|------|
 | `dns.queries` (counter) | `{query}` | Client-facing answers |
 | `dns.query.duration` (histogram) | `s` | Same queries as `dns.queries` |
+| `dns.upstream.queries` (counter) | `{query}` | Outbound nameserver queries |
+| `dns.upstream.duration` (histogram) | `s` | Same hops as `dns.upstream.queries` |
 
 `dns.queries` labels:
 
@@ -69,6 +71,22 @@ not counted (DS/DNSKEY/glue/CNAME used to inflate `source=unknown`).
 Blackhole, NOTIMP, and rate-limit **REFUSED** / **Drop**
 (`answered_by=UdpRateLimit`) **are** counted. `Drop` is a label only (no
 wire rcode): the query was ignored.
+
+`dns.upstream.*` is one sample per outbound UDP/TCP nameserver query
+(including directed zone-cut hops). Labels:
+
+| Label | Values |
+|-------|--------|
+| `network.transport` | `udp` / `tcp` |
+| `error` | true on timeout or other exception (not a race cancel) |
+| `cancelled` | true when the parallel NS race cancels a loser |
+| `rcode` | wire rcode on success; `none` on cancel/throw |
+| `query_type` | `A`, `NS`, `DNSKEY`, `DS`, … |
+
+No peer address or QNAME (cardinality). Hops per miss:
+`rate(dns_upstream_queries_total) / rate(dns_queries_total{cache_hit="false"})`.
+A high `query_type=NS` rate on a warm cache means recursion is still
+walking from the root.
 
 ### DHCP
 

@@ -7,9 +7,14 @@ public static class DnsMetrics
     public const string MeterName = "Dhcpr.Dns";
     public const string QueriesInstrumentName = "dns.queries";
     public const string DurationInstrumentName = "dns.query.duration";
+    public const string UpstreamQueriesInstrumentName = "dns.upstream.queries";
+    public const string UpstreamDurationInstrumentName = "dns.upstream.duration";
 
     /// <summary>Synthetic rcode for a rate-limit ignore (no wire reply).</summary>
     public const string DropRcode = "Drop";
+
+    /// <summary>Synthetic rcode when an upstream hop is cancelled or throws.</summary>
+    public const string NoneRcode = "none";
 
     /// <summary>
     /// Increments <c>dns.queries</c> with the same tags as

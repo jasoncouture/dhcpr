@@ -73,7 +73,9 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
         // re-verify and load DNSKEY/DS into scope without a network fetch for the answer.
         await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
 
-        if (!context.CacheHit && !context.DoNotCacheResponse)
+        // BypassCache hops (health checks, directed NS) never Set. Publishing a
+        // status update would fan out a cache event for an entry we did not write.
+        if (!context.CacheHit && !context.DoNotCacheResponse && !context.BypassCache)
             _cache.UpdateSecurityStatus(context.DomainMessage, context.DnssecScope.Status);
 
         var after = context.DnssecScope.Status;

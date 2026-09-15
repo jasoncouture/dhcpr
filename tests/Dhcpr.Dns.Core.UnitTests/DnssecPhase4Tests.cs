@@ -214,6 +214,89 @@ public class DnssecPhase4Tests
     }
 
     [Fact]
+    public async Task Middleware_BypassCacheDoesNotUpdateSecurityStatus()
+    {
+        var cache = Substitute.For<IDnsResponseCache>();
+        var request = DomainMessage.CreateRequest("health.example");
+        var response = DomainMessage.CreateResponse(
+            request,
+            answers:
+            [
+                new DomainResourceRecord(
+                    new DomainLabels("health.example"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(60),
+                    new IPAddressData(IPAddress.Parse("192.0.2.80")))
+            ],
+            responseCode: DomainResponseCode.NoError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(response);
+
+        var options = Monitor(new DnsConfiguration());
+        var validator = new DnssecMessageValidator(
+            new DnssecValidator(NullLogger<DnssecValidator>.Instance, options),
+            NoopInternalClient(),
+            options,
+            NullLogger<DnssecMessageValidator>.Instance);
+        var dnssec = new DnssecValidationMiddleware(
+            inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
+
+        var context = new DomainMessageContext(null, null, request)
+        {
+            BypassCache = true,
+            DnssecScope = new DnssecScope()
+        };
+
+        await dnssec.ProcessAsync(context, CancellationToken.None);
+
+        cache.DidNotReceive()
+            .UpdateSecurityStatus(Arg.Any<DomainMessage>(), Arg.Any<DnssecValidationStatus>());
+    }
+
+    [Fact]
+    public async Task Middleware_MissUpdatesSecurityStatus()
+    {
+        var cache = Substitute.For<IDnsResponseCache>();
+        var request = DomainMessage.CreateRequest("miss.example");
+        var response = DomainMessage.CreateResponse(
+            request,
+            answers:
+            [
+                new DomainResourceRecord(
+                    new DomainLabels("miss.example"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(60),
+                    new IPAddressData(IPAddress.Parse("192.0.2.81")))
+            ],
+            responseCode: DomainResponseCode.NoError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(response);
+
+        var options = Monitor(new DnsConfiguration());
+        var validator = new DnssecMessageValidator(
+            new DnssecValidator(NullLogger<DnssecValidator>.Instance, options),
+            NoopInternalClient(),
+            options,
+            NullLogger<DnssecMessageValidator>.Instance);
+        var dnssec = new DnssecValidationMiddleware(
+            inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
+
+        var context = new DomainMessageContext(null, null, request)
+        {
+            DnssecScope = new DnssecScope()
+        };
+
+        await dnssec.ProcessAsync(context, CancellationToken.None);
+
+        cache.Received(1)
+            .UpdateSecurityStatus(request, Arg.Any<DnssecValidationStatus>());
+    }
+
+    [Fact]
     public async Task Cname_PreservesCoveringRrsigs()
     {
         var (dnsKey, privateKey) = CreateEcdsaDnsKey("example.com");

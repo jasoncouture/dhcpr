@@ -14,10 +14,10 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     public Task<IReadOnlyList<string>> GetAllAsync()
         => Task.FromResult<IReadOnlyList<string>>(_elements.ToArray());
 
-    public Task StoreAsync(string elementXml, string? friendlyName)
+    public async Task StoreAsync(string elementXml, string? friendlyName)
     {
+        await Task.Yield();
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
         _elements.Add(elementXml);
-        return Task.CompletedTask;
     }
 }

@@ -50,7 +50,7 @@ Add more with `env` / `envFrom`. Do not add `tls://` here.
 `persistence.size` (default 1Gi), `storageClassName`, `accessMode`
 (default **ReadWriteMany**). Use RWX if `replicaCount > 1` so
 `settings.json`, zones, DynDNS, and cache are shared. Cookie keys are an
-Orleans grain, not the PVC.
+Orleans grain plus a silo-local push cache, not the PVC.
 
 ## Probes
 

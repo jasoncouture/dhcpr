@@ -38,8 +38,10 @@ and ULA (`10/8`, `172.16/12`, `192.168/16`, `127/8`, `::1`, `fc00::/7`).
 
 Blazor circuits need **sticky sessions** if you run more than one replica
 (Helm `httpRoute.sticky` is a Traefik cookie). Data Protection keys live in
-an in-memory Orleans grain (shared while that activation is alive; a new
-activation mints a new ring and existing cookies die).
+an in-memory Orleans grain. Each silo keeps the last ring it was pushed;
+cookie encrypt/decrypt reads that copy. A new grain activation on a silo
+that already saw the ring bootstraps from it. A cluster-wide empty restart
+mints a new ring and existing cookies die.
 
 ## Live queries (`/`)
 

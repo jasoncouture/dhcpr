@@ -24,7 +24,7 @@ Under that directory:
 |------|----------|
 | `settings.json` | UI-saved settings |
 | `dynamic-dns.json` | DynDNS host → address map |
-| `dataprotection-keys/` | Unused. Cookie keys are an in-memory Orleans grain |
+| `dataprotection-keys/` | Unused. Cookie keys are an Orleans grain plus a silo-local push cache |
 | `cache/` | `root.zone`, `root-servers.txt` |
 | `zones/` | Authoritative zone files |
 

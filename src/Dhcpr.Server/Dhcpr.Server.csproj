@@ -19,6 +19,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Dhcpr.Server.UnitTests" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="KubernetesClient" Version="19.0.2" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.11" />
       <PackageReference Include="Microsoft.Orleans.Clustering.Consul" Version="10.2.2" />

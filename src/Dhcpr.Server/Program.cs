@@ -62,6 +62,7 @@ builder.Services.Replace(ServiceDescriptor.Singleton<IDnsCacheEventPublisher, Or
 builder.Services.AddHostedService(static sp =>
     (OrleansDnsCacheEventPublisher)sp.GetRequiredService<IDnsCacheEventPublisher>());
 builder.Services.AddHostedService<DnsCacheOrleansBridge>();
+builder.Services.AddHostedService<DataProtectionKeyOrleansBridge>();
 builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();
 builder.Services.AddHostedService(static sp =>
     (LiveQueryStore)sp.GetRequiredService<ILiveQueryStore>());

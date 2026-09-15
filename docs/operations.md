@@ -101,7 +101,7 @@ dropped. Query names are PII on a public resolver.
 {DataPath}/
   settings.json              # UI-saved DNS + DynDNS knobs
   dynamic-dns.json           # DynDNS address map
-  dataprotection-keys/       # unused (cookie keys are an Orleans grain)
+  dataprotection-keys/       # unused (cookie keys are an Orleans grain + silo cache)
   cache/
     root-servers.txt
     root.zone

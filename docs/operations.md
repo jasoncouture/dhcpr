@@ -101,7 +101,7 @@ dropped. Query names are PII on a public resolver.
 {DataPath}/
   settings.json              # UI-saved DNS + DynDNS knobs
   dynamic-dns.json           # DynDNS address map
-  dataprotection-keys/       # cookie encryption — share across replicas
+  dataprotection-keys/       # unused (cookie keys are an Orleans grain)
   cache/
     root-servers.txt
     root.zone
@@ -109,8 +109,8 @@ dropped. Query names are PII on a public resolver.
     **/*.bind                # authoritative zones
 ```
 
-Back up `settings.json`, `dynamic-dns.json`, `zones/`, and
-`dataprotection-keys/`. `cache/` is rebuilt from InterNIC on the next start
+Back up `settings.json`, `dynamic-dns.json`, and `zones/`. Cookie keys
+are not on disk. `cache/` is rebuilt from InterNIC on the next start
 if `Addresses` is empty (the `Download` flag is unused).
 
 ## Logging

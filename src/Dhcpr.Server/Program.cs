@@ -11,6 +11,8 @@ using Dhcpr.Server.Orleans.Cache;
 using Dhcpr.Server.Orleans.LiveQueries;
 using Dhcpr.Server.Settings;
 
+using Dhcpr.Server.Orleans.DataProtection;
+
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
@@ -40,13 +42,9 @@ builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
     .Validate(static o => o.Validate(), "DataPath must be set");
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
-
+builder.Services.AddSingleton<IXmlRepository, OrleansDataProtectionKeyRepository>();
 builder.Services.AddOptions<KeyManagementOptions>()
-    .Configure<ILoggerFactory, IOptions<ApplicationConfiguration>>((options, loggerFactory, application) =>
-    {
-        var target = Directory.CreateDirectory(application.Value.GetDataProtectionKeysPath());
-        options.XmlRepository = new FileSystemXmlRepository(target, loggerFactory);
-    });
+    .Configure<IXmlRepository>((options, repository) => options.XmlRepository = repository);
 
 builder.Services.AddCoreServices();
 builder.Services.AddDns();

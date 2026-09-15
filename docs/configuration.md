@@ -24,7 +24,7 @@ Under that directory:
 |------|----------|
 | `settings.json` | UI-saved settings |
 | `dynamic-dns.json` | DynDNS host → address map |
-| `dataprotection-keys/` | ASP.NET Data Protection keys (cookie encryption) |
+| `dataprotection-keys/` | Unused. Cookie keys are an in-memory Orleans grain |
 | `cache/` | `root.zone`, `root-servers.txt` |
 | `zones/` | Authoritative zone files |
 

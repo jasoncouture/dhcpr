@@ -11,13 +11,8 @@ public static class DirectedQueryEdns
         DomainMessage message,
         IEdnsProtocolService ednsProtocolService)
     {
-        var existingOpt = message.Records.Additional.FirstOrDefault(r => r.Type == DomainRecordType.OPT);
-        var optRecord = existingOpt is not null
-            ? ednsProtocolService.CreateOptRecord(4096, dnssecOk: true,
-                extendedRCode: ednsProtocolService.GetExtendedRCode(existingOpt),
-                version: ednsProtocolService.GetEdnsVersion(existingOpt),
-                optData: existingOpt.Data as RecordData.OptionData)
-            : ednsProtocolService.CreateOptRecord(4096, dnssecOk: true);
+        // Our OPT only. Do not forward the stub's COOKIE/NSID/etc. to nameservers.
+        var optRecord = ednsProtocolService.CreateOptRecord(4096, dnssecOk: true);
 
         var newAdditional = message.Records.Additional
             .Where(r => r.Type != DomainRecordType.OPT)

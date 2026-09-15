@@ -179,7 +179,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
         // Strip AD — security lives in SecurityStatus only.
         var flags = response.Flags with { Authentic = false };
-        var entry = new CacheEntry(flags, response.Records, cachedAt)
+        var entry = new CacheEntry(flags, EdnsCookie.StripCookies(response.Records), cachedAt)
         {
             SecurityStatus = securityStatus
         };

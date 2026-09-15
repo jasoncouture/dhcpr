@@ -154,7 +154,8 @@ Classic DNS over UDP is capped at **1232** bytes. Larger answers (TXT, DNSSEC
 assemblies, and similar) are returned as **TC** with empty answer / authority /
 additional sections. Clients retry over TCP. Client EDNS payload sizes above
 1232 are ignored so a spoofed source cannot bounce a multi-kilobyte UDP
-response at a victim.
+response at a victim. A request COOKIE (RFC 7873) is echoed on the reply;
+cached or upstream COOKIE bytes are not replayed.
 
 TCP, DoT, and DoH are not capped this way. A TCP/DoT client must send a
 complete length-prefixed message within **5 seconds** or the connection is

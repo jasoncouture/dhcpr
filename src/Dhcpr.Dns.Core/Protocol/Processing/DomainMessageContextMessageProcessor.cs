@@ -108,6 +108,8 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                 response = response with { Id = message.Context.DomainMessage.Id };
             }
 
+            response = EdnsCookie.Apply(message.Context.DomainMessage, response);
+
             // Publish once per external client answer (UDP/TCP/DoH), independent of decorate order.
             await DnsQueryEventFactory.PublishAnswersAsync(
                 _liveQueryPublisher,

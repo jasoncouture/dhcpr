@@ -141,7 +141,7 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
 
     private sealed class HubObserver : IDataProtectionKeyObserver
     {
-        public async Task OnKeysAsync(IReadOnlyList<string> elementXml, CancellationToken cancellationToken)
+        public async Task OnKeysAsync(IEnumerable<string> elementXml, CancellationToken cancellationToken)
         {
             await Task.Yield();
             DataProtectionKeySnapshot.Replace(elementXml);

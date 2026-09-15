@@ -9,7 +9,7 @@ public interface IDataProtectionKeyGrain : IGrainWithIntegerKey
 
     Task UnsubscribeAsync(IDataProtectionKeyObserver observer, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<string>> GetAllAsync();
+    Task<IEnumerable<string>> GetAllAsync();
 
     Task StoreAsync(string elementXml, string? friendlyName);
 }

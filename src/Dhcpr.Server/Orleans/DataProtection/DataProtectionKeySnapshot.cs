@@ -16,7 +16,7 @@ internal static class DataProtectionKeySnapshot
             return [.. _xml];
     }
 
-    public static void Replace(IReadOnlyList<string> xml)
+    public static void Replace(IEnumerable<string> xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
         lock (Gate)

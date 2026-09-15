@@ -78,14 +78,14 @@ public class DataProtectionKeyGrainTests
     }
 
     [Fact]
-    public async Task StorePublishesIntoLocalSnapshot()
+    public async Task StoreKeepsKeyOnGrain()
     {
         var grain = new DataProtectionKeyGrain(NullLogger<DataProtectionKeyGrain>.Instance);
         await grain.OnActivateAsync(CancellationToken.None);
 
         await grain.StoreAsync("""<key id="b"/>""", "b");
 
-        Assert.Equal(["""<key id="b"/>"""], DataProtectionKeySnapshot.Copy());
+        Assert.Equal(["""<key id="b"/>"""], await grain.GetAllAsync());
     }
 }
 

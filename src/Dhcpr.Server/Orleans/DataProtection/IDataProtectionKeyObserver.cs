@@ -8,5 +8,5 @@ public interface IDataProtectionKeyObserver : IGrainObserver
     /// Full key ring. One-way; must complete quickly.
     /// </summary>
     [OneWay]
-    Task OnKeysAsync(IReadOnlyList<string> elementXml, CancellationToken cancellationToken);
+    Task OnKeysAsync(IEnumerable<string> elementXml, CancellationToken cancellationToken);
 }

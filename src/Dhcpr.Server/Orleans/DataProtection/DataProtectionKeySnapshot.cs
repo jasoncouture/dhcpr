@@ -13,7 +13,7 @@ internal static class DataProtectionKeySnapshot
     public static string[] Copy()
     {
         lock (Gate)
-            return [.. _xml];
+            return _xml;
     }
 
     public static void Replace(IEnumerable<string> xml)

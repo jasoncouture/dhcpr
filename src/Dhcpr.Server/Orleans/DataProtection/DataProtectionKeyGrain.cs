@@ -59,8 +59,7 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     {
         await Task.Yield();
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
-        if (!_elements.Add(elementXml))
-            return;
+        _elements.Add(elementXml);
         await PublishAsync();
     }
 

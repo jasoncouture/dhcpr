@@ -1,0 +1,19 @@
+---
+description: Never start, watch, or background Dhcpr.Server
+alwaysApply: true
+---
+
+# Do not start the server
+
+The operator starts `Dhcpr.Server`. Agents never do.
+
+Forbidden:
+- `dotnet run`, `dotnet watch`, `dotnet exec` against `Dhcpr.Server`
+- launching `bin/**/Dhcpr.Server`
+- VS Code / Cursor launch or debug of the server
+- backgrounding any of the above (`block_until_ms: 0`, `&`, `nohup`, `disown`)
+- `test.sh` unless the user said they already started the server
+
+`dotnet build` and `dotnet test` are fine. They must not host the process.
+
+If ports 65353 / 11111 / 30000 are busy, do not start another copy. Say so and stop.

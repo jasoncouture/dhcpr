@@ -40,10 +40,11 @@ public class InternalDomainClient : IInternalDomainClient
         ImmutableArray<IPEndPoint> upstreamEndpoints,
         CancellationToken cancellationToken)
     {
-        if (parentContext.QueryCoalescer is { } coalescer && message.Questions.Length > 0)
+        if (parentContext.QueryCoalescer is { } coalescer && !message.Questions.IsDefaultOrEmpty)
         {
             return await coalescer.JoinAsync(
-                QueryCoalescer.Key(message, upstreamEndpoints),
+                message.Questions[0],
+                upstreamEndpoints,
                 token => SendUncoalescedAsync(parentContext, message, upstreamEndpoints, token).AsTask(),
                 cancellationToken);
         }
@@ -100,10 +101,11 @@ public class InternalDomainClient : IInternalDomainClient
         DomainMessage message,
         CancellationToken cancellationToken)
     {
-        if (parentContext.QueryCoalescer is { } coalescer && message.Questions.Length > 0)
+        if (parentContext.QueryCoalescer is { } coalescer && !message.Questions.IsDefaultOrEmpty)
         {
             return await coalescer.JoinAsync(
-                QueryCoalescer.Key(message, endpoints: default),
+                message.Questions[0],
+                endpoints: default,
                 token => SendPrefetchUncoalescedAsync(parentContext, message, token).AsTask(),
                 cancellationToken);
         }

@@ -15,10 +15,12 @@ public sealed class QueryCoalescer
         new(StringComparer.Ordinal);
 
     public async ValueTask<DomainMessage> JoinAsync(
-        string key,
+        DomainQuestion question,
+        ImmutableArray<IPEndPoint> endpoints,
         Func<CancellationToken, Task<DomainMessage>> start,
         CancellationToken cancellationToken)
     {
+        var key = Key(question, endpoints);
         while (true)
         {
             if (_inflight.TryGetValue(key, out var existing))
@@ -52,9 +54,11 @@ public sealed class QueryCoalescer
         }
     }
 
-    public static string Key(DomainMessage message, ImmutableArray<IPEndPoint> endpoints)
+    private static string Key(DomainQuestion question, ImmutableArray<IPEndPoint> endpoints)
     {
-        var question = message.Questions[0];
+        if (endpoints.IsDefaultOrEmpty)
+            return $"{question.Class:D}/{question.Type:D}/{question.Name}";
+
         return $"{question.Class:D}/{question.Type:D}/{question.Name}/{string.Join(",", endpoints.Select(static e => e.ToString()).Order(StringComparer.Ordinal))}";
     }
 }

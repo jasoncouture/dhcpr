@@ -44,6 +44,59 @@ public class BindChaosMiddlewareTests
     }
 
     [Fact]
+    public async Task IpInfoReturnsClientIpv4()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.9"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        var text = Assert.IsType<TextData>(Assert.Single(result!.Records.Answers).Data);
+        Assert.Equal("203.0.113.9", text.Text);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task IpInfoReturnsClientIpv6()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("IP.INFO", DomainRecordType.TXT, DomainRecordClass.CH);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("2001:db8::5"), 53000),
+            new IPEndPoint(IPAddress.IPv6Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        var text = Assert.IsType<TextData>(Assert.Single(result!.Records.Answers).Data);
+        Assert.Equal(IPAddress.Parse("2001:db8::5").ToString(), text.Text);
+    }
+
+    [Fact]
+    public async Task IpInfoMapsIpv4MappedIpv6()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new BindChaosMiddleware(inner);
+        var request = DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("::ffff:198.51.100.10"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        var text = Assert.IsType<TextData>(Assert.Single(result!.Records.Answers).Data);
+        Assert.Equal("198.51.100.10", text.Text);
+    }
+
+    [Fact]
     public async Task ChaosAnyReturnsHostnameTxt()
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();

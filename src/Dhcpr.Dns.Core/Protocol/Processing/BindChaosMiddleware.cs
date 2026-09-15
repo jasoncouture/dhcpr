@@ -1,10 +1,13 @@
+using System.Net;
+
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
 /// Only class IN is forwarded or recursed. CH is answered locally (BIND
-/// identity bait or NXDOMAIN). Every other class is NOTIMP.
+/// identity bait, <c>ip.info</c> client address, or NXDOMAIN). Every other
+/// class is NOTIMP.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
@@ -14,6 +17,10 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
     public const string HostnameText = "ns1";
 
     public const string AuthorsText = "Mark Andrews";
+
+    public const string IpInfoName = "ip.info";
+
+    public const string UnknownClientText = "unknown";
 
     internal static readonly TimeSpan Ttl = TimeSpan.Zero;
 
@@ -59,17 +66,36 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
         }
 
         context.AnsweredBy = "bind-chaos";
-        var response = !IsIdentityName(question.Name)
-            ? NxDomain(context.DomainMessage)
-            : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-                ? Txt(context.DomainMessage, TextFor(question.Name))
-                : Nodata(context.DomainMessage);
+        var response = IsIpInfo(question.Name)
+            ? question.Type is DomainRecordType.TXT or DomainRecordType.ANY
+                ? Txt(context.DomainMessage, ClientAddressText(context.ClientEndPoint))
+                : Nodata(context.DomainMessage)
+            : !IsIdentityName(question.Name)
+                ? NxDomain(context.DomainMessage)
+                : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
+                    ? Txt(context.DomainMessage, TextFor(question.Name))
+                    : Nodata(context.DomainMessage);
 
         return Local(response, response.Flags.ResponseCode, authoritative: true);
     }
 
     internal static bool IsIdentityName(DomainLabels name)
         => IdentityNames.Contains(name.ToString());
+
+    internal static bool IsIpInfo(DomainLabels name)
+        => name.ToString().Equals(IpInfoName, StringComparison.OrdinalIgnoreCase);
+
+    internal static string ClientAddressText(IPEndPoint? client)
+    {
+        var address = client?.Address;
+        if (address is null || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
+            return UnknownClientText;
+
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+
+        return address.ToString();
+    }
 
     internal static string TextFor(DomainLabels name)
         => name.ToString().ToLowerInvariant() switch

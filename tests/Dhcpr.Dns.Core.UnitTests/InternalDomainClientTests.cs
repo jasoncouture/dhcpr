@@ -57,6 +57,7 @@ public class InternalDomainClientTests
         Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
         Assert.Same(tips, queue.LastMessage.Context.NameserverTips);
         Assert.True(queue.LastMessage.Context.BypassCache);
+        Assert.True(queue.LastMessage.Context.DoNotCacheResponse);
         Assert.Equal(parent.ClientCookie, queue.LastMessage.Context.ClientCookie);
         Assert.True(budget.TryConsume());
 

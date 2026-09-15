@@ -57,12 +57,18 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
 
     /// <summary>
     /// When true, the cache decorator must not store the response
-    /// (e.g. answers from authoritative zone files).
+    /// (e.g. answers from authoritative zone files). Implied by
+    /// <see cref="BypassCache"/>.
     /// </summary>
-    public bool DoNotCacheResponse { get; set; }
+    public bool DoNotCacheResponse
+    {
+        get => field || BypassCache;
+        set;
+    }
 
     /// <summary>
-    /// When true, skip both cache lookup and store (e.g. health-check probes).
+    /// When true, skip both cache lookup and store (e.g. health-check probes
+    /// and directed NS hops). Implies <see cref="DoNotCacheResponse"/>.
     /// </summary>
     public bool BypassCache { get; init; }
 

@@ -106,6 +106,7 @@ public class DnsQueryExecutorTests
         Assert.NotNull(queue.LastMessage);
         Assert.Equal("health.example", queue.LastMessage!.Context.DomainMessage.Questions[0].Name.ToString());
         Assert.True(queue.LastMessage.Context.BypassCache);
+        Assert.True(queue.LastMessage.Context.DoNotCacheResponse);
 
         var response = DomainMessage.CreateResponse(
             queue.LastMessage.Context.DomainMessage,

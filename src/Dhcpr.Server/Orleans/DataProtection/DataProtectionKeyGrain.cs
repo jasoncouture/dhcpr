@@ -15,7 +15,7 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     private static readonly TimeSpan _observerExpiration = TimeSpan.FromMinutes(5);
 
     private readonly ObserverManager<IDataProtectionKeyObserver> _observers;
-    private readonly List<string> _elements = [];
+    private readonly HashSet<string> _elements = [];
 
     public DataProtectionKeyGrain(ILogger<DataProtectionKeyGrain> logger)
     {
@@ -59,9 +59,8 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     {
         await Task.Yield();
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
-        if (_elements.Contains(elementXml))
+        if (!_elements.Add(elementXml))
             return;
-        _elements.Add(elementXml);
         await PublishAsync();
     }
 
@@ -84,9 +83,8 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
             return;
         foreach (var xml in knownKeys)
         {
-            if (string.IsNullOrWhiteSpace(xml) || _elements.Contains(xml))
-                continue;
-            _elements.Add(xml);
+            if (!string.IsNullOrWhiteSpace(xml))
+                _elements.Add(xml);
         }
     }
 }

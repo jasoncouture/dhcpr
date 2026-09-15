@@ -118,7 +118,7 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     {
         try
         {
-            await _hub!.SubscribeAsync(_observer!, DataProtectionKeySnapshot.Get(), cancellationToken);
+            await _hub!.SubscribeAsync(_observer!, DataProtectionKeySnapshot.Copy(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

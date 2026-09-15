@@ -25,7 +25,7 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        Merge(DataProtectionKeySnapshot.Get());
+        Merge(DataProtectionKeySnapshot.Copy());
     }
 
     public async Task SubscribeAsync(

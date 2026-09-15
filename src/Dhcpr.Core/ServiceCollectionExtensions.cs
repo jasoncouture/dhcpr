@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
+using Dhcpr.Core.Metrics;
 using Dhcpr.Core.Queue;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +50,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddCoreServices(this IServiceCollection services)
     {
         services.AddSingleton(typeof(IMessageQueue<>), typeof(MessageQueue<>));
+        services.AddSingleton<IMetricPublisher, MetricPublisher>();
         services.AddHostedService<HeartBeatPublisherService>();
         return services;
     }

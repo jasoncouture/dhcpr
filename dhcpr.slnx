@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Dhcpr.Benchmarks/Dhcpr.Benchmarks.csproj" />
+    <Project Path="tests/Dhcpr.Core.UnitTests/Dhcpr.Core.UnitTests.csproj" />
     <Project Path="tests/Dhcpr.Dhcp.Core.UnitTests/Dhcpr.Dhcp.Core.UnitTests.csproj" />
     <Project Path="tests/Dhcpr.Dns.Core.UnitTests/Dhcpr.Dns.Core.UnitTests.csproj" />
     <Project Path="tests/Dhcpr.Peering.Discovery.UnitTests/Dhcpr.Peering.Discovery.UnitTests.csproj" />

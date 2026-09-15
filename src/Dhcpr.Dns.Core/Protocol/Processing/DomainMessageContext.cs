@@ -44,6 +44,13 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     public NameserverTipCache? NameserverTips { get; init; }
 
     /// <summary>
+    /// Shared across a client query and internal re-entries. Joins in-flight
+    /// hops that ask the same QNAME+QTYPE at the same endpoints so parallel
+    /// glue walks do not repeat a directed (uncached) parent-cut probe.
+    /// </summary>
+    public QueryCoalescer? QueryCoalescer { get; init; }
+
+    /// <summary>
     /// Set by the cache decorator when the response was served from cache.
     /// Stored on the context so the flag is visible to outer middleware after await
     /// (AsyncLocal does not flow mutations back to the caller).

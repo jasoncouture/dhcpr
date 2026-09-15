@@ -372,6 +372,7 @@ public sealed partial class DnsServer : BackgroundService
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
             NameserverTips = new NameserverTipCache(),
+            QueryCoalescer = new QueryCoalescer(),
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
             Source = source
         };
@@ -402,6 +403,7 @@ public sealed partial class DnsServer : BackgroundService
                 DnssecScope = new DnssecScope(),
                 WorkBudget = new QueryWorkBudget(),
                 NameserverTips = new NameserverTipCache(),
+                QueryCoalescer = new QueryCoalescer(),
                 ParentTraceContext = DnsInstrumentation.CaptureContext(),
                 Source = DnsQuerySource.Udp
             };

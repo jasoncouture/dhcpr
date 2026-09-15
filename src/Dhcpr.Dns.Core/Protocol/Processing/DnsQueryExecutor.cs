@@ -89,6 +89,7 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
             NameserverTips = new NameserverTipCache(),
+            QueryCoalescer = new QueryCoalescer(),
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
             Source = DnsQuerySource.Doh
         };

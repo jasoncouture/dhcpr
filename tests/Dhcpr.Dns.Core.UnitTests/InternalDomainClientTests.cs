@@ -159,11 +159,79 @@ public class InternalDomainClientTests
         await sendTask;
     }
 
+    [Fact]
+    public async Task SendAsync_CoalescesIdenticalDirectedHops()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue.Queue);
+        var endpoints = ImmutableArray.Create(
+            new IPEndPoint(IPAddress.Parse("192.0.2.1"), 53),
+            new IPEndPoint(IPAddress.Parse("192.0.2.2"), 53));
+        var shuffled = ImmutableArray.Create(endpoints[1], endpoints[0]);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            QueryCoalescer = new QueryCoalescer()
+        };
+        var request = DomainMessage.CreateRequest("ntpns.org", DomainRecordType.NS);
+
+        var first = client.SendAsync(parent, request, endpoints, CancellationToken.None).AsTask();
+        var second = client.SendAsync(parent, request, shuffled, CancellationToken.None).AsTask();
+
+        Assert.Equal(1, queue.EnqueueCount);
+        Assert.NotNull(queue.LastMessage);
+
+        var response = DomainMessage.CreateResponse(
+            queue.LastMessage!.Context.DomainMessage,
+            DomainResourceRecords.Empty,
+            DomainResponseCode.NoError);
+        queue.LastMessage.TaskCompletionSource.TrySetResult(response);
+
+        Assert.Same(response, await first);
+        Assert.Same(response, await second);
+    }
+
+    [Fact]
+    public async Task SendAsync_DoesNotCoalesceDifferentQuestions()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue.Queue);
+        var endpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Loopback, 53));
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            QueryCoalescer = new QueryCoalescer()
+        };
+
+        var first = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("a.ntpns.org"),
+            endpoints,
+            CancellationToken.None).AsTask();
+        var second = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("b.ntpns.org"),
+            endpoints,
+            CancellationToken.None).AsTask();
+
+        Assert.Equal(2, queue.EnqueueCount);
+        foreach (var queued in queue.Messages)
+        {
+            queued.TaskCompletionSource.TrySetResult(
+                DomainMessage.CreateResponse(
+                    queued.Context.DomainMessage,
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.NoError));
+        }
+
+        await first;
+        await second;
+    }
+
     private sealed class CountingQueue
     {
         public IMessageQueue<DnsPacketReceivedMessage> Queue { get; }
         public int EnqueueCount { get; private set; }
         public InternalDnsRequestReceivedMessage? LastMessage { get; private set; }
+        public List<InternalDnsRequestReceivedMessage> Messages { get; } = [];
 
         public CountingQueue()
         {
@@ -173,6 +241,7 @@ public class InternalDomainClientTests
                 {
                     EnqueueCount++;
                     LastMessage = (InternalDnsRequestReceivedMessage)ci.Arg<DnsPacketReceivedMessage>();
+                    Messages.Add(LastMessage);
                 });
             Queue = queue;
         }

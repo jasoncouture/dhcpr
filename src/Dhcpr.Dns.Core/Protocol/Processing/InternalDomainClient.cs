@@ -40,6 +40,23 @@ public class InternalDomainClient : IInternalDomainClient
         ImmutableArray<IPEndPoint> upstreamEndpoints,
         CancellationToken cancellationToken)
     {
+        if (parentContext.QueryCoalescer is { } coalescer && message.Questions.Length > 0)
+        {
+            return await coalescer.JoinAsync(
+                QueryCoalescer.Key(message, upstreamEndpoints),
+                token => SendUncoalescedAsync(parentContext, message, upstreamEndpoints, token).AsTask(),
+                cancellationToken);
+        }
+
+        return await SendUncoalescedAsync(parentContext, message, upstreamEndpoints, cancellationToken);
+    }
+
+    private async ValueTask<DomainMessage> SendUncoalescedAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        ImmutableArray<IPEndPoint> upstreamEndpoints,
+        CancellationToken cancellationToken)
+    {
         var directed = !upstreamEndpoints.IsDefaultOrEmpty;
         var depth = parentContext.InternalHopDepth + (directed ? 0 : 1);
 
@@ -65,6 +82,7 @@ public class InternalDomainClient : IInternalDomainClient
             DnssecScope = parentContext.DnssecScope,
             WorkBudget = parentContext.WorkBudget,
             NameserverTips = parentContext.NameserverTips,
+            QueryCoalescer = parentContext.QueryCoalescer,
             // Directed hops are "ask these nameservers". A cache keyed only by
             // QNAME+QTYPE would replay a parent referral when we later ask the child
             // the same NS/SOA/DNSKEY question (google.com NS → no ANSWER, no AD).
@@ -82,6 +100,22 @@ public class InternalDomainClient : IInternalDomainClient
         DomainMessage message,
         CancellationToken cancellationToken)
     {
+        if (parentContext.QueryCoalescer is { } coalescer && message.Questions.Length > 0)
+        {
+            return await coalescer.JoinAsync(
+                QueryCoalescer.Key(message, endpoints: default),
+                token => SendPrefetchUncoalescedAsync(parentContext, message, token).AsTask(),
+                cancellationToken);
+        }
+
+        return await SendPrefetchUncoalescedAsync(parentContext, message, cancellationToken);
+    }
+
+    private async ValueTask<DomainMessage> SendPrefetchUncoalescedAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        CancellationToken cancellationToken)
+    {
         var context = new DomainMessageContext(
             parentContext.ClientEndPoint,
             parentContext.ServerEndPoint,
@@ -92,6 +126,7 @@ public class InternalDomainClient : IInternalDomainClient
             DnssecScope = new DnssecScope(),
             WorkBudget = new QueryWorkBudget(),
             NameserverTips = parentContext.NameserverTips ?? new NameserverTipCache(),
+            QueryCoalescer = parentContext.QueryCoalescer,
             SuppressAddressPrefetch = true,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),

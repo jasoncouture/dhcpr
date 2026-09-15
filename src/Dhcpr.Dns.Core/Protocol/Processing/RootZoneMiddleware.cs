@@ -9,8 +9,10 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Answers from the primed root.zone snapshot (TLD NS/DS and in-zone glue) before
-/// live upstream queries. Priority must be less than <see cref="UpstreamQueryMiddleware"/>.
+/// Answers from the primed root.zone snapshot (TLD NS/DS, covering RRSIGs, and
+/// in-zone glue) before live upstream queries — including directed hops when a
+/// currently-valid covering RRSIG is present (or DNSSEC is off). Priority must
+/// be less than <see cref="UpstreamQueryMiddleware"/>.
 /// </summary>
 public sealed class RootZoneMiddleware : IDomainMessageMiddleware
 {
@@ -31,11 +33,6 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         await Task.Yield();
-        // Directed upstream hops must hit live nameservers (with DO=1) so DNSSEC
-        // sees RRSIGs. Primed root.zone answers are unsigned NS/DS/glue only.
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
-
         var snapshot = _store.Current;
         if (snapshot is null)
             return null;

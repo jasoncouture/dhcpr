@@ -89,10 +89,11 @@ reload ~500 ms after a filesystem change.
 Supported record types that are mapped into answers:
 
 A, AAAA, NS, CNAME, DNAME, ALIAS, PTR, MX, TXT, HINFO, SRV, CAA, TLSA, SSHFP,
-NAPTR, LUA, SOA, DS.
+NAPTR, LUA, SOA, DS, RRSIG.
 
-`$GENERATE` and types the parser does not know (including most DNSSEC RRSIGs)
+`$GENERATE` and types the parser does not know (DNSKEY, NSEC, and similar)
 are stripped so signed InterNIC-style files can still load the useful records.
+RRSIGs are parsed from presentation format (RFC 4034 §3.2) and kept.
 
 Example `{DataPath}/zones/home.arpa.bind`:
 

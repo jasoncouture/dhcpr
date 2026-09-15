@@ -95,7 +95,7 @@ public class ZoneFileParserTests
     }
 
     [Fact]
-    public void ParseRootZone_SkipsDnssecAndGenerateLines()
+    public void ParseRootZone_KeepsRrsigAndStripsOtherDnssecAndGenerate()
     {
         var text = File.ReadAllText(FixturePath("root-zone-with-dnssec.txt"));
 
@@ -105,10 +105,53 @@ public class ZoneFileParserTests
         Assert.True(snapshot.TryGetRecords("com", out var com));
         Assert.Contains(com, r => r.Type == DomainRecordType.NS);
         Assert.Contains(com, r => r.Type == DomainRecordType.DS);
-        Assert.DoesNotContain(com, r => r.Type is DomainRecordType.RRSIG or DomainRecordType.DNSKEY or DomainRecordType.NSEC);
+        var rrsig = Assert.Single(com, r => r.Type is DomainRecordType.RRSIG);
+        var sig = Assert.IsType<ResourceRecordSignatureData>(rrsig.Data);
+        Assert.Equal(DomainRecordType.DS, sig.TypeCovered);
+        Assert.Equal(DnssecAlgorithmType.RsaSha256, sig.Algorithm);
+        Assert.Equal((byte)1, sig.Labels);
+        Assert.Equal(12345, sig.KeyTag);
+        Assert.Equal("com", sig.SignersName.ToString());
+        Assert.DoesNotContain(com, r => r.Type is DomainRecordType.DNSKEY or DomainRecordType.NSEC);
         Assert.True(snapshot.TryGetRecords("a.gtld-servers.net", out var glue));
         Assert.Contains(glue, r => r.Type == DomainRecordType.A);
         Assert.False(snapshot.TryGetRecords("host1.example", out _));
+    }
+
+    [Fact]
+    public void Parse_ReadsInternicAndParenthesizedRrsig()
+    {
+        const string text = """
+            . 86400 IN SOA a.root-servers.net. nstld.verisign-grs.com. 1 1800 900 604800 86400
+            com. 86400 IN RRSIG DS 8 1 86400 20300101000000 20250101000000 57780 . deadbeef
+            host.example. 86400 IN RRSIG A 13 3 86400 20300101000000 (
+                                      20250101000000 2642 host.example.
+                                      de adbe ef )
+            """;
+
+        var records = ZoneFileParser.Parse(text);
+        var com = Assert.Single(
+            records,
+            r => r.Type is DomainRecordType.RRSIG && r.Name.ToString() == "com");
+        var comSig = Assert.IsType<ResourceRecordSignatureData>(com.Data);
+        Assert.Equal(DomainRecordType.DS, comSig.TypeCovered);
+        Assert.Equal(DomainLabels.Empty, comSig.SignersName);
+        Assert.Equal(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds(), comSig.SignatureExpiration);
+        Assert.Equal(Convert.FromBase64String("deadbeef"), comSig.Signature.ToArray());
+
+        var host = Assert.Single(
+            records,
+            r => r.Type is DomainRecordType.RRSIG && r.Name.ToString() == "host.example");
+        var hostSig = Assert.IsType<ResourceRecordSignatureData>(host.Data);
+        Assert.Equal(DomainRecordType.A, hostSig.TypeCovered);
+        Assert.Equal(DnssecAlgorithmType.EcdsaP256Sha256, hostSig.Algorithm);
+        Assert.Equal((byte)3, hostSig.Labels);
+        Assert.Equal(2642, hostSig.KeyTag);
+        Assert.Equal("host.example", hostSig.SignersName.ToString());
+        Assert.Equal(
+            new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds(),
+            hostSig.SignatureExpiration);
+        Assert.Equal(Convert.FromBase64String("deadbeef"), hostSig.Signature.ToArray());
     }
 
     [Fact]

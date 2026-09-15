@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 using DnsZone.Records;
@@ -5,8 +6,9 @@ using DnsZone.Records;
 namespace Dhcpr.Dns.Core.Protocol.Zone;
 
 /// <summary>
-/// Drops RR lines DnsZone cannot parse (DNSSEC, $GENERATE, unknown types)
-/// so InterNIC-style signed zones still load for the RRs we care about.
+/// Drops RR lines DnsZone cannot parse (DNSKEY, NSEC, $GENERATE, unknown types)
+/// so InterNIC-style signed zones still load. RRSIGs are parsed separately by
+/// <see cref="BindZoneRrsigParser"/> and merged back in.
 /// </summary>
 public static class BindZoneUnsupportedFilter
 {
@@ -18,6 +20,40 @@ public static class BindZoneUnsupportedFilter
         var expanded = ExpandParentheses(text);
         // DnsZone's $INCLUDE handler always dequeues a NewLine after the filename.
         return string.Join('\n', expanded.Split('\n').Where(ShouldKeepLine)) + '\n';
+    }
+
+    internal static bool IsSupportedType(string token)
+        => _supportedTypes.Contains(token);
+
+    internal static bool TryParseTtl(string token, out uint seconds)
+    {
+        seconds = 0;
+        if (!IsTtl(token))
+            return false;
+
+        var digits = 0;
+        while (digits < token.Length && char.IsDigit(token[digits]))
+            digits++;
+
+        if (!uint.TryParse(token.AsSpan(0, digits), NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+            return false;
+
+        if (digits == token.Length)
+        {
+            seconds = value;
+            return true;
+        }
+
+        seconds = char.ToLowerInvariant(token[^1]) switch
+        {
+            's' => value,
+            'm' => value * 60,
+            'h' => value * 3600,
+            'd' => value * 86400,
+            'w' => value * 604800,
+            _ => 0
+        };
+        return true;
     }
 
     private static bool ShouldKeepLine(string rawLine)
@@ -61,13 +97,13 @@ public static class BindZoneUnsupportedFilter
     private static bool LooksLikeOwner(string token)
         => !IsClass(token) && !IsTtl(token) && !_supportedTypes.Contains(token);
 
-    private static bool IsClass(string token)
+    internal static bool IsClass(string token)
         => token.Equals("IN", StringComparison.OrdinalIgnoreCase) ||
            token.Equals("CH", StringComparison.OrdinalIgnoreCase) ||
            token.Equals("HS", StringComparison.OrdinalIgnoreCase) ||
            token.Equals("CS", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsTtl(string token)
+    internal static bool IsTtl(string token)
     {
         if (token.Length == 0)
             return false;
@@ -84,7 +120,7 @@ public static class BindZoneUnsupportedFilter
         return token[^1] is 's' or 'S' or 'm' or 'M' or 'h' or 'H' or 'd' or 'D' or 'w' or 'W';
     }
 
-    private static string StripComment(string line)
+    internal static string StripComment(string line)
     {
         var inQuotes = false;
         for (var i = 0; i < line.Length; i++)
@@ -99,7 +135,7 @@ public static class BindZoneUnsupportedFilter
         return line;
     }
 
-    private static List<string> Tokenize(string line)
+    internal static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
         var current = new StringBuilder();
@@ -132,7 +168,7 @@ public static class BindZoneUnsupportedFilter
         return tokens;
     }
 
-    private static string ExpandParentheses(string text)
+    internal static string ExpandParentheses(string text)
     {
         var sb = new StringBuilder();
         var depth = 0;

@@ -189,7 +189,7 @@ public class RootZoneMiddlewareTests
     }
 
     [Fact]
-    public async Task DirectedUpstreamSkipsRootZone()
+    public async Task DirectedUpstreamUsesSnapshotWhenDnssecDisabled()
     {
         var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));
         var store = new RootZoneStore();
@@ -202,7 +202,65 @@ public class RootZoneMiddlewareTests
         };
 
         var result = await middleware.ProcessAsync(context, CancellationToken.None);
-        Assert.Null(result);
+        Assert.NotNull(result);
+        Assert.Contains(result!.Records.Answers, r => r.Type == DomainRecordType.NS);
+    }
+
+    [Fact]
+    public async Task DirectedUpstreamUsesSignedSnapshotWhenDnssecEnabled()
+    {
+        var owner = new DomainLabels("com");
+        var ns = new DomainResourceRecord(
+            owner,
+            DomainRecordType.NS,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(172800),
+            new NameData(new DomainLabels("a.gtld-servers.net")));
+        var rrsig = new DomainResourceRecord(
+            owner,
+            DomainRecordType.RRSIG,
+            DomainRecordClass.IN,
+            TimeSpan.FromSeconds(172800),
+            new ResourceRecordSignatureData(
+                DomainRecordType.NS,
+                DnssecAlgorithmType.EcdsaP256Sha256,
+                1,
+                172800,
+                (uint)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds(),
+                (uint)DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds(),
+                1234,
+                DomainLabels.Empty,
+                ImmutableArray.Create<byte>(1, 2, 3, 4)));
+
+        var soa = new StartOfAuthorityData(
+            new DomainLabels("a.root-servers.net"),
+            new DomainLabels("nstld.verisign-grs.com"),
+            1,
+            TimeSpan.FromSeconds(1800),
+            TimeSpan.FromSeconds(900),
+            TimeSpan.FromDays(7),
+            TimeSpan.FromDays(1));
+        var snapshot = new RootZoneSnapshot(
+            soa,
+            TimeSpan.FromDays(1),
+            DateTimeOffset.UtcNow,
+            new Dictionary<string, ImmutableArray<DomainResourceRecord>>
+            {
+                ["com"] = [ns, rrsig]
+            });
+        var store = new RootZoneStore();
+        store.Set(snapshot);
+
+        var middleware = CreateMiddleware(store, dnssecEnabled: true);
+        var context = new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS))
+        {
+            UpstreamEndpoints = [new IPEndPoint(IPAddress.Parse("198.41.0.4"), 53)]
+        };
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+        Assert.NotNull(result);
+        Assert.Contains(result!.Records.Answers, r => r.Type == DomainRecordType.NS);
+        Assert.Contains(result.Records.Answers, r => r.Type == DomainRecordType.RRSIG);
     }
 
     [Fact]

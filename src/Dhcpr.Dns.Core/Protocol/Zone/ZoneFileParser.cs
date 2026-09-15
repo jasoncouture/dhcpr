@@ -64,11 +64,12 @@ public static class ZoneFileParser
 
     public static IReadOnlyList<DomainResourceRecord> Parse(string text, string? origin = null)
     {
+        var rrsigs = BindZoneRrsigParser.Parse(text, origin);
         var filtered = BindZoneUnsupportedFilter.Filter(text);
         try
         {
             var zone = DnsZoneFile.Parse(filtered, origin);
-            return BindZoneMapper.MapAll(zone.Records);
+            return Combine(BindZoneMapper.MapAll(zone.Records), rrsigs);
         }
         catch (Exception ex) when (ex is not FormatException and not OperationCanceledException)
         {
@@ -79,16 +80,30 @@ public static class ZoneFileParser
     /// <summary>Parse a BIND zone file from disk with <c>$INCLUDE</c> support.</summary>
     public static IReadOnlyList<DomainResourceRecord> ParseFile(string path)
     {
+        var rrsigs = BindZoneRrsigParser.Parse(File.ReadAllText(path));
         var source = new BindFileDnsSource(path, BindZoneUnsupportedFilter.Filter);
         try
         {
             var zone = DnsZoneFile.Parse(source);
-            return BindZoneMapper.MapAll(zone.Records);
+            return Combine(BindZoneMapper.MapAll(zone.Records), rrsigs);
         }
         catch (Exception ex) when (ex is not FormatException and not OperationCanceledException)
         {
             throw new FormatException($"Failed to parse BIND zone file '{path}': {ex.Message}", ex);
         }
+    }
+
+    private static IReadOnlyList<DomainResourceRecord> Combine(
+        IReadOnlyList<DomainResourceRecord> mapped,
+        IReadOnlyList<DomainResourceRecord> rrsigs)
+    {
+        if (rrsigs.Count == 0)
+            return mapped;
+
+        var list = new List<DomainResourceRecord>(mapped.Count + rrsigs.Count);
+        list.AddRange(mapped);
+        list.AddRange(rrsigs);
+        return list;
     }
 
     /// <summary>Legacy alias for <see cref="Parse"/>.</summary>

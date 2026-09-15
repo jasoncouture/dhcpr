@@ -2,8 +2,6 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
 
-using DnsZone;
-
 namespace Dhcpr.Dns.Core.Authoritative;
 
 public static class AuthoritativeZoneBuilder
@@ -53,19 +51,7 @@ public static class AuthoritativeZoneBuilder
     }
 
     public static AuthoritativeZone ParseFile(string path)
-    {
-        var source = new BindFileDnsSource(path, BindZoneUnsupportedFilter.Filter);
-        try
-        {
-            var zoneFile = DnsZoneFile.Parse(source);
-            var records = BindZoneMapper.MapAll(zoneFile.Records);
-            return FromRecords(records, path);
-        }
-        catch (Exception ex) when (ex is not FormatException and not OperationCanceledException)
-        {
-            throw new FormatException($"Failed to parse BIND zone file '{path}': {ex.Message}", ex);
-        }
-    }
+        => FromRecords(ZoneFileParser.ParseFile(path), path);
 
     internal static bool IsUnderApex(string owner, string apex)
     {

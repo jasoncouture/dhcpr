@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDhcpRequestHandler, DhcpDiscoverRequestHandler>();
         services.AddSingleton<IDhcpRequestHandler, DhcpSelectRequestHandler>();
 
+        services.AddSingleton<IDhcpMetrics, DhcpMetricsPublisher>();
         services.AddHostedService<DhcpServerHostedService>();
         services.AddQueueProcessor<QueuedDhcpMessage, DhcpMessageQueueProcessor>();
         return services;

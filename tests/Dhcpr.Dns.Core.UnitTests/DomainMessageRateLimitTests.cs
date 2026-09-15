@@ -1,4 +1,3 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -6,7 +5,6 @@ using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -190,14 +188,12 @@ public class DomainMessageRateLimitTests
         IUdpQueryRateLimiter limiter,
         IDomainMessageMiddleware middleware)
     {
-        var services = new ServiceCollection();
-        services.AddMetrics();
         return new DomainMessageContextMessageProcessor(
             [middleware],
             Substitute.For<ILiveQueryEventPublisher>(),
             limiter,
             NullLogger<DomainMessageContextMessageProcessor>.Instance,
-            services.BuildServiceProvider().GetRequiredService<IMeterFactory>());
+            Substitute.For<IDnsMetrics>());
     }
 
     private static IDomainMessageMiddleware PassthroughMiddleware(DomainMessage? response = null)

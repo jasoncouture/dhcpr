@@ -8,13 +8,13 @@ public sealed class TracingDomainClient : IDomainClient
     private readonly IDomainClient _inner;
     private readonly IPEndPoint _target;
     private readonly string _transport;
-    private readonly DnsUpstreamMetrics _metrics;
+    private readonly IDnsMetrics _metrics;
 
     public TracingDomainClient(
         IDomainClient inner,
         IPEndPoint target,
         string transport,
-        DnsUpstreamMetrics metrics)
+        IDnsMetrics metrics)
     {
         _inner = inner;
         _target = target;
@@ -52,7 +52,7 @@ public sealed class TracingDomainClient : IDomainClient
         }
         finally
         {
-            _metrics.Record(
+            _metrics.RecordUpstream(
                 _transport,
                 message,
                 response,

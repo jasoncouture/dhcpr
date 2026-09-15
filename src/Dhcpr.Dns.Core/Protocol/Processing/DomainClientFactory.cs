@@ -9,16 +9,16 @@ public sealed class DomainClientFactory : IDomainClientFactory
 {
     private readonly ISocketFactory _socketFactory;
     private readonly IInternalDomainClient _internalDomainClient;
-    private readonly DnsUpstreamMetrics _upstreamMetrics;
+    private readonly IDnsMetrics _metrics;
 
     public DomainClientFactory(
         ISocketFactory socketFactory,
         IInternalDomainClient internalDomainClient,
-        DnsUpstreamMetrics upstreamMetrics)
+        IDnsMetrics metrics)
     {
         _socketFactory = socketFactory;
         _internalDomainClient = internalDomainClient;
-        _upstreamMetrics = upstreamMetrics;
+        _metrics = metrics;
     }
 
     public async ValueTask<IDomainClient> GetParallelDomainClientAsync(IEnumerable<DomainClientOptions> options,
@@ -86,7 +86,7 @@ public sealed class DomainClientFactory : IDomainClientFactory
         if (options.Type.HasFlag(DomainClientType.Udp) || options.Type.HasFlag(DomainClientType.Tcp))
         {
             var transport = options.Type.HasFlag(DomainClientType.Udp) ? "udp" : "tcp";
-            clients[0] = new TracingDomainClient(clients[0], options.EndPoint, transport, _upstreamMetrics);
+            clients[0] = new TracingDomainClient(clients[0], options.EndPoint, transport, _metrics);
         }
 
         return clients[0];

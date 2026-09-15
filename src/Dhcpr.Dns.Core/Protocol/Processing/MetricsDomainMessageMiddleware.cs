@@ -1,20 +1,14 @@
-using System.Diagnostics.Metrics;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;
-    private readonly Counter<long> _queries;
+    private readonly IDnsMetrics _metrics;
 
-    public MetricsDomainMessageMiddleware(IDomainMessageMiddleware inner, IMeterFactory meterFactory)
+    public MetricsDomainMessageMiddleware(IDomainMessageMiddleware inner, IDnsMetrics metrics)
     {
         _inner = inner;
-        var meter = meterFactory.Create(DnsMetrics.MeterName);
-        _queries = meter.CreateCounter<long>(
-            DnsMetrics.QueriesInstrumentName,
-            unit: "{query}",
-            description: "DNS queries answered by a middleware handler");
+        _metrics = metrics;
     }
 
     public string Name => _inner.Name;
@@ -30,7 +24,7 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
         if (result is null)
             return null;
 
-        DnsMetrics.RecordQueries(_queries, context, result);
+        _metrics.RecordQuery(context, result);
         return result;
     }
 }

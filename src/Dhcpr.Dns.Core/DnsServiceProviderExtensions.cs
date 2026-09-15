@@ -95,7 +95,7 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IReferralWalker, ReferralWalker>();
         services.AddScoped<IInternalDomainClient, InternalDomainClient>();
         services.AddScoped<IDnsQueryExecutor, DnsQueryExecutor>();
-        services.AddSingleton<DnsUpstreamMetrics>();
+        services.AddSingleton<IDnsMetrics, DnsMetricsPublisher>();
         services.AddScoped<IDomainClientFactory, DomainClientFactory>();
         services.AddScoped<IEdnsProtocolService, EdnsProtocolService>();
         services.AddScoped<IDnssecValidator, DnssecValidator>();

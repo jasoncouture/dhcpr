@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 
 using Dhcpr.Dhcp.Core.Pipeline;
 using Dhcpr.Dhcp.Core.Protocol;
@@ -36,15 +35,6 @@ public static class DhcpInstrumentation
             activity.SetTag("dhcpr.cancelled", true);
         if (context.Response is not null)
             activity.SetTag("dhcp.response.type", MessageTypeName(context.Response));
-    }
-
-    public static void RecordMessage(Counter<long> messages, DhcpRequestContext context)
-    {
-        messages.Add(
-            1,
-            new KeyValuePair<string, object?>("message_type", MessageTypeName(context.Message)),
-            new KeyValuePair<string, object?>("cancelled", context.Cancel),
-            new KeyValuePair<string, object?>("replied", context.Response is not null));
     }
 
     public static string MessageTypeName(DhcpMessage message)

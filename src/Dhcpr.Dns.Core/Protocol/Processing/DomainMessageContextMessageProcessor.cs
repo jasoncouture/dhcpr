@@ -1,7 +1,6 @@
 ﻿using System.Buffers;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -26,29 +25,20 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
-    private readonly Histogram<double> _duration;
-    private readonly Counter<long> _queries;
+    private readonly IDnsMetrics _metrics;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
         ILiveQueryEventPublisher liveQueryPublisher,
         IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
-        IMeterFactory meterFactory)
+        IDnsMetrics metrics)
     {
         _logger = logger;
         _liveQueryPublisher = liveQueryPublisher;
         _udpRateLimiter = udpRateLimiter;
+        _metrics = metrics;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
-        var meter = meterFactory.Create(DnsMetrics.MeterName);
-        _duration = DnsMetrics.CreateDurationHistogram(
-            meter,
-            DnsMetrics.DurationInstrumentName,
-            "DNS query processing duration");
-        _queries = meter.CreateCounter<long>(
-            DnsMetrics.QueriesInstrumentName,
-            unit: "{query}",
-            description: "DNS queries answered by a middleware handler");
     }
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
@@ -66,9 +56,9 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             {
                 // Rate-limit answers never enter MetricsDomainMessageMiddleware.
                 if (response is not null)
-                    DnsMetrics.RecordQueries(_queries, message.Context, response);
+                    _metrics.RecordQuery(message.Context, response);
                 else
-                    DnsMetrics.RecordQueries(_queries, message.Context, DnsMetrics.DropRcode, error: true);
+                    _metrics.RecordQuery(message.Context, DnsMetrics.DropRcode, error: true);
             }
             else
             {
@@ -89,8 +79,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                 message.Context.AnsweredBy = answeredBy.Name;
 
             DnsInstrumentation.CompleteQuery(activity, message.Context, response);
-            DnsInstrumentation.RecordDuration(
-                _duration,
+            _metrics.RecordDuration(
                 message.Context,
                 response,
                 Stopwatch.GetElapsedTime(started));

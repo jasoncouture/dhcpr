@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -16,20 +15,17 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
 {
     private readonly IEnumerable<IDhcpRequestHandler> _handlers;
     private readonly ILogger<DhcpMessageQueueProcessor> _logger;
-    private readonly Counter<long> _messages;
+    private readonly IDhcpMetrics _metrics;
 
     public DhcpMessageQueueProcessor(IEnumerable<IDhcpRequestHandler> handlers,
         ILogger<DhcpMessageQueueProcessor> logger,
-        IMeterFactory meterFactory)
+        IDhcpMetrics metrics)
     {
         _handlers = handlers.OrderByDescending(i => i.Priority)
             .ThenBy(i => i.Name)
             .ToArray();
         _logger = logger;
-        _messages = meterFactory.Create(DhcpInstrumentation.MeterName).CreateCounter<long>(
-            DhcpInstrumentation.MessagesInstrumentName,
-            unit: "{message}",
-            description: "DHCP messages processed");
+        _metrics = metrics;
     }
 
     public async Task ProcessMessageAsync(QueuedDhcpMessage message, CancellationToken cancellationToken)
@@ -67,7 +63,7 @@ public sealed class DhcpMessageQueueProcessor : IQueueMessageProcessor<QueuedDhc
 
                 await EncodeAndSendAsync(requestContext, udpClient, cancellationToken);
                 DhcpInstrumentation.CompleteMessage(activity, requestContext);
-                DhcpInstrumentation.RecordMessage(_messages, requestContext);
+                _metrics.RecordMessage(requestContext);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }

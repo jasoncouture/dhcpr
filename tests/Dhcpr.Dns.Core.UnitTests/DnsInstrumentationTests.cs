@@ -1,11 +1,8 @@
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
-
-using Microsoft.Extensions.DependencyInjection;
 
 using NSubstitute;
 
@@ -111,83 +108,6 @@ public class DnsInstrumentationTests
     }
 
     [Fact]
-    public void RecordDurationSkipsInternalAndBypass()
-    {
-        double observed = 0;
-        using var meterListener = CreateDurationListener(value => observed += value);
-        var histogram = CreateDurationHistogram();
-
-        var request = DomainMessage.CreateRequest("example.com");
-        var response = DomainMessage.CreateResponse(request);
-        var internalContext = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Loopback, 53000),
-            new IPEndPoint(IPAddress.Loopback, 53),
-            request)
-        {
-            IsInternal = true
-        };
-        var bypassContext = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Loopback, 53000),
-            new IPEndPoint(IPAddress.Loopback, 53),
-            request)
-        {
-            BypassCache = true
-        };
-
-        DnsInstrumentation.RecordDuration(histogram, internalContext, response, TimeSpan.FromMilliseconds(5));
-        DnsInstrumentation.RecordDuration(histogram, bypassContext, response, TimeSpan.FromMilliseconds(5));
-
-        Assert.Equal(0, observed);
-    }
-
-    [Fact]
-    public void RecordDurationCountsClientAnswers()
-    {
-        double observed = 0;
-        using var meterListener = CreateDurationListener(value => observed += value);
-        var histogram = CreateDurationHistogram();
-
-        var request = DomainMessage.CreateRequest("example.com");
-        var response = DomainMessage.CreateResponse(request);
-        var context = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Loopback, 53000),
-            new IPEndPoint(IPAddress.Loopback, 53),
-            request);
-
-        DnsInstrumentation.RecordDuration(histogram, context, response, TimeSpan.FromMilliseconds(25));
-
-        Assert.True(observed > 0);
-    }
-
-    [Fact]
-    public void RecordDurationTagsSource()
-    {
-        string? source = null;
-        using var meterListener = CreateDurationListener((_, tags) =>
-        {
-            foreach (var tag in tags)
-            {
-                if (tag.Key == "source")
-                    source = tag.Value?.ToString();
-            }
-        });
-        var histogram = CreateDurationHistogram();
-        var request = DomainMessage.CreateRequest("example.com");
-        var response = DomainMessage.CreateResponse(request);
-        var context = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
-            new IPEndPoint(IPAddress.Loopback, 853),
-            request)
-        {
-            Source = DnsQuerySource.Dot
-        };
-
-        DnsInstrumentation.RecordDuration(histogram, context, response, TimeSpan.FromMilliseconds(25));
-
-        Assert.Equal("DoT", source);
-    }
-
-    [Fact]
     public async Task TracingDomainClientCreatesUpstreamSpan()
     {
         var started = new Started();
@@ -203,7 +123,7 @@ public class DnsInstrumentationTests
             inner,
             new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53),
             "udp",
-            CreateUpstreamMetrics());
+            Substitute.For<IDnsMetrics>());
         var result = await client.SendAsync(request, CancellationToken.None);
 
         Assert.Same(response, result);
@@ -234,7 +154,7 @@ public class DnsInstrumentationTests
             inner,
             new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53),
             "udp",
-            CreateUpstreamMetrics());
+            Substitute.For<IDnsMetrics>());
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             await client.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None));
 
@@ -246,10 +166,7 @@ public class DnsInstrumentationTests
     [Fact]
     public async Task TracingDomainClientRecordsSuccessUpstreamMetrics()
     {
-        var seen = new UpstreamObservation();
-        using var meterListener = CreateUpstreamListener(seen);
-        var metrics = CreateUpstreamMetrics();
-
+        var metrics = Substitute.For<IDnsMetrics>();
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.NS);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainClient>();
@@ -263,95 +180,93 @@ public class DnsInstrumentationTests
             metrics);
         await client.SendAsync(request, CancellationToken.None);
 
-        Assert.Equal(1, seen.DurationCount);
-        Assert.Equal(1, seen.QueryCount);
-        Assert.True(seen.LastDurationSeconds >= 0);
-        Assert.Equal("udp", seen.Transport);
-        Assert.Equal(false, seen.Error);
-        Assert.Equal(false, seen.Cancelled);
-        Assert.Equal(nameof(DomainResponseCode.NoError), seen.Rcode);
-        Assert.Equal(nameof(DomainRecordType.NS), seen.QueryType);
+        metrics.Received(1).RecordUpstream(
+            "udp",
+            request,
+            response,
+            cancelled: false,
+            error: false,
+            Arg.Any<TimeSpan>());
     }
 
     [Fact]
     public async Task TracingDomainClientRecordsRaceCancelWithoutError()
     {
-        var seen = new UpstreamObservation();
-        using var meterListener = CreateUpstreamListener(seen);
-        var metrics = CreateUpstreamMetrics();
-
+        var metrics = Substitute.For<IDnsMetrics>();
         var inner = Substitute.For<IDomainClient>();
         inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
             .Returns<DomainMessage>(_ => throw new OperationCanceledException());
 
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
+        var request = DomainMessage.CreateRequest("example.com");
         var client = new TracingDomainClient(
             inner,
             new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53),
             "udp",
             metrics);
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await client.SendAsync(DomainMessage.CreateRequest("example.com"), cancelled.Token));
+            await client.SendAsync(request, cancelled.Token));
 
-        Assert.Equal(1, seen.QueryCount);
-        Assert.Equal(false, seen.Error);
-        Assert.Equal(true, seen.Cancelled);
-        Assert.Equal(DnsMetrics.NoneRcode, seen.Rcode);
+        metrics.Received(1).RecordUpstream(
+            "udp",
+            request,
+            null,
+            cancelled: true,
+            error: false,
+            Arg.Any<TimeSpan>());
     }
 
     [Fact]
     public async Task TracingDomainClientRecordsTimeoutAsError()
     {
-        var seen = new UpstreamObservation();
-        using var meterListener = CreateUpstreamListener(seen);
-        var metrics = CreateUpstreamMetrics();
-
+        var metrics = Substitute.For<IDnsMetrics>();
         var inner = Substitute.For<IDomainClient>();
         inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
             .Returns<DomainMessage>(_ => throw new OperationCanceledException());
 
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.DNSKEY);
         var client = new TracingDomainClient(
             inner,
             new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53),
             "tcp",
             metrics);
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await client.SendAsync(
-                DomainMessage.CreateRequest("example.com", DomainRecordType.DNSKEY),
-                CancellationToken.None));
+            await client.SendAsync(request, CancellationToken.None));
 
-        Assert.Equal(1, seen.QueryCount);
-        Assert.Equal("tcp", seen.Transport);
-        Assert.Equal(true, seen.Error);
-        Assert.Equal(false, seen.Cancelled);
-        Assert.Equal(DnsMetrics.NoneRcode, seen.Rcode);
-        Assert.Equal(nameof(DomainRecordType.DNSKEY), seen.QueryType);
+        metrics.Received(1).RecordUpstream(
+            "tcp",
+            request,
+            null,
+            cancelled: false,
+            error: true,
+            Arg.Any<TimeSpan>());
     }
 
     [Fact]
     public async Task TracingDomainClientRecordsExceptionAsError()
     {
-        var seen = new UpstreamObservation();
-        using var meterListener = CreateUpstreamListener(seen);
-        var metrics = CreateUpstreamMetrics();
-
+        var metrics = Substitute.For<IDnsMetrics>();
         var inner = Substitute.For<IDomainClient>();
         inner.SendAsync(Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
             .Returns<DomainMessage>(_ => throw new IOException("upstream reset"));
 
+        var request = DomainMessage.CreateRequest("example.com");
         var client = new TracingDomainClient(
             inner,
             new IPEndPoint(IPAddress.Parse("192.0.2.53"), 53),
             "udp",
             metrics);
         await Assert.ThrowsAsync<IOException>(async () =>
-            await client.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None));
+            await client.SendAsync(request, CancellationToken.None));
 
-        Assert.Equal(1, seen.QueryCount);
-        Assert.Equal(true, seen.Error);
-        Assert.Equal(false, seen.Cancelled);
-        Assert.Equal(DnsMetrics.NoneRcode, seen.Rcode);
+        metrics.Received(1).RecordUpstream(
+            "udp",
+            request,
+            null,
+            cancelled: false,
+            error: true,
+            Arg.Any<TimeSpan>());
     }
 
     private sealed class Started
@@ -373,111 +288,5 @@ public class DnsInstrumentationTests
         };
         ActivitySource.AddActivityListener(listener);
         return listener;
-    }
-
-    private static Histogram<double> CreateDurationHistogram()
-    {
-        var services = new ServiceCollection();
-        services.AddMetrics();
-        var meter = services.BuildServiceProvider().GetRequiredService<IMeterFactory>()
-            .Create(DnsMetrics.MeterName);
-        return meter.CreateHistogram<double>(DnsMetrics.DurationInstrumentName, unit: "s");
-    }
-
-    private static MeterListener CreateDurationListener(Action<double> onMeasurement)
-        => CreateDurationListener((measurement, _) => onMeasurement(measurement));
-
-    private static MeterListener CreateDurationListener(
-        Action<double, ReadOnlySpan<KeyValuePair<string, object?>>> onMeasurement)
-    {
-        var listener = new MeterListener();
-        listener.InstrumentPublished = (instrument, meterListener) =>
-        {
-            if (instrument.Meter.Name == DnsMetrics.MeterName &&
-                instrument.Name == DnsMetrics.DurationInstrumentName)
-            {
-                meterListener.EnableMeasurementEvents(instrument);
-            }
-        };
-        listener.SetMeasurementEventCallback<double>((_, measurement, tags, _) =>
-            onMeasurement(measurement, tags));
-        listener.Start();
-        return listener;
-    }
-
-    private sealed class UpstreamObservation
-    {
-        public int DurationCount;
-        public int QueryCount;
-        public double LastDurationSeconds;
-        public string? Transport;
-        public bool? Error;
-        public bool? Cancelled;
-        public string? Rcode;
-        public string? QueryType;
-    }
-
-    private static DnsUpstreamMetrics CreateUpstreamMetrics()
-    {
-        var services = new ServiceCollection();
-        services.AddMetrics();
-        return new DnsUpstreamMetrics(services.BuildServiceProvider().GetRequiredService<IMeterFactory>());
-    }
-
-    private static MeterListener CreateUpstreamListener(UpstreamObservation seen)
-    {
-        var listener = new MeterListener();
-        listener.InstrumentPublished = (instrument, meterListener) =>
-        {
-            if (instrument.Meter.Name != DnsMetrics.MeterName)
-                return;
-            if (instrument.Name is DnsMetrics.UpstreamDurationInstrumentName
-                or DnsMetrics.UpstreamQueriesInstrumentName)
-                meterListener.EnableMeasurementEvents(instrument);
-        };
-        listener.SetMeasurementEventCallback<double>((instrument, measurement, tags, _) =>
-        {
-            if (instrument.Name != DnsMetrics.UpstreamDurationInstrumentName)
-                return;
-            seen.DurationCount++;
-            seen.LastDurationSeconds = measurement;
-            ReadUpstreamTags(tags, seen);
-        });
-        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, _) =>
-        {
-            if (instrument.Name != DnsMetrics.UpstreamQueriesInstrumentName)
-                return;
-            seen.QueryCount += (int)measurement;
-            ReadUpstreamTags(tags, seen);
-        });
-        listener.Start();
-        return listener;
-    }
-
-    private static void ReadUpstreamTags(
-        ReadOnlySpan<KeyValuePair<string, object?>> tags,
-        UpstreamObservation seen)
-    {
-        foreach (var tag in tags)
-        {
-            switch (tag.Key)
-            {
-                case "network.transport":
-                    seen.Transport = tag.Value?.ToString();
-                    break;
-                case "error":
-                    seen.Error = tag.Value is true;
-                    break;
-                case "cancelled":
-                    seen.Cancelled = tag.Value is true;
-                    break;
-                case "rcode":
-                    seen.Rcode = tag.Value?.ToString();
-                    break;
-                case "query_type":
-                    seen.QueryType = tag.Value?.ToString();
-                    break;
-            }
-        }
     }
 }

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -86,71 +85,6 @@ public static class DnsInstrumentation
         activity.SetTag("dns.response.code", response.Flags.ResponseCode.ToString("G"));
         if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure)
             activity.SetStatus(ActivityStatusCode.Error, "SERVFAIL");
-    }
-
-    public static void RecordDuration(
-        Histogram<double> duration,
-        DomainMessageContext context,
-        DomainMessage? response,
-        TimeSpan elapsed)
-    {
-        if (context.IsInternal || context.BypassCache)
-            return;
-
-        if (response is null && context.AnsweredBy is not "UdpRateLimit")
-            return;
-
-        var question = context.DomainMessage.Questions.IsDefaultOrEmpty
-            ? null
-            : context.DomainMessage.Questions[0];
-        var rcode = response is null
-            ? DnsMetrics.DropRcode
-            : response.Flags.ResponseCode.ToString("G");
-        var error = response is null ||
-                    response.Flags.ResponseCode is not DomainResponseCode.NoError;
-        duration.Record(
-            elapsed.TotalSeconds,
-            new KeyValuePair<string, object?>("cache_hit", context.CacheHit),
-            new KeyValuePair<string, object?>("error", error),
-            new KeyValuePair<string, object?>("rcode", rcode),
-            new KeyValuePair<string, object?>("query_type", question?.Type.ToString("G") ?? "none"),
-            new KeyValuePair<string, object?>("answered_by", context.AnsweredBy ?? "resolver"),
-            new KeyValuePair<string, object?>("source", context.Source.ToMetricLabel()));
-    }
-
-    /// <summary>
-    /// One outbound nameserver query. Directed hops are included — they are
-    /// the RTTs <c>dns.query.duration</c> cannot show.
-    /// </summary>
-    public static void RecordUpstream(
-        Histogram<double> duration,
-        Counter<long> queries,
-        string transport,
-        DomainMessage request,
-        DomainMessage? response,
-        bool cancelled,
-        bool error,
-        TimeSpan elapsed)
-    {
-        var question = request.Questions.IsDefaultOrEmpty ? null : request.Questions[0];
-        var rcode = response is null
-            ? DnsMetrics.NoneRcode
-            : response.Flags.ResponseCode.ToString("G");
-        var queryType = question?.Type.ToString("G") ?? DnsMetrics.NoneRcode;
-        duration.Record(
-            elapsed.TotalSeconds,
-            new KeyValuePair<string, object?>("network.transport", transport),
-            new KeyValuePair<string, object?>("error", error),
-            new KeyValuePair<string, object?>("cancelled", cancelled),
-            new KeyValuePair<string, object?>("rcode", rcode),
-            new KeyValuePair<string, object?>("query_type", queryType));
-        queries.Add(
-            1,
-            new KeyValuePair<string, object?>("network.transport", transport),
-            new KeyValuePair<string, object?>("error", error),
-            new KeyValuePair<string, object?>("cancelled", cancelled),
-            new KeyValuePair<string, object?>("rcode", rcode),
-            new KeyValuePair<string, object?>("query_type", queryType));
     }
 
     private static void SetQuestionTags(Activity activity, DomainMessage message)

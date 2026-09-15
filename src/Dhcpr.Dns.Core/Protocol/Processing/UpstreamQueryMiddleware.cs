@@ -33,8 +33,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
             return null;
 
-        // Caller shuffles; interleave families so a batch is not all one family.
-        using var remaining = NameserverSelection.InterleaveFamilies(endPoints).ToPooledList();
+        using var remaining = endPoints.ToPooledList();
 
         var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
         DomainMessage? nameErrorFallback = null;

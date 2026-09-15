@@ -107,8 +107,8 @@ Chart `serviceMonitor` scrapes `/metrics` on the `http` port.
 
 ## Tracing and OTLP
 
-OTLP traces, metrics, and logs use the OpenTelemetry SDK defaults
-(`OTEL_*`). `/metrics` stays on for Prometheus.
+OTLP traces and logs use the OpenTelemetry SDK defaults (`OTEL_*`).
+Metrics are Prometheus-only (`/metrics`); they are not pushed via OTLP.
 
 | Source | Span | Kind |
 |--------|------|------|

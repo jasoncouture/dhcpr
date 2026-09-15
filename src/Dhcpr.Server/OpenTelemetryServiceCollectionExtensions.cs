@@ -2,6 +2,7 @@ using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -43,16 +44,16 @@ public static class OpenTelemetryServiceCollectionExtensions
                     };
                 });
                 tracing.AddHttpClientInstrumentation();
+                tracing.AddOtlpExporter();
             })
             .WithLogging(
-                configureBuilder: null,
+                configureBuilder: logging => logging.AddOtlpExporter(),
                 configureOptions: options =>
                 {
                     options.IncludeFormattedMessage = true;
                     options.IncludeScopes = true;
                     options.ParseStateValues = true;
-                })
-            .UseOtlpExporter();
+                });
 
         return builder;
     }

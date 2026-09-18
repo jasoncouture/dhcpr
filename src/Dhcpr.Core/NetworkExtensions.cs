@@ -14,11 +14,13 @@ public static partial class NetworkExtensions
         IPNetwork.Parse("10.0.0.0/8"),
         IPNetwork.Parse("172.16.0.0/12"),
         IPNetwork.Parse("192.168.0.0/16"),
-        IPNetwork.Parse("fc00::/7")
+        IPNetwork.Parse("169.254.0.0/16"),
+        IPNetwork.Parse("fc00::/7"),
+        IPNetwork.Parse("fe80::/10")
     ];
 
     /// <summary>
-    /// RFC 1918 IPv4 and unique-local IPv6 (<c>fc00::/7</c>).
+    /// RFC 1918, IPv4 link-local, unique-local IPv6, and IPv6 link-local.
     /// IPv4-mapped IPv6 is compared as IPv4.
     /// </summary>
     public static bool IsPrivateAddress(this IPAddress address)

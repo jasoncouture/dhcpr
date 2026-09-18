@@ -75,7 +75,10 @@ public class SlidingWindowUdpQueryRateLimiterTests
     [InlineData("192.168.1.50")]
     [InlineData("fd12:3456:789a::1")]
     [InlineData("fc00::1")]
+    [InlineData("169.254.1.1")]
+    [InlineData("fe80::1")]
     [InlineData("::ffff:10.0.0.8")]
+    [InlineData("::ffff:169.254.1.1")]
     public void ExemptsPrivateAddresses(string address)
     {
         var limiter = Create(refuse: 1, drop: 2);

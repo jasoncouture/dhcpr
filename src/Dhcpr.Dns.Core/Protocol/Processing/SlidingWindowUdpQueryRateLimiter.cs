@@ -13,7 +13,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// then drop), and client IP over a window <see cref="IpLimitMultiplier"/>
 /// times as long. At or above the per-question rate on that longer window is
 /// abuse: no reply. IPv6 is /64. Idle keys expire. Loopback and private
-/// RFC 1918 / unique-local addresses are not limited.
+/// (RFC 1918, ULA, link-local) addresses are not limited.
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
 {

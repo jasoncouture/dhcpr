@@ -85,6 +85,7 @@ app.UseDohHostIsolation();
 // Infrastructure middleware
 app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
+app.UseWebSockets();
 
 // UI middleware
 app.UseStaticFiles();
@@ -93,6 +94,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapDhcprAccountEndpoints();
+app.MapLiveQueryWebSocket();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization();

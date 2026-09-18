@@ -9,6 +9,32 @@ namespace Dhcpr.Core;
 
 public static partial class NetworkExtensions
 {
+    private static readonly IPNetwork[] PrivateNetworks =
+    [
+        IPNetwork.Parse("10.0.0.0/8"),
+        IPNetwork.Parse("172.16.0.0/12"),
+        IPNetwork.Parse("192.168.0.0/16"),
+        IPNetwork.Parse("fc00::/7")
+    ];
+
+    /// <summary>
+    /// RFC 1918 IPv4 and unique-local IPv6 (<c>fc00::/7</c>).
+    /// IPv4-mapped IPv6 is compared as IPv4.
+    /// </summary>
+    public static bool IsPrivateAddress(this IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+
+        foreach (var network in PrivateNetworks)
+        {
+            if (network.Contains(address))
+                return true;
+        }
+
+        return false;
+    }
+
     public static bool IsInLocalSubnet(this IPAddress address)
     {
         if (IPAddress.IsLoopback(address)) return false;

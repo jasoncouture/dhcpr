@@ -69,6 +69,22 @@ public class SlidingWindowUdpQueryRateLimiterTests
             Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(IPAddress.Loopback, Cisco, DomainRecordType.TXT));
     }
 
+    [Theory]
+    [InlineData("10.1.2.3")]
+    [InlineData("172.16.0.1")]
+    [InlineData("192.168.1.50")]
+    [InlineData("fd12:3456:789a::1")]
+    [InlineData("fc00::1")]
+    [InlineData("::ffff:10.0.0.8")]
+    public void ExemptsPrivateAddresses(string address)
+    {
+        var limiter = Create(refuse: 1, drop: 2);
+        var client = IPAddress.Parse(address);
+
+        for (var i = 0; i < 8; i++)
+            Assert.Equal(UdpRateLimitAction.Allow, limiter.Record(client, Cisco, DomainRecordType.TXT));
+    }
+
     [Fact]
     public void GroupsIpv6BySlash64()
     {

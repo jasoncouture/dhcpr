@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 
+using Dhcpr.Core;
+
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
@@ -10,7 +12,8 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// Two sliding windows for classic DNS (UDP/TCP): client+QNAME+QTYPE (soft REFUSED
 /// then drop), and client IP over a window <see cref="IpLimitMultiplier"/>
 /// times as long. At or above the per-question rate on that longer window is
-/// abuse: no reply. IPv6 is /64. Idle keys expire. Loopback is not limited.
+/// abuse: no reply. IPv6 is /64. Idle keys expire. Loopback and private
+/// RFC 1918 / unique-local addresses are not limited.
 /// </summary>
 public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDisposable
 {
@@ -36,7 +39,7 @@ public sealed class SlidingWindowUdpQueryRateLimiter : IUdpQueryRateLimiter, IDi
         if (client is null)
             return UdpRateLimitAction.Drop;
 
-        if (IPAddress.IsLoopback(client))
+        if (IPAddress.IsLoopback(client) || client.IsPrivateAddress())
             return UdpRateLimitAction.Allow;
 
         var prefix = PartitionKey(client);

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Net;
 using System.Threading.Channels;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -73,7 +72,7 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
     public async ValueTask HandleAsync(DnsQueryEvent message, CancellationToken cancellationToken)
     {
         await Task.Yield();
-        if (IsHealthCheckProbe(message))
+        if (LiveQueryFilters.IsHealthCheckProbe(message))
             return;
 
         lock (_ringLock)
@@ -86,10 +85,6 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
         foreach (var writer in _subscribers.Values)
             writer.TryWrite(message);
     }
-
-    // Health checks use 127.0.0.1:0 / [::1]:0. Real loopback clients have an ephemeral port.
-    private static bool IsHealthCheckProbe(DnsQueryEvent evt) =>
-        evt.Client is { Port: 0, Address: { } address } && IPAddress.IsLoopback(address);
 
     public async ValueTask DisposeAsync()
     {

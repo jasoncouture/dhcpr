@@ -33,6 +33,53 @@ public class BlackholeDomainMiddlewareTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("a.b.localdomain")]
+    [InlineData("www.example.localdomain")]
+    [InlineData("_avatars-sec._tcp.daynix.com.localdomain")]
+    [InlineData("A.B.LOCALDOMAIN")]
+    public async Task RegexBlackholesMultiLabelLocaldomain(string qname)
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = Create(inner, @".+\..+\.localdomain$");
+        var request = DomainMessage.CreateRequest(qname, DomainRecordType.A);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("host.localdomain")]
+    [InlineData("localdomain")]
+    [InlineData("example.com")]
+    public async Task RegexDoesNotBlackholeTwoLabelLocaldomain(string qname)
+    {
+        var request = DomainMessage.CreateRequest(qname, DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+
+        var middleware = Create(inner, @".+\..+\.localdomain$");
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(response, result);
+        await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task OtherNamesPassThrough()
     {

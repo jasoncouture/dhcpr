@@ -5,7 +5,7 @@
 
 <SettingsForm Title="Blackhole domains" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
     <label>
-        One suffix per line
+        One suffix or regex per line (e.g. .+\..+\.localdomain$)
         <textarea rows="10" @bind="_blackhole"></textarea>
     </label>
 </SettingsForm>

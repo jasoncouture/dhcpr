@@ -33,10 +33,16 @@ public sealed class DnsConfiguration : IValidateSelf
     public ParsedConfiguredRecordIndex GetParsedRecords() => _parsedRecords;
 
     /// <summary>
-    /// Domain suffixes that always receive NXDOMAIN (no cache / upstream).
-    /// Matches the name itself and any subdomain (e.g. <c>example.com</c> → <c>*.example.com</c>).
+    /// Domain suffixes or regexes that always receive NXDOMAIN (no cache / upstream).
+    /// A suffix matches the name and any subdomain (e.g. <c>example.com</c> → <c>*.example.com</c>).
+    /// A line is a regex when it starts with <c>/</c> or contains
+    /// <c>^ $ + * ? [ ( { | \</c> (e.g. <c>.+\..+\.localdomain$</c>).
     /// </summary>
     public string[] BlackholeDomains { get; set; } = Array.Empty<string>();
+
+    private BlackholeRuleSet _blackholeRules = BlackholeRuleSet.Empty;
+
+    public BlackholeRuleSet GetBlackholeRules() => _blackholeRules;
 
     /// <summary>
     /// RFC 9462 designated resolvers advertised as SVCB at <c>_dns.resolver.arpa</c>.
@@ -189,7 +195,9 @@ public sealed class DnsConfiguration : IValidateSelf
         BlackholeDomains ??= Array.Empty<string>();
         for (var i = 0; i < BlackholeDomains.Length; i++)
         {
-            var domain = BlackholeDomains[i]?.Trim().TrimEnd('.');
+            var domain = BlackholeDomains[i]?.Trim() ?? "";
+            if (!BlackholeRuleSet.LooksLikeRegex(domain))
+                domain = domain.TrimEnd('.');
             if (string.IsNullOrWhiteSpace(domain))
             {
                 error = $"DNS:BlackholeDomains[{i}] is empty";
@@ -198,6 +206,9 @@ public sealed class DnsConfiguration : IValidateSelf
 
             BlackholeDomains[i] = domain;
         }
+
+        if (!BlackholeRuleSet.TryCreate(BlackholeDomains, out error, out _blackholeRules))
+            return false;
 
         DesignatedResolvers ??= [];
         for (var i = 0; i < DesignatedResolvers.Length; i++)

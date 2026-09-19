@@ -3,13 +3,16 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// NXDOMAIN for configured blackhole suffixes (and their subdomains) before
-/// cache or upstream — used to sinkhole attack domains.
+/// NXDOMAIN for configured blackhole suffixes and regexes before cache or
+/// upstream — used to sinkhole attack domains and search-domain junk.
 /// </summary>
 public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
 {
     private readonly IDomainMessageMiddleware _inner;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
+
+    private string[]? _cachedDomains;
+    private BlackholeRuleSet _rules = BlackholeRuleSet.Empty;
 
     public BlackholeDomainMiddleware(
         IDomainMessageMiddleware inner,
@@ -26,12 +29,12 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        var blackholes = _options.CurrentValue.BlackholeDomains;
-        if (blackholes is { Length: > 0 })
+        var rules = CurrentRules();
+        if (!rules.IsEmpty)
         {
             foreach (var question in context.DomainMessage.Questions)
             {
-                if (!IsBlackholed(question.Name, blackholes))
+                if (!rules.Matches(question.Name))
                     continue;
 
                 context.AnsweredBy = "Blackhole";
@@ -46,17 +49,24 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
     }
 
     internal static bool IsBlackholed(DomainLabels name, string[] blackholes)
-    {
-        var qname = name.ToString();
-        foreach (var suffix in blackholes)
-        {
-            if (qname.Equals(suffix, StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (qname.Length > suffix.Length + 1 &&
-                qname.EndsWith($".{suffix}", StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
+        => BlackholeRuleSet.TryCreate(blackholes, out _, out var rules) && rules.Matches(name);
 
-        return false;
+    private BlackholeRuleSet CurrentRules()
+    {
+        var config = _options.CurrentValue;
+        var compiled = config.GetBlackholeRules();
+        if (!compiled.IsEmpty || config.BlackholeDomains is not { Length: > 0 })
+            return compiled;
+
+        var domains = config.BlackholeDomains;
+        if (ReferenceEquals(domains, _cachedDomains))
+            return _rules;
+
+        if (!BlackholeRuleSet.TryCreate(domains, out _, out var rules))
+            return BlackholeRuleSet.Empty;
+
+        _cachedDomains = domains;
+        _rules = rules;
+        return _rules;
     }
 }

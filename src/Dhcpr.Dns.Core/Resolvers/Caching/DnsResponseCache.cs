@@ -207,7 +207,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = lifetime,
-            SlidingExpiration = lifetime / 4,
+            SlidingExpiration = lifetime / 2,
             Size = 1
         });
         return true;

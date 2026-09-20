@@ -32,12 +32,10 @@ public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         await Task.Yield();
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
-
-        var answer = _options.CurrentValue.GetParsedRecords()
-            .TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address);
-        if (answer is null)
+        if (
+            context.UpstreamEndpoints is { Length: > 0 } || 
+            _options.CurrentValue.GetParsedRecords().TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address) is not {} answer
+            )
             return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         context.DoNotCacheResponse = true;

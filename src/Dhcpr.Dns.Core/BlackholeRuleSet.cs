@@ -128,33 +128,24 @@ public sealed class BlackholeRuleSet
         [NotNullWhen(false)] out string? error,
         [NotNullWhen(true)] out string? pattern)
     {
-        if (entry[0] != '/')
+        if (!entry.StartsWith('/'))
         {
             error = null;
             pattern = entry;
             return true;
         }
 
-        var last = entry.LastIndexOf('/');
-        if (last <= 0)
+        if (entry.Length < 2 || !entry.EndsWith('/'))
         {
             error = $"DNS:BlackholeDomains[{index}] is a regex missing a closing '/'";
             pattern = null;
             return false;
         }
 
-        pattern = entry[1..last];
-        var flags = entry[(last + 1)..];
+        pattern = entry[1..^1];
         if (pattern.Length == 0)
         {
             error = $"DNS:BlackholeDomains[{index}] is an empty regex";
-            pattern = null;
-            return false;
-        }
-
-        if (flags.Length > 0 && !flags.Equals("i", StringComparison.OrdinalIgnoreCase))
-        {
-            error = $"DNS:BlackholeDomains[{index}] has unsupported regex flags '{flags}'";
             pattern = null;
             return false;
         }

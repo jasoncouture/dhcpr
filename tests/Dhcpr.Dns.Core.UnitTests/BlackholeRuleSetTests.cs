@@ -7,7 +7,7 @@ public sealed class BlackholeRuleSetTests
     [InlineData("ads.example", false)]
     [InlineData(@".+\..+\.localdomain$", true)]
     [InlineData(@"/^.+\.evil$/", true)]
-    [InlineData(@"/foo/i", true)]
+    [InlineData(@"/foo/", true)]
     [InlineData("^root", true)]
     [InlineData(@"foo\.bar", true)]
     public void ClassifiesSuffixVersusRegex(string entry, bool regex)
@@ -20,11 +20,20 @@ public sealed class BlackholeRuleSetTests
         Assert.Contains("valid regex", error);
     }
 
-    [Fact]
-    public void RejectsUnclosedSlashRegex()
+    [Theory]
+    [InlineData("/foo")]
+    [InlineData("/foo/i")]
+    public void RejectsUnclosedSlashRegex(string entry)
     {
-        Assert.False(BlackholeRuleSet.TryCreate(["/foo"], out var error, out _));
+        Assert.False(BlackholeRuleSet.TryCreate([entry], out var error, out _));
         Assert.Contains("closing", error);
+    }
+
+    [Fact]
+    public void AcceptsInlineNetOptions()
+    {
+        Assert.True(BlackholeRuleSet.TryCreate([@"(?i).+\..+\.localdomain$"], out var error, out var rules), error);
+        Assert.True(rules.Matches("A.B.LOCALDOMAIN"));
     }
 
     [Fact]

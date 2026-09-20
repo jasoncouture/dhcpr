@@ -30,7 +30,8 @@ public interface IDnsResponseCache
 
     /// <summary>
     /// Stores <paramref name="response"/> for <paramref name="request"/>. Implementations may skip
-    /// truncated, SERVFAIL, REFUSED, Bogus, or referral answers.
+    /// truncated, SERVFAIL, Bogus, or referral answers. Empty NOTIMP /
+    /// REFUSED policy answers are stored for an hour.
     /// </summary>
     void Set(DomainMessage request, DomainMessage response, DnssecValidationStatus securityStatus = DnssecValidationStatus.Unchecked);
 

@@ -48,6 +48,27 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
+    public void PolicyResponseTtlIsOneHour()
+        => Assert.Equal(TimeSpan.FromHours(1), DnsResponseCache.PolicyResponseTtl);
+
+    [Theory]
+    [InlineData(DomainResponseCode.NotImplemented)]
+    [InlineData(DomainResponseCode.Refused)]
+    public void EmptyPolicyAnswersAreCached(DomainResponseCode rcode)
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.ANY);
+        var response = DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, rcode);
+
+        cache.Set(request, response);
+
+        Assert.True(cache.TryGet(request, out var cached));
+        Assert.NotNull(cached);
+        Assert.Equal(rcode, cached!.Flags.ResponseCode);
+        Assert.Empty(cached.Records.Answers);
+    }
+
+    [Fact]
     public void DoesNotCacheServerFailure()
     {
         var cache = CreateCache();

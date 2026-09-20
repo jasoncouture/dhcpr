@@ -69,6 +69,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
         // Inside cache: BIND CHAOS bait is stored. ip.info is DoNotCacheResponse.
         services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
+        // Inside cache: NOTIMP / REFUSED policy answers live for an hour.
+        services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
@@ -78,9 +80,6 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
-        // Class other than IN/CH → NOTIMP; ANY / unknown QTYPE → NOTIMP;
-        // HINFO / AXFR / IXFR → REFUSED.
-        services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // RFC 6303 empty reverse zones — NXDOMAIN locally, no public leak/SERVFAIL.
         services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
         // RFC 9462: resolver.arpa is locally served (never cached or forwarded).

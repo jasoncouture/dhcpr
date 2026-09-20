@@ -18,6 +18,11 @@ public sealed class DnsResponseCache : IDnsResponseCache
     private static readonly TimeSpan _negativeCacheTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan _maxCacheTtl = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// How long empty NOTIMP / REFUSED policy answers are kept.
+    /// </summary>
+    public static readonly TimeSpan PolicyResponseTtl = TimeSpan.FromHours(1);
+
     private readonly IMemoryCache _memoryCache;
     private readonly IDnsCacheEventPublisher _events;
 
@@ -146,7 +151,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return false;
         if (response.Flags.Truncated)
             return false;
-        if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure or DomainResponseCode.Refused)
+        if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure)
             return false;
         if (securityStatus is DnssecValidationStatus.Bogus)
             return false;
@@ -273,6 +278,9 @@ public sealed class DnsResponseCache : IDnsResponseCache
 
         if (response.Flags.ResponseCode is DomainResponseCode.NameError or DomainResponseCode.NoError)
             return _negativeCacheTtl;
+
+        if (response.Flags.ResponseCode is DomainResponseCode.NotImplemented or DomainResponseCode.Refused)
+            return PolicyResponseTtl;
 
         return TimeSpan.Zero;
     }

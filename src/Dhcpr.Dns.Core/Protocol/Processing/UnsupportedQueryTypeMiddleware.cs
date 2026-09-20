@@ -2,7 +2,9 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
 /// Rejects query class other than IN/CH with NOTIMP, QTYPE ANY and unknown
-/// types with NOTIMP, and HINFO / AXFR / IXFR with REFUSED.
+/// types with NOTIMP, and HINFO / AXFR / IXFR with REFUSED. Lives inside
+/// the response cache; those answers are stored for
+/// <see cref="Resolvers.Caching.DnsResponseCache.PolicyResponseTtl"/>.
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {

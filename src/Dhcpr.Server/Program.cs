@@ -1,6 +1,7 @@
 using Dhcpr.Core;
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
+using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
 using Dhcpr.Server.Components;
@@ -12,6 +13,7 @@ using Dhcpr.Server.Orleans.LiveQueries;
 using Dhcpr.Server.Settings;
 
 using Dhcpr.Server.Orleans.DataProtection;
+using Dhcpr.Server.Orleans.DnsCookies;
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -63,6 +65,8 @@ builder.Services.AddHostedService(static sp =>
     (OrleansDnsCacheEventPublisher)sp.GetRequiredService<IDnsCacheEventPublisher>());
 builder.Services.AddHostedService<DnsCacheOrleansBridge>();
 builder.Services.AddHostedService<DataProtectionKeyOrleansBridge>();
+builder.Services.Replace(ServiceDescriptor.Singleton<IDnsServerCookieSecretSource, OrleansDnsServerCookieSecretSource>());
+builder.Services.AddHostedService<DnsServerCookieSecretOrleansBridge>();
 builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();
 builder.Services.AddHostedService(static sp =>
     (LiveQueryStore)sp.GetRequiredService<ILiveQueryStore>());

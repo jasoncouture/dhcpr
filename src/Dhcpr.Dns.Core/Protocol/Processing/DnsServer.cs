@@ -245,9 +245,10 @@ public sealed partial class DnsServer : BackgroundService
         try
         {
             sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
-            using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            handshakeCts.CancelAfter(TcpReadTimeout);
-            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), handshakeCts.Token);
+            // CancelAfter is not enough: SslStream often ignores the token until the
+            // next read. WaitAsync lets finally dispose the socket and abort it.
+            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken)
+                .WaitAsync(TcpReadTimeout, cancellationToken);
             await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

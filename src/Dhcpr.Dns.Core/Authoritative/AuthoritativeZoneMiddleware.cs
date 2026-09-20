@@ -26,7 +26,6 @@ public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        await Task.Yield();
         if (context.UpstreamEndpoints is { Length: > 0 } ||
             context.DomainMessage.Questions.Length == 0)
             return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);

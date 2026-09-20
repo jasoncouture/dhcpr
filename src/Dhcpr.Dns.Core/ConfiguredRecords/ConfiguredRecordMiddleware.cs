@@ -31,7 +31,6 @@ public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        await Task.Yield();
         if (
             context.UpstreamEndpoints is { Length: > 0 } || 
             _options.CurrentValue.GetParsedRecords().TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address) is not {} answer

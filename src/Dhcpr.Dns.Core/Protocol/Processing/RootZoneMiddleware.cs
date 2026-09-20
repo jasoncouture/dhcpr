@@ -37,7 +37,6 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        await Task.Yield();
         var snapshot = _store.Current;
         if (snapshot is null)
             return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);

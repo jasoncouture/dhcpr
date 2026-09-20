@@ -32,7 +32,6 @@ public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        await Task.Yield();
         if (
             context.UpstreamEndpoints is { Length: > 0 } ||
             DynamicDnsAnswerer.TryAnswer(_store, _zones, context.DomainMessage) is not { } answer

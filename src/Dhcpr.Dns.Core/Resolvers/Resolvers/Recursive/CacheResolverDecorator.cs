@@ -24,6 +24,7 @@ public sealed class CacheResolverDecorator : IDomainMessageMiddleware
         {
             context.CacheHit = true;
             context.CachedDnssecStatus = securityStatus;
+            context.AnsweredBy = "Cache";
             return cached;
         }
 

@@ -195,10 +195,14 @@ public class DnsResponseCacheTests
         var context = new DomainMessageContext(null, null, request);
 
         var first = await decorator.ProcessAsync(context, CancellationToken.None);
+        Assert.Null(context.AnsweredBy);
+
         var second = await decorator.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(first);
         Assert.NotNull(second);
+        Assert.True(context.CacheHit);
+        Assert.Equal("Cache", context.AnsweredBy);
         await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
         Assert.Equal(address, ((IPAddressData)second!.Records.Answers[0].Data).Address);
     }

@@ -37,6 +37,12 @@ public enum DomainRecordType : ushort
     HTTPS = 0x41,
     CAA = 0x101,
 
+    /// <summary>RFC 1995 incremental zone transfer — refused on this resolver.</summary>
+    IXFR = 251,
+
+    /// <summary>RFC 1035 full zone transfer — refused on this resolver.</summary>
+    AXFR = 252,
+
     /// <summary>RFC 1035 QTYPE * — request all records (typically NOTIMP per RFC 8482).</summary>
     ANY = 255,
 

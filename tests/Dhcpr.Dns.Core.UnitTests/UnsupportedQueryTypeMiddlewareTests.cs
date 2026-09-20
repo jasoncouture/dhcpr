@@ -10,9 +10,13 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class UnsupportedQueryTypeMiddlewareTests
 {
     [Theory]
-    [InlineData(DomainRecordType.ANY)]
-    [InlineData(DomainRecordType.HINFO)]
-    public async Task BlockedTypeReturnsNotImplementedWithoutCallingInner(DomainRecordType type)
+    [InlineData(DomainRecordType.HINFO, DomainResponseCode.Refused)]
+    [InlineData(DomainRecordType.AXFR, DomainResponseCode.Refused)]
+    [InlineData(DomainRecordType.IXFR, DomainResponseCode.Refused)]
+    [InlineData(DomainRecordType.ANY, DomainResponseCode.NotImplemented)]
+    public async Task BlockedTypeReturnsConfiguredRcodeWithoutCallingInner(
+        DomainRecordType type,
+        DomainResponseCode rcode)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
@@ -25,7 +29,7 @@ public class UnsupportedQueryTypeMiddlewareTests
         var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal(DomainResponseCode.NotImplemented, result!.Flags.ResponseCode);
+        Assert.Equal(rcode, result!.Flags.ResponseCode);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

@@ -1,8 +1,8 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Rejects QTYPE ANY (255), HINFO, and other unknown QTYPEs with NOTIMP before
-/// cache or upstream work. Attack traffic must not poison the cache.
+/// Rejects QTYPE ANY and unknown types with NOTIMP, and HINFO / AXFR / IXFR
+/// with REFUSED, before cache or upstream work.
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {
@@ -22,17 +22,26 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     {
         foreach (var question in context.DomainMessage.Questions)
         {
-            if (question.Type is DomainRecordType.ANY or DomainRecordType.HINFO
-                || !Enum.IsDefined(question.Type))
+            if (RefuseCode(question.Type) is { } rcode)
             {
                 context.AnsweredBy = "UnsupportedQueryType";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
                     DomainResourceRecords.Empty,
-                    DomainResponseCode.NotImplemented);
+                    rcode);
             }
         }
 
         return await _inner.ProcessAsync(context, cancellationToken);
     }
+
+    internal static DomainResponseCode? RefuseCode(DomainRecordType type)
+        => type switch
+        {
+            DomainRecordType.HINFO or DomainRecordType.AXFR or DomainRecordType.IXFR
+                => DomainResponseCode.Refused,
+            DomainRecordType.ANY => DomainResponseCode.NotImplemented,
+            _ when !Enum.IsDefined(type) => DomainResponseCode.NotImplemented,
+            _ => null
+        };
 }

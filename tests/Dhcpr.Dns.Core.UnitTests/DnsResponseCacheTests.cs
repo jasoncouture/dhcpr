@@ -166,6 +166,98 @@ public class DnsResponseCacheTests
         Assert.Equal(glueAddress, ((IPAddressData)cachedGlue!.Records.Answers[0].Data).Address);
     }
 
+    [Theory]
+    [InlineData(80, 0, false)]
+    [InlineData(80, 69, false)]
+    [InlineData(80, 70, false)]
+    [InlineData(80, 71, true)]
+    public void ShouldRefreshWhenLessThanOneEighthRemains(int lifetimeSeconds, int ageSeconds, bool expected)
+        => Assert.Equal(
+            expected,
+            DnsResponseCache.ShouldRefresh(TimeSpan.FromSeconds(lifetimeSeconds), TimeSpan.FromSeconds(ageSeconds)));
+
+    [Fact]
+    public void TryGetFlagsRefreshWhenImportIsPastSevenEighths()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("stale.example", DomainRecordType.A);
+        var response = AddressResponse(request, "203.0.113.9");
+        cache.Import(
+            request,
+            response,
+            DnssecValidationStatus.Unchecked,
+            DateTimeOffset.UtcNow - TimeSpan.FromSeconds(270));
+
+        Assert.True(cache.TryGet(request, out var cached, out _, out var shouldRefresh));
+        Assert.NotNull(cached);
+        Assert.True(shouldRefresh);
+    }
+
+    [Fact]
+    public void FreshSetDoesNotAskForRefresh()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("fresh.example", DomainRecordType.A);
+        cache.Set(request, AddressResponse(request, "203.0.113.10"));
+
+        Assert.True(cache.TryGet(request, out _, out _, out var shouldRefresh));
+        Assert.False(shouldRefresh);
+    }
+
+    [Fact]
+    public async Task DecoratorRefreshesInBackgroundWithoutBlockingTheHit()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("hot.example", DomainRecordType.A);
+        cache.Import(
+            request,
+            AddressResponse(request, "203.0.113.11"),
+            DnssecValidationStatus.Unchecked,
+            DateTimeOffset.UtcNow - TimeSpan.FromSeconds(270));
+
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<DomainMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendRefreshAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                started.TrySetResult();
+                return new ValueTask<DomainMessage>(finish.Task);
+            });
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, client, logger: null);
+        var context = new DomainMessageContext(null, null, request);
+
+        var hit = await decorator.ProcessAsync(context, CancellationToken.None);
+
+        Assert.True(context.CacheHit);
+        Assert.Equal("Cache", context.AnsweredBy);
+        Assert.Equal(IPAddress.Parse("203.0.113.11"), ((IPAddressData)hit!.Records.Answers[0].Data).Address);
+        await inner.DidNotReceive().ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var refreshed = AddressResponse(request, "203.0.113.12");
+        finish.TrySetResult(refreshed);
+        DomainMessage? after = null;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        var shouldRefresh = true;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (cache.TryGet(request, out after, out _, out shouldRefresh) &&
+                after?.Records.Answers is [{ Data: IPAddressData ip }] &&
+                ip.Address.Equals(IPAddress.Parse("203.0.113.12")))
+                break;
+            await Task.Delay(10);
+        }
+
+        Assert.False(shouldRefresh);
+        Assert.Equal(IPAddress.Parse("203.0.113.12"), ((IPAddressData)after!.Records.Answers[0].Data).Address);
+    }
+
     [Fact]
     public async Task DecoratorServesCachedResponseWithoutCallingInner()
     {

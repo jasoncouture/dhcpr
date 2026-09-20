@@ -33,4 +33,14 @@ public interface IInternalDomainClient : IDomainClient
         DomainMessageContext parentContext,
         DomainMessage message,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Re-enter the pipeline to replace a soon-to-expire cache entry. Bypasses
+    /// the response cache so the origin is queried again. Own DNSSEC scope and
+    /// work budget. Caller stores the result.
+    /// </summary>
+    ValueTask<DomainMessage> SendRefreshAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        CancellationToken cancellationToken);
 }

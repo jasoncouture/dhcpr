@@ -160,6 +160,42 @@ public class InternalDomainClientTests
     }
 
     [Fact]
+    public async Task SendRefreshAsync_BypassesCacheAndUsesOwnScope()
+    {
+        var queue = new CountingQueue();
+        var client = new InternalDomainClient(queue.Queue);
+        var parentScope = new DnssecScope();
+        var parentBudget = new QueryWorkBudget(limit: 0);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
+        {
+            InternalHopDepth = InternalDomainClient.MaxInternalHops,
+            DnssecScope = parentScope,
+            WorkBudget = parentBudget
+        };
+
+        var sendTask = client.SendRefreshAsync(
+            parent,
+            DomainMessage.CreateRequest("example.com", DomainRecordType.A),
+            CancellationToken.None).AsTask();
+
+        Assert.Equal(1, queue.EnqueueCount);
+        Assert.NotNull(queue.LastMessage);
+        Assert.True(queue.LastMessage!.Context.BypassCache);
+        Assert.True(queue.LastMessage.Context.IsInternal);
+        Assert.True(queue.LastMessage.Context.SuppressAddressPrefetch);
+        Assert.NotSame(parentScope, queue.LastMessage.Context.DnssecScope);
+        Assert.NotSame(parentBudget, queue.LastMessage.Context.WorkBudget);
+
+        queue.LastMessage.TaskCompletionSource.TrySetResult(
+            DomainMessage.CreateResponse(
+                queue.LastMessage.Context.DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.NoError));
+
+        await sendTask;
+    }
+
+    [Fact]
     public async Task SendAsync_CoalescesIdenticalDirectedHops()
     {
         var queue = new CountingQueue();

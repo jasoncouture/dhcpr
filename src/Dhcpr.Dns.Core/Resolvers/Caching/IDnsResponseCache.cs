@@ -19,6 +19,16 @@ public interface IDnsResponseCache
     bool TryGet(DomainMessage request, out DomainMessage? response, out DnssecValidationStatus securityStatus);
 
     /// <summary>
+    /// Same as the status lookup, and sets <paramref name="shouldRefresh"/> when
+    /// less than 1/8 of the stored lifetime remains (hot-record recache).
+    /// </summary>
+    bool TryGet(
+        DomainMessage request,
+        out DomainMessage? response,
+        out DnssecValidationStatus securityStatus,
+        out bool shouldRefresh);
+
+    /// <summary>
     /// Stores <paramref name="response"/> for <paramref name="request"/>. Implementations may skip
     /// truncated, SERVFAIL, REFUSED, Bogus, or referral answers.
     /// </summary>

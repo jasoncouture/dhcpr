@@ -27,13 +27,27 @@ public sealed class DnsResponseCache : IDnsResponseCache
         _events = events ?? NoOpDnsCacheEventPublisher.Instance;
     }
 
+    /// <summary>
+    /// True when elapsed age has left less than 1/8 of <paramref name="lifetime"/>.
+    /// </summary>
+    public static bool ShouldRefresh(TimeSpan lifetime, TimeSpan age)
+        => lifetime > TimeSpan.Zero && age * 8 > lifetime * 7;
+
     public bool TryGet(DomainMessage request, out DomainMessage? response)
         => TryGet(request, out response, out _);
 
     public bool TryGet(DomainMessage request, out DomainMessage? response, out DnssecValidationStatus securityStatus)
+        => TryGet(request, out response, out securityStatus, out _);
+
+    public bool TryGet(
+        DomainMessage request,
+        out DomainMessage? response,
+        out DnssecValidationStatus securityStatus,
+        out bool shouldRefresh)
     {
         response = null;
         securityStatus = DnssecValidationStatus.Unchecked;
+        shouldRefresh = false;
         if (request.Questions.Length != 1)
             return false;
 
@@ -45,6 +59,7 @@ public sealed class DnsResponseCache : IDnsResponseCache
         if (age < TimeSpan.Zero)
             age = TimeSpan.Zero;
 
+        shouldRefresh = ShouldRefresh(entry.Lifetime, age);
         securityStatus = entry.SecurityStatus;
         // Never resurrect AD from cache flags — Dnssec middleware applies AD from status.
         response = new DomainMessage(
@@ -162,24 +177,24 @@ public sealed class DnsResponseCache : IDnsResponseCache
         DnssecValidationStatus securityStatus,
         DateTimeOffset cachedAt)
     {
-        var lifetime = ComputeLifetime(response);
-        if (lifetime <= TimeSpan.Zero)
+        var originalLifetime = ComputeLifetime(response);
+        if (originalLifetime <= TimeSpan.Zero)
             return false;
 
-        if (lifetime > _maxCacheTtl)
-            lifetime = _maxCacheTtl;
+        if (originalLifetime > _maxCacheTtl)
+            originalLifetime = _maxCacheTtl;
 
         var age = DateTimeOffset.UtcNow - cachedAt;
         if (age < TimeSpan.Zero)
             age = TimeSpan.Zero;
-        lifetime -= age;
+        var lifetime = originalLifetime - age;
         if (lifetime <= TimeSpan.Zero)
             return false;
 
         var key = DnsCacheKey.FromQuestion(request.Questions[0]);
         // Strip AD — security lives in SecurityStatus only.
         var flags = response.Flags with { Authentic = false };
-        var entry = new CacheEntry(flags, EdnsCookie.StripCookies(response.Records), cachedAt)
+        var entry = new CacheEntry(flags, EdnsCookie.StripCookies(response.Records), cachedAt, originalLifetime)
         {
             SecurityStatus = securityStatus
         };
@@ -301,16 +316,19 @@ public sealed class DnsResponseCache : IDnsResponseCache
         public CacheEntry(
             DomainMessageFlags flags,
             DomainResourceRecords records,
-            DateTimeOffset cachedAt)
+            DateTimeOffset cachedAt,
+            TimeSpan lifetime)
         {
             Flags = flags;
             Records = records;
             CachedAt = cachedAt;
+            Lifetime = lifetime;
         }
 
         public DomainMessageFlags Flags { get; }
         public DomainResourceRecords Records { get; }
         public DateTimeOffset CachedAt { get; }
+        public TimeSpan Lifetime { get; }
         public DnssecValidationStatus SecurityStatus { get; set; }
     }
 }

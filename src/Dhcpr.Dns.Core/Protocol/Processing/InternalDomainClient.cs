@@ -138,6 +138,32 @@ public class InternalDomainClient : IInternalDomainClient
         return await EnqueueAsync(context, cancellationToken);
     }
 
+    public async ValueTask<DomainMessage> SendRefreshAsync(
+        DomainMessageContext parentContext,
+        DomainMessage message,
+        CancellationToken cancellationToken)
+    {
+        var context = new DomainMessageContext(
+            parentContext.ClientEndPoint,
+            parentContext.ServerEndPoint,
+            message)
+        {
+            IsInternal = true,
+            InternalHopDepth = 1,
+            DnssecScope = new DnssecScope(),
+            WorkBudget = new QueryWorkBudget(),
+            NameserverTips = parentContext.NameserverTips ?? new NameserverTipCache(),
+            QueryCoalescer = new QueryCoalescer(),
+            BypassCache = true,
+            SuppressAddressPrefetch = true,
+            Source = parentContext.Source,
+            ParentTraceContext = DnsInstrumentation.CaptureContext(),
+            ClientCookie = parentContext.ClientCookie
+        };
+
+        return await EnqueueAsync(context, cancellationToken);
+    }
+
     private static DomainMessage ServFail(DomainMessage message)
         => DomainMessage.CreateResponse(
             message,

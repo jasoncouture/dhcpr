@@ -1,0 +1,15 @@
+---
+description: Keep Task.Yield and do not singleton-everything
+alwaysApply: true
+---
+
+# Yield and lifetime
+
+`Task.Yield()` is load-bearing. Measured query times dropped after adding it. Do not remove it, "optimize it out," or recommend removing it as a hot-path win.
+
+Do not make services singletons by default, and do not recommend that as a performance fix. Scoped/transient registrations stay unless the user asks to change them. Same reason: forcing singleton lifetime made things worse.
+
+Forbidden:
+- deleting or "simplifying away" existing `await Task.Yield()`
+- suggesting Yield is wasted work on cache hits
+- rewriting a scoped/transient service to singleton (or hosted-singleton) without being asked

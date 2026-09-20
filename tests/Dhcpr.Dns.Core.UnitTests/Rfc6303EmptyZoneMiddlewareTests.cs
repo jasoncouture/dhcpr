@@ -4,7 +4,10 @@ using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -64,6 +67,27 @@ public class Rfc6303EmptyZoneMiddlewareTests
 
         Assert.Same(response, result);
         await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CachedNxDomainSkipsSuffixMatchOnTheNextLookup()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(Create(inner), cache);
+        var firstContext = Context(DomainMessage.CreateRequest("232.0.168.192.in-addr.arpa", DomainRecordType.PTR));
+        var secondContext = Context(DomainMessage.CreateRequest("232.0.168.192.in-addr.arpa", DomainRecordType.PTR));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.NameError, first!.Flags.ResponseCode);
+        Assert.Equal("rfc6303", firstContext.AnsweredBy);
+        Assert.Equal(DomainResponseCode.NameError, second!.Flags.ResponseCode);
+        Assert.True(secondContext.CacheHit);
+        Assert.Equal("Cache", secondContext.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

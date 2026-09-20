@@ -63,7 +63,7 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IDomainMessageMiddleware, ForwardResolver>();
         services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → resolver.arpa → RFC 6303 → …
+        // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         // Inside cache: sinkhole NXDOMAIN is stored so regex/suffix match runs once.
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
@@ -71,6 +71,10 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
         // Inside cache: NOTIMP / REFUSED policy answers live for an hour.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
+        // Inside cache: RFC 6303 empty reverse NXDOMAIN, no public leak/SERVFAIL.
+        services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
+        // Inside cache: RFC 9462 resolver.arpa is local and stored (never forwarded).
+        services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
@@ -80,10 +84,6 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
-        // RFC 6303 empty reverse zones — NXDOMAIN locally, no public leak/SERVFAIL.
-        services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
-        // RFC 9462: resolver.arpa is locally served (never cached or forwarded).
-        services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.

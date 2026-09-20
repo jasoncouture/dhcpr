@@ -10,6 +10,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// <summary>
 /// RFC 9462 Discovery of Designated Resolvers: serve <c>resolver.arpa</c> locally
 /// so SVCB at <c>_dns.resolver.arpa</c> never leaks to the public DNS.
+/// Lives inside the response cache; the zone check runs once per name.
 /// </summary>
 public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
 {
@@ -49,9 +50,6 @@ public sealed class ResolverArpaMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         context.AnsweredBy = "resolver.arpa";
-        context.DoNotCacheResponse = true;
-        // Local zone — never forwarded. Log/metrics treat it as a cache hit.
-        context.CacheHit = true;
 
         var response = question.Type is DomainRecordType.SVCB && IsDiscoveryName(question.Name)
             ? CreateDiscoveryResponse(context.DomainMessage)

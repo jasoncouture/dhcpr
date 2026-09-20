@@ -6,8 +6,9 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Serves RFC 6303 empty reverse zones locally (outside cache and DNSSEC)
-/// so private PTR lookups are NXDOMAIN instead of a leaked SERVFAIL.
+/// Serves RFC 6303 empty reverse zones locally so private PTR lookups are
+/// NXDOMAIN instead of a leaked SERVFAIL. Lives inside the response cache;
+/// the suffix match runs once per name.
 /// </summary>
 public sealed class Rfc6303EmptyZoneMiddleware : IDomainMessageMiddleware
 {
@@ -47,7 +48,6 @@ public sealed class Rfc6303EmptyZoneMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         context.AnsweredBy = "rfc6303";
-        context.CacheHit = true;
 
         var apex = new DomainLabels(zoneName);
         var response = isApex

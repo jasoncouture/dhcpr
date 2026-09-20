@@ -5,7 +5,10 @@ using System.Security.Cryptography.X509Certificates;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -56,7 +59,7 @@ public class ResolverArpaMiddlewareTests
         Assert.Empty(result.Records.Answers);
         Assert.True(result.Flags.Authoritative);
         Assert.True(result.Flags.RecursionAvailable);
-        Assert.True(context.CacheHit);
+        Assert.False(context.DoNotCacheResponse);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
@@ -98,8 +101,7 @@ public class ResolverArpaMiddlewareTests
 
         Assert.NotNull(result);
         Assert.Equal("resolver.arpa", context.AnsweredBy);
-        Assert.True(context.DoNotCacheResponse);
-        Assert.True(context.CacheHit);
+        Assert.False(context.DoNotCacheResponse);
         Assert.Equal(DomainResponseCode.NoError, result!.Flags.ResponseCode);
         var svcb = Assert.IsType<SvcbData>(Assert.Single(result.Records.Answers).Data);
         Assert.Equal((ushort)1, svcb.Priority);
@@ -141,6 +143,53 @@ public class ResolverArpaMiddlewareTests
         Assert.Equal("dns.example.com", second.TargetName.ToString());
         Assert.Contains(first.Parameters, p => p.Key is SvcbParameterKey.Alpn);
         Assert.Contains(second.Parameters, p => p.Key is SvcbParameterKey.DohPath);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CachedNodataSkipsZoneCheckOnTheNextLookup()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(Create(inner), cache);
+        var firstContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
+        var secondContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.NoError, first!.Flags.ResponseCode);
+        Assert.Empty(first.Records.Answers);
+        Assert.Equal(DomainResponseCode.NoError, second!.Flags.ResponseCode);
+        Assert.True(secondContext.CacheHit);
+        Assert.Equal("Cache", secondContext.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CachedDiscoverySvcbSkipsZoneCheckOnTheNextLookup()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(
+            Create(inner, new DesignatedResolverConfiguration
+            {
+                Priority = 1,
+                Target = "dns.example.com"
+            }),
+            cache);
+        var firstContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
+        var secondContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Single(first!.Records.Answers);
+        Assert.Single(second!.Records.Answers);
+        Assert.True(secondContext.CacheHit);
+        Assert.Equal("Cache", secondContext.AnsweredBy);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

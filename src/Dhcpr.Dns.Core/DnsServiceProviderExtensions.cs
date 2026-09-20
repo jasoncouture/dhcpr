@@ -67,6 +67,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         // Inside cache: sinkhole NXDOMAIN is stored so regex/suffix match runs once.
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
+        // Inside cache: BIND CHAOS bait is stored. ip.info is DoNotCacheResponse.
+        services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
@@ -83,8 +85,6 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
         // RFC 9462: resolver.arpa is locally served (never cached or forwarded).
         services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
-        // BIND CHAOS identity names — joke TXT, no version leak (outside cache/DNSSEC).
-        services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.

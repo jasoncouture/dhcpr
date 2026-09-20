@@ -3,6 +3,10 @@ using System.Net;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+
+using Microsoft.Extensions.Caching.Memory;
 
 using NSubstitute;
 
@@ -34,11 +38,11 @@ public class BindChaosMiddlewareTests
         var answer = Assert.Single(result.Records.Answers);
         Assert.Equal(DomainRecordType.TXT, answer.Type);
         Assert.Equal(DomainRecordClass.CH, answer.Class);
-        Assert.Equal(TimeSpan.Zero, answer.TimeToLive);
+        Assert.Equal(BindChaosMiddleware.IdentityTtl, answer.TimeToLive);
         var text = Assert.IsType<TextData>(answer.Data);
         Assert.Equal(expected, text.Text);
         Assert.Equal("bind-chaos", context.AnsweredBy);
-        Assert.True(context.DoNotCacheResponse);
+        Assert.False(context.DoNotCacheResponse);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
@@ -148,6 +152,57 @@ public class BindChaosMiddlewareTests
 
         Assert.Same(response, result);
         await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CachedIdentitySkipsBindChaosOnTheNextLookup()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var chaos = new BindChaosMiddleware(inner);
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(chaos, cache);
+        var firstContext = Context(
+            DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
+        var secondContext = Context(
+            DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal(BindChaosMiddleware.VersionText, Assert.IsType<TextData>(Assert.Single(first!.Records.Answers).Data).Text);
+        Assert.Equal("bind-chaos", firstContext.AnsweredBy);
+        Assert.Equal(BindChaosMiddleware.VersionText, Assert.IsType<TextData>(Assert.Single(second!.Records.Answers).Data).Text);
+        Assert.True(secondContext.CacheHit);
+        Assert.Equal("Cache", secondContext.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task IpInfoIsNotServedFromAnotherClientsCache()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var chaos = new BindChaosMiddleware(inner);
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(chaos, cache);
+        var request = DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH);
+        var firstContext = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.9"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+        var secondContext = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("198.51.100.20"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal("203.0.113.9", Assert.IsType<TextData>(Assert.Single(first!.Records.Answers).Data).Text);
+        Assert.True(firstContext.DoNotCacheResponse);
+        Assert.Equal("198.51.100.20", Assert.IsType<TextData>(Assert.Single(second!.Records.Answers).Data).Text);
+        Assert.False(secondContext.CacheHit);
+        Assert.Equal("bind-chaos", secondContext.AnsweredBy);
     }
 
     [Fact]

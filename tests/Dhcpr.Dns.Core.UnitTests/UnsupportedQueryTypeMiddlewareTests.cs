@@ -79,10 +79,13 @@ public class UnsupportedQueryTypeMiddlewareTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task ChaosClassPassesThrough()
+    [Theory]
+    [InlineData(DomainRecordType.TXT)]
+    [InlineData(DomainRecordType.ANY)]
+    [InlineData(DomainRecordType.HINFO)]
+    public async Task ChaosClassPassesThrough(DomainRecordType type)
     {
-        var request = DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH);
+        var request = DomainMessage.CreateRequest("version.bind", type, DomainRecordClass.CH);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())

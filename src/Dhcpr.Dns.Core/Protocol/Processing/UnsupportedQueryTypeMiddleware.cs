@@ -31,6 +31,10 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
                     DomainResponseCode.NotImplemented);
             }
 
+            // CH ANY / HINFO / AXFR are BindChaos local bait, not IN policy.
+            if (question.Class is DomainRecordClass.CH)
+                continue;
+
             if (RefuseCode(question.Type) is { } rcode)
             {
                 context.AnsweredBy = "UnsupportedQueryType";

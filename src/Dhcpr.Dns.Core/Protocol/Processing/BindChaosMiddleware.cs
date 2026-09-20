@@ -24,6 +24,9 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 
     internal static readonly TimeSpan Ttl = TimeSpan.Zero;
 
+    /// <summary>Identity TXT lifetime so the response cache will store it.</summary>
+    public static readonly TimeSpan IdentityTtl = TimeSpan.FromSeconds(60);
+
     private static readonly HashSet<string> IdentityNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "version.bind",
@@ -55,25 +58,22 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         // CHAOS never leaves the process (a "." route would otherwise
-        // send version.bind upstream).
-        context.CacheHit = true;
+        // send version.bind upstream). Identity answers are cached;
+        // ip.info is not — that TXT is the client address.
         context.AnsweredBy = "bind-chaos";
         if (IsIpInfo(question.Name))
         {
-            // Per-client address. Must not be stored or another stub
-            // would be told the previous client's IP.
             context.DoNotCacheResponse = true;
             var ipResponse = question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-                ? Txt(context.DomainMessage, ClientAddressText(context.ClientEndPoint))
+                ? Txt(context.DomainMessage, ClientAddressText(context.ClientEndPoint), Ttl)
                 : Nodata(context.DomainMessage);
             return Local(ipResponse, ipResponse.Flags.ResponseCode, authoritative: true);
         }
 
-        context.DoNotCacheResponse = true;
         var response = !IsIdentityName(question.Name)
             ? NxDomain(context.DomainMessage)
             : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-                ? Txt(context.DomainMessage, TextFor(question.Name))
+                ? Txt(context.DomainMessage, TextFor(question.Name), IdentityTtl)
                 : Nodata(context.DomainMessage);
 
         return Local(response, response.Flags.ResponseCode, authoritative: true);
@@ -106,7 +106,7 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             _ => VersionText
         };
 
-    private static DomainMessage Txt(DomainMessage request, string text)
+    private static DomainMessage Txt(DomainMessage request, string text, TimeSpan ttl)
         => DomainMessage.CreateResponse(
             request,
             answers:
@@ -115,7 +115,7 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
                     request.Questions[0].Name,
                     DomainRecordType.TXT,
                     DomainRecordClass.CH,
-                    Ttl,
+                    ttl,
                     new TextData(text))
             ],
             responseCode: DomainResponseCode.NoError);

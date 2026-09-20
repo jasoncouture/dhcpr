@@ -54,15 +54,25 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
-        services.AddScoped<IDomainMessageMiddleware, RootZoneMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, ConfiguredRecordMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, DynamicDnsMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware, ForwardResolver>();
-        services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
-        services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
+        services.AddScoped<RootZoneMiddleware>();
+        services.AddScoped<UpstreamQueryMiddleware>();
+        services.AddScoped<ConfiguredRecordMiddleware>();
+        services.AddScoped<DynamicDnsMiddleware>();
+        services.AddScoped<AuthoritativeZoneMiddleware>();
+        services.AddScoped<AuthoritativeNsCutMiddleware>();
+        services.AddScoped<ForwardResolver>();
+        services.AddScoped<RecursiveRootResolver>();
+        services.AddScoped<ServerFailureDomainMiddleware>();
+        services.AddScoped<IDomainMessageMiddleware>(static sp => new CompositeDomainMessageMiddleware(
+            sp.GetRequiredService<RootZoneMiddleware>(),
+            sp.GetRequiredService<UpstreamQueryMiddleware>(),
+            sp.GetRequiredService<ConfiguredRecordMiddleware>(),
+            sp.GetRequiredService<DynamicDnsMiddleware>(),
+            sp.GetRequiredService<AuthoritativeZoneMiddleware>(),
+            sp.GetRequiredService<AuthoritativeNsCutMiddleware>(),
+            sp.GetRequiredService<ForwardResolver>(),
+            sp.GetRequiredService<RecursiveRootResolver>(),
+            sp.GetRequiredService<ServerFailureDomainMiddleware>()));
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
         // Inside cache, inside ServFailRetry: sibling A/AAAA warm only on miss.
         services.Decorate<IDomainMessageMiddleware, AddressPrefetchMiddleware>();

@@ -11,16 +11,21 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// <summary>
 /// Answers from the primed root.zone snapshot (TLD NS/DS, covering RRSIGs, and
 /// in-zone glue) before live upstream queries — including directed hops when a
-/// currently-valid covering RRSIG is present (or DNSSEC is off). Priority must
-/// be less than <see cref="UpstreamQueryMiddleware"/>.
+/// currently-valid covering RRSIG is present (or DNSSEC is off). Innermost
+/// decorator around the remaining resolver walk.
 /// </summary>
 public sealed class RootZoneMiddleware : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IRootZoneStore _store;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
 
-    public RootZoneMiddleware(IRootZoneStore store, IOptionsMonitor<DnsConfiguration> options)
+    public RootZoneMiddleware(
+        IDomainMessageMiddleware inner,
+        IRootZoneStore store,
+        IOptionsMonitor<DnsConfiguration> options)
     {
+        _inner = inner;
         _store = store;
         _options = options;
     }
@@ -35,16 +40,16 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         await Task.Yield();
         var snapshot = _store.Current;
         if (snapshot is null)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var question = context.DomainMessage.Questions[0];
         var ownerKey = RootZoneSnapshot.NormalizeOwner(question.Name.ToString());
         if (!snapshot.TryGetRecords(ownerKey, out var records))
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var matching = records.Where(r => r.Type == question.Type).ToImmutableArray();
         if (matching.Length == 0)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var rrsigs = records
             .Where(r =>
@@ -60,7 +65,7 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
         if (dnssecEnabled)
         {
             if (rrsigs.Length == 0 || !HasCurrentlyValidRrsig(rrsigs, DateTimeOffset.UtcNow))
-                return null;
+                return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
         }
 
         var answers = rrsigs.Length == 0
@@ -87,6 +92,7 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
             }
         };
 
+        context.AnsweredBy ??= Name;
         return response;
     }
 

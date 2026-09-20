@@ -54,7 +54,6 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
-        services.AddScoped<RootZoneMiddleware>();
         services.AddScoped<UpstreamQueryMiddleware>();
         services.AddScoped<ConfiguredRecordMiddleware>();
         services.AddScoped<DynamicDnsMiddleware>();
@@ -64,7 +63,6 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<RecursiveRootResolver>();
         services.AddScoped<ServerFailureDomainMiddleware>();
         services.AddScoped<IDomainMessageMiddleware>(static sp => new CompositeDomainMessageMiddleware(
-            sp.GetRequiredService<RootZoneMiddleware>(),
             sp.GetRequiredService<UpstreamQueryMiddleware>(),
             sp.GetRequiredService<ConfiguredRecordMiddleware>(),
             sp.GetRequiredService<DynamicDnsMiddleware>(),
@@ -74,6 +72,8 @@ public static class DnsServiceProviderExtensions
             sp.GetRequiredService<RecursiveRootResolver>(),
             sp.GetRequiredService<ServerFailureDomainMiddleware>()));
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
+        // First leaf: root.zone wraps the remaining walk.
+        services.Decorate<IDomainMessageMiddleware, RootZoneMiddleware>();
         // Inside cache, inside ServFailRetry: sibling A/AAAA warm only on miss.
         services.Decorate<IDomainMessageMiddleware, AddressPrefetchMiddleware>();
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();

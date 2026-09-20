@@ -81,7 +81,6 @@ public class CompositeDomainMessageMiddlewareTests
             .ToList();
 
         Assert.Single(middleware);
-        Assert.Contains(services, static d => d.ServiceType == typeof(RootZoneMiddleware));
         Assert.Contains(services, static d => d.ServiceType == typeof(ServerFailureDomainMiddleware));
     }
 

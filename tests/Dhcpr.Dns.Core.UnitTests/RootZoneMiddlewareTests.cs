@@ -27,6 +27,25 @@ public class RootZoneMiddlewareTests
     }
 
     [Fact]
+    public async Task MissCallsInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("com", DomainRecordType.NS);
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var middleware = CreateMiddleware(new RootZoneStore(), dnssecEnabled: false, inner);
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task HitReturnsNsAndGlue_WhenDnssecDisabled()
     {
         var text = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "root-zone-excerpt.txt"));
@@ -279,13 +298,26 @@ public class RootZoneMiddlewareTests
         Assert.All(result!.Records.Answers, r => Assert.Equal(DomainRecordType.DS, r.Type));
     }
 
-    private static RootZoneMiddleware CreateMiddleware(IRootZoneStore store, bool dnssecEnabled)
-        => new(
+    private static RootZoneMiddleware CreateMiddleware(
+        IRootZoneStore store,
+        bool dnssecEnabled,
+        IDomainMessageMiddleware? inner = null)
+    {
+        if (inner is null)
+        {
+            inner = Substitute.For<IDomainMessageMiddleware>();
+            inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+                .Returns((DomainMessage?)null);
+        }
+
+        return new(
+            inner,
             store,
             Monitor(new DnsConfiguration
             {
                 Dnssec = new DnssecConfiguration { Enabled = dnssecEnabled }
             }));
+    }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)
     {

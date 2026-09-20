@@ -19,17 +19,20 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     private readonly IInternalDomainClient _internalClient;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly ILogger<DnssecMessageValidator> _logger;
+    private readonly TimeProvider _time;
 
     public DnssecMessageValidator(
         IDnssecValidator crypto,
         IInternalDomainClient internalClient,
         IOptionsMonitor<DnsConfiguration> options,
-        ILogger<DnssecMessageValidator> logger)
+        ILogger<DnssecMessageValidator> logger,
+        TimeProvider? timeProvider = null)
     {
         _crypto = crypto;
         _internalClient = internalClient;
         _options = options;
         _logger = logger;
+        _time = timeProvider ?? TimeProvider.System;
     }
 
     public void EnsureTrustAnchorsLoaded(DnssecScope scope)
@@ -138,7 +141,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     {
         var scope = context.DnssecScope!;
         var question = response.Questions[0];
-        var now = DateTimeOffset.UtcNow;
+        var now = _time.GetUtcNow();
 
         // Positive answers: verify answer-section RRsets only. Authority/additional on
         // those responses often carry parent NS + glue (or one-RR fragments) whose RRSIGs
@@ -671,7 +674,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         }
 
         if (!DnssecRrsetVerifier.TryVerifyRrset(
-                _crypto, dnsKeyRecords, rrsigs, matchingKeys, DateTimeOffset.UtcNow))
+                _crypto, dnsKeyRecords, rrsigs, matchingKeys, _time.GetUtcNow()))
         {
             LogDnsKeyRrsigFailed(_logger, zone);
             return false;
@@ -710,7 +713,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             return false;
 
         if (!DnssecRrsetVerifier.TryVerifyRrset(
-                _crypto, dsRecords, rrsigs, parentKeys.Keys, DateTimeOffset.UtcNow))
+                _crypto, dsRecords, rrsigs, parentKeys.Keys, _time.GetUtcNow()))
         {
             LogDsRrsigFailed(_logger, childZone, parent);
             return false;

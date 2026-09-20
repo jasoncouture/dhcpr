@@ -176,7 +176,11 @@ public class DebianOrgDnssecTests
         var options = Monitor(new DnsConfiguration());
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, options);
         var validator = new DnssecMessageValidator(
-            crypto, internalClient, options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto,
+            internalClient,
+            options,
+            NullLogger<DnssecMessageValidator>.Instance,
+            new FrozenTimeProvider(FrozenNow));
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(response);
@@ -234,4 +238,17 @@ public class DebianOrgDnssecTests
             var data = (DomainNameSystemKeyData)k.Data;
             return $"alg={data.Algorithm} flags={data.Flags} tag={crypto.CalculateKeyTag(data, k)}";
         }));
+
+    /// <summary>
+    /// Fixture RRSIGs are snapshots; <c>org.DS</c> and <c>root.DNSKEY</c>
+    /// expire on the order of days. Validation must use <see cref="FrozenNow"/>.
+    /// </summary>
+    private sealed class FrozenTimeProvider : TimeProvider
+    {
+        private readonly DateTimeOffset _utc;
+
+        public FrozenTimeProvider(DateTimeOffset utc) => _utc = utc.ToUniversalTime();
+
+        public override DateTimeOffset GetUtcNow() => _utc;
+    }
 }

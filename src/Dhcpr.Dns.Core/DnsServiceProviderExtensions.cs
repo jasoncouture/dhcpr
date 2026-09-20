@@ -100,6 +100,7 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IDomainClientFactory, DomainClientFactory>();
         services.AddScoped<IEdnsProtocolService, EdnsProtocolService>();
         services.AddScoped<IDnssecValidator, DnssecValidator>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IDnssecMessageValidator, DnssecMessageValidator>();
         services.AddScoped<ISocketFactory, SocketFactory>();
         // Process-bound: shared StringBuilder pool.

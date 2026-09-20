@@ -8,17 +8,20 @@ namespace Dhcpr.Dns.Core.Authoritative;
 
 /// <summary>
 /// Follows in-zone NS cuts from a loaded parent, preferring a loaded child zone
-/// at the cut when present.
+/// at the cut when present. Decorator around forward / recurse. Directed hops skip.
 /// </summary>
 public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IAuthoritativeZoneStore _zones;
     private readonly IReferralWalker _referralWalker;
 
     public AuthoritativeNsCutMiddleware(
+        IDomainMessageMiddleware inner,
         IAuthoritativeZoneStore zones,
         IReferralWalker referralWalker)
     {
+        _inner = inner;
         _zones = zones;
         _referralWalker = referralWalker;
     }
@@ -31,19 +34,17 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
-
-        if (context.DomainMessage.Questions.Length == 0)
-            return null;
+        if (context.UpstreamEndpoints is { Length: > 0 } ||
+            context.DomainMessage.Questions.Length == 0)
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var question = context.DomainMessage.Questions[0];
         if (_zones.FindZone(question.Name.ToString()) is not { } localZone)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var local = ZoneAnswerEngine.Answer(localZone, context.DomainMessage);
         if (local.Kind is not ZoneAnswerKind.Referral || local.Message is null)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var options = ReferralWalkOptions.Authoritative with
         {
@@ -56,6 +57,7 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
         if (!await _referralWalker.TrySeedEndpointsAsync(
                 context, local.Message, endPoints, cancellationToken, options).ConfigureAwait(false))
         {
+            context.AnsweredBy ??= Name;
             return ServFail(context.DomainMessage);
         }
 
@@ -66,6 +68,7 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
         var followed = await _referralWalker.FollowAsync(
             context, clonedRequest, endPoints, cancellationToken, options)
             .ConfigureAwait(false);
+        context.AnsweredBy ??= Name;
         return Finalize(context.DomainMessage, followed);
     }
 

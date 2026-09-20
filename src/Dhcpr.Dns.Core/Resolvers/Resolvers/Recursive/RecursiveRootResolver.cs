@@ -11,16 +11,19 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly IReferralWalker _referralWalker;
     private readonly IRootServerTips _rootServerTips;
 
     public RecursiveRootResolver(
+        IDomainMessageMiddleware inner,
         IRootServerTips rootServerTips,
         IReferralWalker referralWalker,
         ILogger<RecursiveRootResolver> logger
     )
     {
+        _inner = inner;
         _rootServerTips = rootServerTips;
         _referralWalker = referralWalker;
         _logger = logger;
@@ -32,7 +35,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
     {
         // Directed upstream hops are owned by UpstreamQueryMiddleware.
         if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var question = context.DomainMessage.Questions[0];
         using var startPoints = ListPool<IPEndPoint>.Default.Get();
@@ -59,6 +62,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
                     context, cloned, result, startPoints, _referralWalker, cancellationToken);
             }
 
+            context.AnsweredBy ??= Name;
             return RecursiveResponseNormalizer.FinalizeRecursiveResponse(context.DomainMessage, result);
         }
         catch (Exception ex)
@@ -69,6 +73,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
             }
 
             context.ServFailReason = "recursive resolver exception";
+            context.AnsweredBy ??= Name;
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
         }

@@ -5,14 +5,16 @@ namespace Dhcpr.Dns.Core.Authoritative;
 
 /// <summary>
 /// Answers from loaded authoritative zones (AA / NODATA / NXDOMAIN).
-/// NS-cut follow is <see cref="AuthoritativeNsCutMiddleware"/>.
+/// Decorator around NS-cut / forward / recurse. Directed hops skip.
 /// </summary>
 public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IAuthoritativeZoneStore _zones;
 
-    public AuthoritativeZoneMiddleware(IAuthoritativeZoneStore zones)
+    public AuthoritativeZoneMiddleware(IDomainMessageMiddleware inner, IAuthoritativeZoneStore zones)
     {
+        _inner = inner;
         _zones = zones;
     }
 
@@ -25,25 +27,24 @@ public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         await Task.Yield();
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
-
-        if (context.DomainMessage.Questions.Length == 0)
-            return null;
+        if (context.UpstreamEndpoints is { Length: > 0 } ||
+            context.DomainMessage.Questions.Length == 0)
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var question = context.DomainMessage.Questions[0];
         if (_zones.FindZone(question.Name.ToString()) is not { } localZone)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var local = ZoneAnswerEngine.Answer(localZone, context.DomainMessage);
         if (local.Message is not null &&
             local.Kind is ZoneAnswerKind.Answer or ZoneAnswerKind.NoData or ZoneAnswerKind.NameError)
         {
             context.DoNotCacheResponse = true;
+            context.AnsweredBy ??= Name;
             return Finalize(context.DomainMessage, local.Message);
         }
 
-        return null;
+        return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     private static DomainMessage Finalize(DomainMessage request, DomainMessage response)

@@ -738,12 +738,24 @@ public class RecursiveRootResolverTests
     }
 
     [Fact]
-    public async Task UpstreamDirectedContextIsIgnored()
+    public async Task UpstreamDirectedContextCallsInner()
     {
-        var internalClient = new ScriptedInternalDomainClient(_ =>
-            throw new InvalidOperationException("should not query"));
-        var resolver = CreateResolver(internalClient.Client);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
         var request = DomainMessage.CreateRequest("example.com");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var tips = new RootServerTips(Monitor(new RootServerConfiguration
+        {
+            Addresses = new[] { _rootServer.ToString() }
+        }));
+        var resolver = new RecursiveRootResolver(
+            inner,
+            tips,
+            new ReferralWalker(new ScriptedInternalDomainClient(_ =>
+                throw new InvalidOperationException("should not query")).Client),
+            NullLogger<RecursiveRootResolver>.Instance);
         var context = new DomainMessageContext(null, null, request)
         {
             UpstreamEndpoints = ImmutableArray.Create(_rootServer)
@@ -751,7 +763,9 @@ public class RecursiveRootResolverTests
 
         var result = await resolver.ProcessAsync(context, CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     private static RecursiveRootResolver CreateResolver(IInternalDomainClient internalClient)
@@ -762,9 +776,18 @@ public class RecursiveRootResolverTests
         }));
 
         return new RecursiveRootResolver(
+            PassThroughInner(),
             tips,
             new ReferralWalker(internalClient),
             NullLogger<RecursiveRootResolver>.Instance);
+    }
+
+    private static IDomainMessageMiddleware PassThroughInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return inner;
     }
 
     private static DomainMessage Referral(string zone, string nsName, IPAddress glue)

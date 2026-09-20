@@ -54,19 +54,16 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
-        services.AddScoped<AuthoritativeZoneMiddleware>();
-        services.AddScoped<AuthoritativeNsCutMiddleware>();
-        services.AddScoped<ForwardResolver>();
-        services.AddScoped<RecursiveRootResolver>();
         services.AddScoped<ServerFailureDomainMiddleware>();
         services.AddScoped<IDomainMessageMiddleware>(static sp => new CompositeDomainMessageMiddleware(
-            sp.GetRequiredService<AuthoritativeZoneMiddleware>(),
-            sp.GetRequiredService<AuthoritativeNsCutMiddleware>(),
-            sp.GetRequiredService<ForwardResolver>(),
-            sp.GetRequiredService<RecursiveRootResolver>(),
             sp.GetRequiredService<ServerFailureDomainMiddleware>()));
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
-        // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → remaining walk.
+        // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
+        // NsCut → Forward → Recursive → ServerFailure.
+        services.Decorate<IDomainMessageMiddleware, RecursiveRootResolver>();
+        services.Decorate<IDomainMessageMiddleware, ForwardResolver>();
+        services.Decorate<IDomainMessageMiddleware, AuthoritativeNsCutMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, AuthoritativeZoneMiddleware>();
         services.Decorate<IDomainMessageMiddleware, DynamicDnsMiddleware>();
         services.Decorate<IDomainMessageMiddleware, UpstreamQueryMiddleware>();
         services.Decorate<IDomainMessageMiddleware, RootZoneMiddleware>();

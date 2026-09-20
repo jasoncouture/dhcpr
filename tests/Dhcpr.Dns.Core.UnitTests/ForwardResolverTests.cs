@@ -106,6 +106,32 @@ public class ForwardResolverTests
     }
 
     [Fact]
+    public async Task MissCallsInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("www.example.com");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var resolver = CreateResolver(
+            Substitute.For<IInternalDomainClient>(),
+            new Dictionary<string, DnsRouteConfiguration>
+            {
+                ["nebula"] = Route(_nebulaForwarder.ToString())
+            },
+            inner);
+
+        var result = await resolver.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task EmptyRoutesReturnsNull()
     {
         var internalClient = new CapturingInternalDomainClient((_, _) =>
@@ -261,7 +287,8 @@ public class ForwardResolverTests
 
     private static ForwardResolver CreateResolver(
         IInternalDomainClient internalClient,
-        Dictionary<string, DnsRouteConfiguration> routes)
+        Dictionary<string, DnsRouteConfiguration> routes,
+        IDomainMessageMiddleware? inner = null)
     {
         var configuration = new DnsConfiguration
         {
@@ -275,9 +302,18 @@ public class ForwardResolverTests
         Assert.True(configuration.Validate());
 
         return new ForwardResolver(
+            inner ?? PassThroughInner(),
             Monitor(configuration),
             internalClient,
             new AuthoritativeZoneStore());
+    }
+
+    private static IDomainMessageMiddleware PassThroughInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return inner;
     }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)

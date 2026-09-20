@@ -13,18 +13,22 @@ namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 /// Conditional forwarder: longest-suffix match against <see cref="DnsConfiguration.Routes"/>.
 /// Unmatched names fall through to recursive resolution.
 /// Loaded authoritative zones win over forward routes.
+/// Decorator around recurse. Directed hops skip.
 /// </summary>
 public sealed class ForwardResolver : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IInternalDomainClient _internalClient;
     private readonly IAuthoritativeZoneStore _authoritativeZones;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
 
     public ForwardResolver(
+        IDomainMessageMiddleware inner,
         IOptionsMonitor<DnsConfiguration> options,
         IInternalDomainClient internalClient,
         IAuthoritativeZoneStore authoritativeZones)
     {
+        _inner = inner;
         _internalClient = internalClient;
         _authoritativeZones = authoritativeZones;
         _options = options;
@@ -34,20 +38,19 @@ public sealed class ForwardResolver : IDomainMessageMiddleware
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
-
-        if (context.DomainMessage.Questions.Length == 0)
-            return null;
+        if (context.UpstreamEndpoints is { Length: > 0 } ||
+            context.DomainMessage.Questions.Length == 0)
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var questionName = context.DomainMessage.Questions[0].Name;
         if (_authoritativeZones.FindZone(questionName.ToString()) is not null)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var endpoints = MatchRoute(questionName, context.ClientEndPoint?.Address);
         if (endpoints is null || endpoints.Length == 0)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
+        context.AnsweredBy ??= Name;
         return await _internalClient.SendAsync(
             context,
             context.DomainMessage,

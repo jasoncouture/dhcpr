@@ -204,7 +204,27 @@ public class AuthoritativeZoneTests
 
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
+        Assert.Equal("Authoritative Zones", context.AnsweredBy);
         Assert.True(result!.Flags.Authoritative);
+    }
+
+    [Fact]
+    public async Task Authoritative_MissCallsInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("www.example.com");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var middleware = new AuthoritativeZoneMiddleware(inner, new AuthoritativeZoneStore());
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -249,6 +269,28 @@ public class AuthoritativeZoneTests
             ((IPAddressData)r.Data).Address.Equals(IPAddress.Parse("192.0.2.77")));
         Assert.Contains(client.UpstreamEndPoints, ep => ep.Address.Equals(childNs.Address));
         Assert.DoesNotContain(client.Queries, q => q.StartsWith("bar/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AuthoritativeNsCut_MissCallsInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("www.example.com");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var middleware = new AuthoritativeNsCutMiddleware(
+            inner,
+            new AuthoritativeZoneStore(),
+            new ReferralWalker(Substitute.For<IInternalDomainClient>()));
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -307,6 +349,7 @@ public class AuthoritativeZoneTests
         });
 
         var forwarder = new ForwardResolver(
+            PassThroughInner(),
             Monitor(configuration),
             client.Client,
             store);
@@ -386,12 +429,20 @@ public class AuthoritativeZoneTests
     }
 
     private static AuthoritativeZoneMiddleware CreateAuthoritative(AuthoritativeZoneStore store)
-        => new(store);
+        => new(PassThroughInner(), store);
 
     private static AuthoritativeNsCutMiddleware CreateAuthoritativeNsCut(
         IInternalDomainClient client,
         AuthoritativeZoneStore store)
-        => new(store, new ReferralWalker(client));
+        => new(PassThroughInner(), store, new ReferralWalker(client));
+
+    private static IDomainMessageMiddleware PassThroughInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return inner;
+    }
 
     private static IOptionsMonitor<T> Monitor<T>(T value)
     {

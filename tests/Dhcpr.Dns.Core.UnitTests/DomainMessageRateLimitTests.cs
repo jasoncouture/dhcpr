@@ -278,7 +278,7 @@ public class DomainMessageRateLimitTests
             .Returns(call =>
             {
                 var context = call.Arg<DomainMessageContext>();
-                return new ValueTask<DomainMessage?>(
+                return new ValueTask<DomainMessage>(
                     response ?? DomainMessage.CreateResponse(
                         context.DomainMessage,
                         DomainResourceRecords.Empty,

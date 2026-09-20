@@ -35,7 +35,7 @@ public sealed partial class AddressPrefetchMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
@@ -52,15 +52,12 @@ public sealed partial class AddressPrefetchMiddleware : IDomainMessageMiddleware
             _ => null
         };
 
-    private void TrySchedulePrefetch(DomainMessageContext context, DomainMessage? result)
+    private void TrySchedulePrefetch(DomainMessageContext context, DomainMessage result)
     {
         if (context.IsInternal || context.SuppressAddressPrefetch)
             return;
 
         if (context.BypassCache || context.UpstreamEndpoints is { Length: > 0 })
-            return;
-
-        if (result is null)
             return;
 
         if (result.Flags.ResponseCode is not DomainResponseCode.NoError)

@@ -59,7 +59,7 @@ public class Rfc6303EmptyZoneMiddlewareTests
         var request = DomainMessage.CreateRequest("4.4.8.8.in-addr.arpa", DomainRecordType.PTR);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = Create(inner);
         var context = Context(request);
 

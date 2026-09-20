@@ -33,7 +33,7 @@ public sealed class Rfc6303EmptyZoneMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

@@ -27,7 +27,7 @@ public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
     public string Name => "Configured Records";
     public int Priority => MiddlewarePriority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

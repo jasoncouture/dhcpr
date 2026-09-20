@@ -499,7 +499,7 @@ public class DnssecPhase5Tests
                     new NameData(new DomainLabels("ns.example.com")));
                 var ds = CreateDsRecord("child.example.com", parentKey);
                 var dsSig = SignRrset(parentPrivate, parentKey, [ds], DomainRecordType.DS);
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     ctx.DomainMessage,
                     answers: [],
                     authorities: [ns, ds, dsSig],
@@ -719,7 +719,7 @@ public class DnssecPhase5Tests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.Priority.Returns(1);
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<DomainMessage?>(response));
+            .Returns(new ValueTask<DomainMessage>(response));
         return inner;
     }
 

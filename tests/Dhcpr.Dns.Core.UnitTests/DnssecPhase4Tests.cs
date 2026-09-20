@@ -185,9 +185,10 @@ public class DnssecPhase4Tests
             {
                 var ctx = ci.ArgAt<DomainMessageContext>(0);
                 Assert.True(cache.TryGet(ctx.DomainMessage, out var cached));
+                Assert.NotNull(cached);
                 ctx.CacheHit = true;
                 ctx.CachedDnssecStatus = DnssecValidationStatus.Insecure;
-                return new ValueTask<DomainMessage?>(cached);
+                return new ValueTask<DomainMessage>(cached);
             });
 
         // Use real cache decorator path.
@@ -237,7 +238,7 @@ public class DnssecPhase4Tests
                 var ctx = ci.ArgAt<DomainMessageContext>(0);
                 ctx.CacheHit = true;
                 ctx.CachedDnssecStatus = DnssecValidationStatus.Secure;
-                return new ValueTask<DomainMessage?>(response);
+                return new ValueTask<DomainMessage>(response);
             });
 
         var validator = Substitute.For<IDnssecMessageValidator>();
@@ -287,7 +288,7 @@ public class DnssecPhase4Tests
                 var ctx = ci.ArgAt<DomainMessageContext>(0);
                 ctx.CacheHit = true;
                 ctx.CachedDnssecStatus = DnssecValidationStatus.Unchecked;
-                return new ValueTask<DomainMessage?>(response);
+                return new ValueTask<DomainMessage>(response);
             });
 
         var validator = Substitute.For<IDnssecMessageValidator>();
@@ -427,7 +428,7 @@ public class DnssecPhase4Tests
             .Returns(ci =>
             {
                 var req = ci.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     req, answers: [cname, cnameSig], responseCode: DomainResponseCode.NoError));
             });
 
@@ -488,7 +489,7 @@ public class DnssecPhase4Tests
                 // Simulate prior hop validation for CNAME.
                 ctx.DnssecScope?.Observe(DnssecValidationStatus.Secure);
                 var req = ctx.DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     req, answers: [cname, cnameSig], responseCode: DomainResponseCode.NoError));
             });
 
@@ -563,7 +564,7 @@ public class DnssecPhase4Tests
             {
                 var ctx = ci.ArgAt<DomainMessageContext>(0);
                 ctx.DnssecScope?.Observe(DnssecValidationStatus.Secure);
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     ctx.DomainMessage, answers: [cname, cnameSig], responseCode: DomainResponseCode.NoError));
             });
 

@@ -36,7 +36,7 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
         _logger = logger;
     }
 
-    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
+    public async ValueTask<DomainMessage> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         if (!context.BypassCache &&
@@ -52,7 +52,7 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
         }
 
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
-        if (result is not null && !context.DoNotCacheResponse)
+        if (!context.DoNotCacheResponse)
             _cache.Set(context.DomainMessage, result);
 
         return result;

@@ -22,7 +22,7 @@ public sealed class AuthoritativeZoneMiddleware : IDomainMessageMiddleware
     // After DynDNS (200), before NS-cut (310) / forward (500) / recursive (5000).
     public int Priority => 300;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

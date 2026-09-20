@@ -33,7 +33,7 @@ public sealed class RootZoneMiddleware : IDomainMessageMiddleware
     public string Name => "Root Zone";
     public int Priority => 50;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

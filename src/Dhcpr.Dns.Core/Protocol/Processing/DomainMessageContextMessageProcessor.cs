@@ -70,11 +70,7 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
                     response = await middleware.ProcessAsync(message.Context, cancellationToken);
                     if (message.Context.Cancel) // This is intended for things that want to ignore the request.
                         break;
-                    if (response is not null) // This is intended for things to say "I don't handle this, try next"
-                    {
-                        answeredBy = middleware;
-                        break;
-                    }
+                    answeredBy = middleware;
                 }
             }
 

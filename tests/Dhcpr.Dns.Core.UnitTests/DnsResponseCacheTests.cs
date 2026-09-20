@@ -289,7 +289,7 @@ public class DnsResponseCacheTests
             .Returns(callInfo =>
             {
                 var context = callInfo.ArgAt<DomainMessageContext>(0);
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     context.DomainMessage,
                     new[]
                     {
@@ -342,7 +342,7 @@ public class DnsResponseCacheTests
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
         var context = new DomainMessageContext(null, null, request) { BypassCache = true };

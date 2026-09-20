@@ -23,7 +23,7 @@ public class RootZoneMiddlewareTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS)),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class RootZoneMiddlewareTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS)),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public class RootZoneMiddlewareTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS)),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public class RootZoneMiddlewareTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("com", DomainRecordType.NS)),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -307,7 +307,10 @@ public class RootZoneMiddlewareTests
         {
             inner = Substitute.For<IDomainMessageMiddleware>();
             inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-                .Returns((DomainMessage?)null);
+                .Returns(call => DomainMessage.CreateResponse(
+                call.Arg<DomainMessageContext>().DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
         }
 
         return new(

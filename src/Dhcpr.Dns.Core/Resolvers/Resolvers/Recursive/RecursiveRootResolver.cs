@@ -29,7 +29,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
         _logger = logger;
     }
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

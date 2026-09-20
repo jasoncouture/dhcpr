@@ -32,7 +32,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
     public string Name => "Upstream Query";
     public int Priority => 100;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

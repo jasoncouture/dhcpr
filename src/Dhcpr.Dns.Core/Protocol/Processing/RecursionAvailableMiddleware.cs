@@ -12,14 +12,11 @@ public sealed class RecursionAvailableMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         var result = await _inner.ProcessAsync(context, cancellationToken);
-        if (result is null)
-            return null;
-
         return result with { Flags = result.Flags with { RecursionAvailable = true } };
     }
 }

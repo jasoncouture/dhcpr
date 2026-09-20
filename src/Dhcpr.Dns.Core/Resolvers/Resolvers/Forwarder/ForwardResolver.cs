@@ -34,7 +34,7 @@ public sealed class ForwardResolver : IDomainMessageMiddleware
         _options = options;
     }
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

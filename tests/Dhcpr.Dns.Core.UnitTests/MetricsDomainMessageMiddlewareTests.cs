@@ -27,22 +27,6 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     [Fact]
-    public async Task DoesNotCountCoRPassThrough()
-    {
-        var (middleware, metrics) = CreateMiddleware(response: null);
-        var context = new DomainMessageContext(
-            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
-            new IPEndPoint(IPAddress.Loopback, 53),
-            DomainMessage.CreateRequest("example.com"));
-
-        var result = await middleware.ProcessAsync(context, CancellationToken.None);
-
-        Assert.Null(result);
-        metrics.DidNotReceive().RecordQuery(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>());
-        metrics.DidNotReceive().RecordQuery(Arg.Any<DomainMessageContext>(), Arg.Any<string>(), Arg.Any<bool>());
-    }
-
-    [Fact]
     public async Task CountsBlackholeNxDomain()
     {
         var leaf = Substitute.For<IDomainMessageMiddleware>();
@@ -59,8 +43,7 @@ public class MetricsDomainMessageMiddlewareTests
 
         var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.Equal(DomainResponseCode.NameError, result.Flags.ResponseCode);
         metrics.Received(1).RecordQuery(context, result);
         await leaf.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
@@ -83,11 +66,11 @@ public class MetricsDomainMessageMiddlewareTests
     }
 
     private static (MetricsDomainMessageMiddleware Middleware, IDnsMetrics Metrics) CreateMiddleware(
-        DomainMessage? response)
+        DomainMessage response)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var metrics = Substitute.For<IDnsMetrics>();
         return (new MetricsDomainMessageMiddleware(inner, metrics), metrics);
     }

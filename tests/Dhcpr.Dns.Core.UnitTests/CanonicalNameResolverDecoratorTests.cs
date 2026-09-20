@@ -23,7 +23,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -78,7 +78,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -179,7 +179,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -257,7 +257,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -294,7 +294,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -343,7 +343,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {
@@ -378,7 +378,7 @@ public class CanonicalNameResolverDecoratorTests
             .Returns(callInfo =>
             {
                 var request = callInfo.ArgAt<DomainMessageContext>(0).DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     request,
                     new[]
                     {

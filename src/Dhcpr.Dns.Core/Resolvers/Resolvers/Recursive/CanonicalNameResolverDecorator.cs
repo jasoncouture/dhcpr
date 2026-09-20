@@ -22,12 +22,10 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
         _internalClient = internalClient;
     }
 
-    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context,
+    public async ValueTask<DomainMessage> ProcessAsync(DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken);
-        if (result is null)
-            return result;
 
         // Directed hops are stub queries to a specific nameserver set. Chase
         // aliases only on the undirected pass so a zone-walk referral is not

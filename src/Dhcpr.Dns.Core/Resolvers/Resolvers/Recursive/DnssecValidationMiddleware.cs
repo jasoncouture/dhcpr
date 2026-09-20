@@ -33,15 +33,13 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
     public string Name => _innerMiddleware.Name;
     public int Priority => _innerMiddleware.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         var dnssecEnabled = _options.CurrentValue.Dnssec?.Enabled ?? true;
 
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
-        if (result is null)
-            return null;
 
         // Never copy upstream / cache AD — AD is set only from local scope status below.
         result = result with { Flags = result.Flags with { Authentic = false } };

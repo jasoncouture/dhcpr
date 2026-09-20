@@ -257,7 +257,10 @@ public class DynamicDnsTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns((DomainMessage?)null);
+            .Returns(call => DomainMessage.CreateResponse(
+                call.Arg<DomainMessageContext>().DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
         return inner;
     }
 

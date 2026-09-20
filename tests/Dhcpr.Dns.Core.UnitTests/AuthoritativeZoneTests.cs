@@ -358,7 +358,7 @@ public class AuthoritativeZoneTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.foo.bar")),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
         Assert.False(forwarded);
     }
 
@@ -376,7 +376,7 @@ public class AuthoritativeZoneTests
                 var ctx = ci.Arg<DomainMessageContext>();
                 ctx.DoNotCacheResponse = true;
                 var msg = ctx.DomainMessage;
-                return new ValueTask<DomainMessage?>(DomainMessage.CreateResponse(
+                return new ValueTask<DomainMessage>(DomainMessage.CreateResponse(
                     msg,
                     answers:
                     [
@@ -440,7 +440,10 @@ public class AuthoritativeZoneTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns((DomainMessage?)null);
+            .Returns(call => DomainMessage.CreateResponse(
+                call.Arg<DomainMessageContext>().DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
         return inner;
     }
 

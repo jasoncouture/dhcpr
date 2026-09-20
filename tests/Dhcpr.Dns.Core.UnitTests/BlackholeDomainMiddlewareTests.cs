@@ -70,7 +70,7 @@ public class BlackholeDomainMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = Create(inner, @".+\..+\.localdomain$");
         var context = new DomainMessageContext(
@@ -120,7 +120,7 @@ public class BlackholeDomainMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = Create(inner, "dhitc.com");
         var context = new DomainMessageContext(

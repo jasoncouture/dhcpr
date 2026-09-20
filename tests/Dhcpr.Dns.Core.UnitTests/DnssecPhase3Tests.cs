@@ -372,7 +372,7 @@ public class DnssecPhase3Tests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.Priority.Returns(1);
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<DomainMessage?>(response));
+            .Returns(new ValueTask<DomainMessage>(response));
         return inner;
     }
 

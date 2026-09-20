@@ -101,7 +101,7 @@ public class ForwardResolverTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.example.com")),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
         Assert.Empty(internalClient.Calls);
     }
 
@@ -142,7 +142,7 @@ public class ForwardResolverTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("nas.nebula")),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class ForwardResolverTests
             },
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public class ForwardResolverTests
                 DomainMessage.CreateRequest("nas.nebula")),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
         Assert.Empty(internalClient.Calls);
     }
 
@@ -262,7 +262,7 @@ public class ForwardResolverTests
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("nas.nebula")),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
     }
 
     [Fact]
@@ -312,7 +312,10 @@ public class ForwardResolverTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns((DomainMessage?)null);
+            .Returns(call => DomainMessage.CreateResponse(
+                call.Arg<DomainMessageContext>().DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
         return inner;
     }
 

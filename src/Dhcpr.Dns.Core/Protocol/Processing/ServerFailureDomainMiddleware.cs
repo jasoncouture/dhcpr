@@ -3,7 +3,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 // Terminal fallback: unhandled query → SERVFAIL, never NXDOMAIN.
 public sealed class ServerFailureDomainMiddleware : IDomainMessageMiddleware
 {
-    public async ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
+    public async ValueTask<DomainMessage> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken)
     {
         await Task.Yield();
         context.ServFailReason = $"no handler answered ({Name})";

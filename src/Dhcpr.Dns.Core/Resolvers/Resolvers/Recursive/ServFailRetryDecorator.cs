@@ -22,20 +22,17 @@ public sealed class ServFailRetryDecorator : IDomainMessageMiddleware
     public string Name => _innerMiddleware.Name;
     public int Priority => _innerMiddleware.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        DomainMessage? result = null;
+        DomainMessage result = default!;
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             if (attempt > 1)
                 context.DnssecScope?.ResetStatus();
 
             result = await _innerMiddleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
-            if (result is null)
-                return null;
-
             if (result.Flags.ResponseCode is not DomainResponseCode.ServerFailure)
                 return result;
         }

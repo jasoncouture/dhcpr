@@ -3,10 +3,10 @@
 public interface IDomainMessageMiddleware
 {
     /// <summary>
-    /// Attempts to produce a response for <paramref name="context"/>.
-    /// Returns <see langword="null"/> to pass the request to the next middleware.
+    /// Produces a response for <paramref name="context"/>.
+    /// The pipeline always answers; ServerFailure is the terminal fallback.
     /// </summary>
-    public ValueTask<DomainMessage?> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken);
+    public ValueTask<DomainMessage> ProcessAsync(DomainMessageContext context, CancellationToken cancellationToken);
 
     /// <summary>
     /// Display name for logs. Defaults to the implementing type name.

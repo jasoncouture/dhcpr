@@ -24,7 +24,7 @@ public class ResolverArpaMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = Create(inner);
         var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);

@@ -23,13 +23,13 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         var result = await _inner.ProcessAsync(context, cancellationToken);
 
-        if (result is null || context.IsInternal)
+        if (context.IsInternal)
             return result;
 
         var queryId = Guid.CreateVersion7();

@@ -32,7 +32,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = new QueryLoggingDomainMessageMiddleware(
             inner,
@@ -57,7 +57,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var logger = CreateLogger();
         var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
@@ -84,7 +84,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var logger = CreateLogger();
         var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
@@ -110,7 +110,7 @@ public class QueryLoggingDomainMessageMiddlewareTests
             .Returns(call =>
             {
                 call.Arg<DomainMessageContext>().ServFailReason = "unsupported query type 255";
-                return new ValueTask<DomainMessage?>(response);
+                return new ValueTask<DomainMessage>(response);
             });
 
         var logger = CreateLogger();

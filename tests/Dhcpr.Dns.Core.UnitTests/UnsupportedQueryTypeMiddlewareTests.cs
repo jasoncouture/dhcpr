@@ -93,7 +93,7 @@ public class UnsupportedQueryTypeMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
@@ -113,7 +113,7 @@ public class UnsupportedQueryTypeMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
         var context = new DomainMessageContext(

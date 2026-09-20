@@ -28,7 +28,7 @@ public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
     // After directed upstream (100), before forward (500) / recursive (5000).
     public int Priority => 200;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

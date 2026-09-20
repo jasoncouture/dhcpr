@@ -28,7 +28,7 @@ public class AddressPrefetchMiddlewareTests
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         middleware = Wrap(inner, cache, client);
 
         var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
@@ -47,7 +47,7 @@ public class AddressPrefetchMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         middleware = Wrap(inner, Substitute.For<IDnsResponseCache>(), client);
 
         var context = Context(request) with { IsInternal = true };
@@ -77,7 +77,7 @@ public class AddressPrefetchMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = Wrap(inner, Substitute.For<IDnsResponseCache>(), client);
 
         var context = Context(request) with { SuppressAddressPrefetch = true };
@@ -98,7 +98,7 @@ public class AddressPrefetchMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = Wrap(inner, cache, client);
 
         await middleware.ProcessAsync(Context(request), CancellationToken.None);
@@ -115,7 +115,7 @@ public class AddressPrefetchMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = Wrap(inner, Substitute.For<IDnsResponseCache>(), client);
 
         await middleware.ProcessAsync(Context(request), CancellationToken.None);
@@ -153,7 +153,7 @@ public class AddressPrefetchMiddlewareTests
             responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache);
 
         await pipeline.ProcessAsync(Context(request), CancellationToken.None);
@@ -180,7 +180,7 @@ public class AddressPrefetchMiddlewareTests
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
         var middleware = Wrap(inner, Substitute.For<IDnsResponseCache>(), client);
 
         var result = await middleware.ProcessAsync(Context(request), CancellationToken.None)

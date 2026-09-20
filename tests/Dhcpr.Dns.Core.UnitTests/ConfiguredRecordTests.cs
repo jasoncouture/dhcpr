@@ -266,7 +266,8 @@ public class ConfiguredRecordTests
         {
             UpstreamEndpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Parse("1.1.1.1"), 53))
         };
-        Assert.Null(await middleware.ProcessAsync(directed, CancellationToken.None));
+        var skipped = await middleware.ProcessAsync(directed, CancellationToken.None);
+        Assert.Equal(DomainResponseCode.ServerFailure, skipped.Flags.ResponseCode);
     }
 
     [Fact]
@@ -287,7 +288,7 @@ public class ConfiguredRecordTests
         var miss = await middleware.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.home.arpa")),
             CancellationToken.None);
-        Assert.Null(miss);
+        Assert.Equal(DomainResponseCode.ServerFailure, miss.Flags.ResponseCode);
     }
 
     [Fact]
@@ -328,7 +329,8 @@ public class ConfiguredRecordTests
 
         var request = DomainMessage.CreateRequest("dyn.home.arpa");
         var context = new DomainMessageContext(null, null, request);
-        Assert.Null(await configMiddleware.ProcessAsync(context, CancellationToken.None));
+        var configMiss = await configMiddleware.ProcessAsync(context, CancellationToken.None);
+        Assert.Equal(DomainResponseCode.ServerFailure, configMiss.Flags.ResponseCode);
 
         var dynAnswer = await dynMiddleware.ProcessAsync(context, CancellationToken.None);
         Assert.Equal(IPAddress.Parse("203.0.113.60"), Address(dynAnswer));
@@ -403,7 +405,10 @@ public class ConfiguredRecordTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns((DomainMessage?)null);
+            .Returns(call => DomainMessage.CreateResponse(
+                call.Arg<DomainMessageContext>().DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure));
         return inner;
     }
 }

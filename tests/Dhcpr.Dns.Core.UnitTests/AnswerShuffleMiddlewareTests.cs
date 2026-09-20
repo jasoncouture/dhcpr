@@ -65,7 +65,7 @@ public class AnswerShuffleMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
-            .Returns(_ => new ValueTask<DomainMessage?>(response));
+            .Returns(_ => new ValueTask<DomainMessage>(response));
 
         var middleware = new AnswerShuffleMiddleware(inner);
         return await middleware.ProcessAsync(

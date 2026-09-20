@@ -30,7 +30,7 @@ public sealed class AuthoritativeNsCutMiddleware : IDomainMessageMiddleware
     // After local auth (300), before forward (500) / recursive (5000).
     public int Priority => 310;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {

@@ -14,12 +14,12 @@ public sealed class AnswerShuffleMiddleware : IDomainMessageMiddleware
     public string Name => _inner.Name;
     public int Priority => _inner.Priority;
 
-    public async ValueTask<DomainMessage?> ProcessAsync(
+    public async ValueTask<DomainMessage> ProcessAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
         var result = await _inner.ProcessAsync(context, cancellationToken);
-        return result is null ? null : ShuffleAddressAnswers(result);
+        return ShuffleAddressAnswers(result);
     }
 
     private static DomainMessage ShuffleAddressAnswers(DomainMessage message)

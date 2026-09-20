@@ -244,7 +244,9 @@ public sealed partial class DnsServer : BackgroundService
         try
         {
             sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
-            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken);
+            using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            handshakeCts.CancelAfter(TcpReadTimeout);
+            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), handshakeCts.Token);
             await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -327,7 +329,11 @@ public sealed partial class DnsServer : BackgroundService
             try
             {
                 if (pendingReplies.Count > 0)
-                    await Task.WhenAll(pendingReplies).WaitAsync(cancellationToken);
+                    await Task.WhenAll(pendingReplies).WaitAsync(TcpReadTimeout, cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                // Reply never left the queue — close anyway so we do not sit in CLOSE_WAIT.
             }
             catch (OperationCanceledException)
             {

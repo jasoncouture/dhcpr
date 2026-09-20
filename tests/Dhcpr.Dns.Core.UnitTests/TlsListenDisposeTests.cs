@@ -25,16 +25,7 @@ public class TlsListenDisposeTests
         try
         {
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
-            var tls = new TlsConfiguration
-            {
-                Enabled = true,
-                Listeners = ["127.0.0.1:853"],
-                CertificatePath = certificatePath,
-                PrivateKeyPath = keyPath
-            };
-            Assert.True(tls.TryValidate(out _));
-
-            ITlsServerCertificateProvider certificates = new FileTlsServerCertificateProvider(Monitor(tls));
+            var tls = ValidTls(certificatePath, keyPath);
 
             var queued = new TaskCompletionSource<DnsPacketReceivedMessage>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -45,7 +36,7 @@ public class TlsListenDisposeTests
                 queue,
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
-                certificates,
+                new FileTlsServerCertificateProvider(Monitor(tls)),
                 NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -96,6 +87,58 @@ public class TlsListenDisposeTests
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task TlsHandshakeTimeoutDisposesClient()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
+            var tls = ValidTls(certificatePath, keyPath);
+            var server = new DnsServer(
+                Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>(),
+                Monitor(new DnsConfiguration()),
+                Monitor(tls),
+                new FileTlsServerCertificateProvider(Monitor(tls)),
+                NullLogger<DnsServer>.Instance);
+
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                using var queryClient = new TcpClient();
+                var connect = queryClient.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+                using var accepted = await listener.AcceptTcpClientAsync();
+                await connect;
+
+                var handleTask = server.HandleTlsClientAsync(accepted, CancellationToken.None);
+                await handleTask.WaitAsync(DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
+                Assert.True(IsDisposed(accepted));
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    private static TlsConfiguration ValidTls(string certificatePath, string keyPath)
+    {
+        var tls = new TlsConfiguration
+        {
+            Enabled = true,
+            Listeners = ["127.0.0.1:853"],
+            CertificatePath = certificatePath,
+            PrivateKeyPath = keyPath
+        };
+        Assert.True(tls.TryValidate(out _));
+        return tls;
     }
 
     private static bool IsDisposed(TcpClient client)

@@ -9,6 +9,10 @@ public static class HealthCheckEndpointExtensions
     public static IServiceCollection AddDhcprHealthChecks(this IServiceCollection services)
     {
         services.AddHealthChecks()
+            .AddCheck<DnsListenersHealthCheck>(
+                DnsListenersHealthCheck.Name,
+                failureStatus: HealthStatus.Unhealthy,
+                tags: ["ready", "live", "dns"])
             .AddCheck<DnsResolveHealthCheck>(
                 DnsResolveHealthCheck.Name,
                 failureStatus: HealthStatus.Unhealthy,

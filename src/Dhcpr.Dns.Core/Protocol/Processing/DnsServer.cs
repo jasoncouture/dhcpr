@@ -35,19 +35,22 @@ public sealed partial class DnsServer : BackgroundService
     private readonly IOptionsMonitor<TlsConfiguration> _tlsOptions;
     private readonly ITlsServerCertificateProvider _certificates;
     private readonly ILogger<DnsServer> _logger;
+    private readonly IDnsListenerReadiness? _readiness;
 
     public DnsServer(
         IMessageQueue<DnsPacketReceivedMessage> messageQueue,
         IOptionsMonitor<DnsConfiguration> options,
         IOptionsMonitor<TlsConfiguration> tlsOptions,
         ITlsServerCertificateProvider certificates,
-        ILogger<DnsServer> logger)
+        ILogger<DnsServer> logger,
+        IDnsListenerReadiness? readiness = null)
     {
         _messageQueue = messageQueue;
         _options = options;
         _tlsOptions = tlsOptions;
         _certificates = certificates;
         _logger = logger;
+        _readiness = readiness;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -62,7 +65,7 @@ public sealed partial class DnsServer : BackgroundService
 
         try
         {
-            var tasks = new List<Task>();
+            var planned = new List<(string Name, Func<CancellationToken, Task> Run)>();
             foreach (var listen in listenEndPoints)
             {
                 var addresses = await ResolveListenAddressesAsync(listen, stoppingToken);
@@ -78,22 +81,19 @@ public sealed partial class DnsServer : BackgroundService
                         $"DNS listen {target} did not resolve to any addresses.{available}");
                 }
 
+                var interfaceSuffix = listen.IsNetworkInterface ? $" (interface {listen.Host})" : string.Empty;
                 foreach (var address in addresses)
                 {
                     var endPoint = new IPEndPoint(address, listen.Port);
                     foreach (var protocol in ExpandProtocols(listen.Protocol))
                     {
-                        tasks.Add(protocol switch
+                        var name = $"{protocol.ToString().ToLowerInvariant()}://{endPoint}";
+                        planned.Add((name, protocol switch
                         {
-                            DnsListenProtocol.Udp => ServeUdpDnsAsync(endPoint, listenerToken),
-                            DnsListenProtocol.Tcp => ServeTcpDnsAsync(endPoint, listenerToken),
+                            DnsListenProtocol.Udp => ct => ServeUdpDnsAsync(endPoint, name, interfaceSuffix, ct),
+                            DnsListenProtocol.Tcp => ct => ServeTcpDnsAsync(endPoint, name, interfaceSuffix, ct),
                             _ => throw new InvalidOperationException($"Unsupported listen protocol: {protocol}")
-                        });
-                        LogListening(
-                            _logger,
-                            protocol.ToString().ToLowerInvariant(),
-                            endPoint,
-                            listen.IsNetworkInterface ? $" (interface {listen.Host})" : string.Empty);
+                        }));
                     }
                 }
             }
@@ -118,12 +118,14 @@ public sealed partial class DnsServer : BackgroundService
                     foreach (var address in addresses)
                     {
                         var endPoint = new IPEndPoint(address, port);
-                        tasks.Add(ServeTlsDnsAsync(endPoint, listenerToken));
-                        LogListening(_logger, "tls", endPoint, string.Empty);
+                        var name = $"tls://{endPoint}";
+                        planned.Add((name, ct => ServeTlsDnsAsync(endPoint, name, ct)));
                     }
                 }
             }
 
+            _readiness?.SetExpected(planned.ConvertAll(listener => listener.Name));
+            var tasks = planned.ConvertAll(listener => listener.Run(listenerToken));
             var completed = await Task.WhenAny(tasks);
             if (stoppingToken.IsCancellationRequested)
             {
@@ -187,7 +189,11 @@ public sealed partial class DnsServer : BackgroundService
             _ => throw new InvalidOperationException($"Unsupported TLS listen endpoint: {listener}")
         };
 
-    private async Task ServeUdpDnsAsync(IPEndPoint listenEndPoint, CancellationToken cancellationToken)
+    private async Task ServeUdpDnsAsync(
+        IPEndPoint listenEndPoint,
+        string listenerName,
+        string interfaceSuffix,
+        CancellationToken cancellationToken)
     {
         const int SioUdpConnreset = -1744830452;
         var udpClient = new UdpClient(listenEndPoint.AddressFamily);
@@ -209,6 +215,8 @@ public sealed partial class DnsServer : BackgroundService
                 udpClient.Client.IOControl((IOControlCode)SioUdpConnreset, new byte[] { 0, 0, 0, 0 }, null);
 
             udpClient.Client.Bind(listenEndPoint);
+            _readiness?.MarkBound(listenerName);
+            LogListening(_logger, "udp", listenEndPoint, interfaceSuffix);
             var buffer = new byte[16384];
             // ReceiveMessageFrom requires a remote endpoint template matching the socket family.
             // Per-listener instance: the API may mutate this endpoint.
@@ -476,7 +484,11 @@ public sealed partial class DnsServer : BackgroundService
         return await listener.AcceptTcpClientAsync(cancellationToken).AsTask().OperationCancelledToNull();
     }
 
-    private async Task ServeTcpDnsAsync(IPEndPoint listenEndPoint, CancellationToken stoppingToken)
+    private async Task ServeTcpDnsAsync(
+        IPEndPoint listenEndPoint,
+        string listenerName,
+        string interfaceSuffix,
+        CancellationToken stoppingToken)
     {
         var tcpServer = new TcpListener(listenEndPoint);
         var activeTasks = new List<Task>();
@@ -485,6 +497,8 @@ public sealed partial class DnsServer : BackgroundService
         {
             // Must Start before Accept — AcceptTcpClientAsync throws if not listening.
             tcpServer.Start(ushort.MaxValue);
+            _readiness?.MarkBound(listenerName);
+            LogListening(_logger, "tcp", listenEndPoint, interfaceSuffix);
             acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -510,7 +524,10 @@ public sealed partial class DnsServer : BackgroundService
         }
     }
 
-    private async Task ServeTlsDnsAsync(IPEndPoint listenEndPoint, CancellationToken stoppingToken)
+    private async Task ServeTlsDnsAsync(
+        IPEndPoint listenEndPoint,
+        string listenerName,
+        CancellationToken stoppingToken)
     {
         var tcpServer = new TcpListener(listenEndPoint);
         var activeTasks = new List<Task>();
@@ -518,6 +535,8 @@ public sealed partial class DnsServer : BackgroundService
         try
         {
             tcpServer.Start(ushort.MaxValue);
+            _readiness?.MarkBound(listenerName);
+            LogListening(_logger, "tls", listenEndPoint, string.Empty);
             acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {

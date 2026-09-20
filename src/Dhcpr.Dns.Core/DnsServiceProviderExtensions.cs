@@ -51,6 +51,7 @@ public static class DnsServiceProviderExtensions
         // Process-bound: OnChange → shared cache.Clear().
         services.AddHostedService<DnsConfigurationCacheInvalidator>();
 
+        services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
         services.AddScoped<IDomainMessageMiddleware, RootZoneMiddleware>();

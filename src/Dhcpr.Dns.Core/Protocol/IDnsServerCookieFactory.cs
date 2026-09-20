@@ -9,15 +9,15 @@ namespace Dhcpr.Dns.Core.Protocol;
 /// </summary>
 public interface IDnsServerCookieFactory
 {
-    ImmutableArray<byte> Create(ReadOnlySpan<byte> clientCookie, IPAddress clientAddress);
+    ImmutableArray<byte> Create(in ReadOnlySpan<byte> clientCookie, IPAddress clientAddress);
 
     bool TryCreate(
-        ReadOnlySpan<byte> clientCookie,
+        in ReadOnlySpan<byte> clientCookie,
         IPAddress clientAddress,
         out ImmutableArray<byte> serverCookie);
 
     bool IsValid(
-        ReadOnlySpan<byte> clientCookie,
-        ReadOnlySpan<byte> serverCookie,
+        in ReadOnlySpan<byte> clientCookie,
+        in ReadOnlySpan<byte> serverCookie,
         IPAddress clientAddress);
 }

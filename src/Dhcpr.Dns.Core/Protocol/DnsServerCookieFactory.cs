@@ -27,7 +27,7 @@ public sealed class DnsServerCookieFactory : IDnsServerCookieFactory
         _time = timeProvider;
     }
 
-    public ImmutableArray<byte> Create(ReadOnlySpan<byte> clientCookie, IPAddress clientAddress)
+    public ImmutableArray<byte> Create(in ReadOnlySpan<byte> clientCookie, IPAddress clientAddress)
     {
         if (!TryCreate(clientCookie, clientAddress, out var cookie))
             throw new InvalidOperationException("DNS server cookie secret is not available.");
@@ -36,7 +36,7 @@ public sealed class DnsServerCookieFactory : IDnsServerCookieFactory
     }
 
     public bool TryCreate(
-        ReadOnlySpan<byte> clientCookie,
+        in ReadOnlySpan<byte> clientCookie,
         IPAddress clientAddress,
         out ImmutableArray<byte> serverCookie)
     {
@@ -56,8 +56,8 @@ public sealed class DnsServerCookieFactory : IDnsServerCookieFactory
     }
 
     public bool IsValid(
-        ReadOnlySpan<byte> clientCookie,
-        ReadOnlySpan<byte> serverCookie,
+        in ReadOnlySpan<byte> clientCookie,
+        in ReadOnlySpan<byte> serverCookie,
         IPAddress clientAddress)
     {
         if (clientCookie.Length != EdnsCookie.ClientCookieLength)
@@ -83,9 +83,9 @@ public sealed class DnsServerCookieFactory : IDnsServerCookieFactory
     }
 
     private static void WriteHash(
-        ReadOnlySpan<byte> secret,
-        ReadOnlySpan<byte> clientCookie,
-        ReadOnlySpan<byte> header,
+        in ReadOnlySpan<byte> secret,
+        in ReadOnlySpan<byte> clientCookie,
+        in ReadOnlySpan<byte> header,
         IPAddress clientAddress,
         Span<byte> destination)
     {

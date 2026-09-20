@@ -2,6 +2,10 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Resolvers.Caching;
+using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
+
+using Microsoft.Extensions.Caching.Memory;
 
 using Microsoft.Extensions.Options;
 
@@ -78,6 +82,35 @@ public class BlackholeDomainMiddlewareTests
 
         Assert.Same(response, result);
         await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CachedNxDomainSkipsBlackholeOnTheNextLookup()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var blackhole = Create(inner, @".+\..+\.localdomain$");
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var pipeline = new CacheResolverDecorator(blackhole, cache);
+        var request = DomainMessage.CreateRequest("a.b.localdomain", DomainRecordType.A);
+        var firstContext = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+        var secondContext = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            DomainMessage.CreateRequest("a.b.localdomain", DomainRecordType.A));
+
+        var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
+        var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.NameError, first!.Flags.ResponseCode);
+        Assert.Equal("Blackhole", firstContext.AnsweredBy);
+        Assert.Equal(DomainResponseCode.NameError, second!.Flags.ResponseCode);
+        Assert.True(secondContext.CacheHit);
+        Assert.Equal("Cache", secondContext.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

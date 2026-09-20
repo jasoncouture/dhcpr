@@ -63,8 +63,10 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IDomainMessageMiddleware, ForwardResolver>();
         services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → resolver.arpa → RFC 6303 → Blackhole → …
+        // Outermost last: Logging → Metrics → resolver.arpa → RFC 6303 → …
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
+        // Inside cache: sinkhole NXDOMAIN is stored so regex/suffix match runs once.
+        services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
         // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
@@ -76,8 +78,6 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
         // ANY / unknown QTYPE → NOTIMP; HINFO / AXFR / IXFR → REFUSED.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
-        // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
-        services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
         // RFC 6303 empty reverse zones — NXDOMAIN locally, no public leak/SERVFAIL.
         services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();
         // RFC 9462: resolver.arpa is locally served (never cached or forwarded).

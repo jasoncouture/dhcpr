@@ -3,8 +3,8 @@ using Microsoft.Extensions.Options;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// NXDOMAIN for configured blackhole suffixes and regexes before cache or
-/// upstream — used to sinkhole attack domains and search-domain junk.
+/// NXDOMAIN for configured blackhole suffixes and regexes before upstream.
+/// Lives inside the response cache so a name pays the regex once.
 /// </summary>
 public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
 {

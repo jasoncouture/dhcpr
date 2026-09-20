@@ -277,7 +277,7 @@ public class ConfiguredRecordTests
         var monitor = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
         monitor.CurrentValue.Returns(initial);
 
-        var middleware = new ConfiguredRecordMiddleware(monitor);
+        var middleware = new ConfiguredRecordMiddleware(PassThroughInner(), monitor);
         var hit = await middleware.ProcessAsync(
             new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.home.arpa")),
             CancellationToken.None);
@@ -396,6 +396,14 @@ public class ConfiguredRecordTests
     {
         var monitor = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
         monitor.CurrentValue.Returns(configuration);
-        return new ConfiguredRecordMiddleware(monitor);
+        return new ConfiguredRecordMiddleware(PassThroughInner(), monitor);
+    }
+
+    private static IDomainMessageMiddleware PassThroughInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return inner;
     }
 }

@@ -7,21 +7,24 @@ namespace Dhcpr.Dns.Core.ConfiguredRecords;
 
 /// <summary>
 /// Sparse config-record overlay (AA A/AAAA/CNAME/NS + wildcards).
-/// Runs before DynDNS so hard-set records win.
+/// Decorator around Root Zone so hard-set records win over primed root data.
 /// </summary>
 public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
 {
     public const int MiddlewarePriority = 150;
 
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
 
-    public ConfiguredRecordMiddleware(IOptionsMonitor<DnsConfiguration> options)
+    public ConfiguredRecordMiddleware(
+        IDomainMessageMiddleware inner,
+        IOptionsMonitor<DnsConfiguration> options)
     {
+        _inner = inner;
         _options = options;
     }
 
     public string Name => "Configured Records";
-    // After directed upstream (100), before DynDNS (200).
     public int Priority => MiddlewarePriority;
 
     public async ValueTask<DomainMessage?> ProcessAsync(
@@ -30,14 +33,15 @@ public sealed class ConfiguredRecordMiddleware : IDomainMessageMiddleware
     {
         await Task.Yield();
         if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var answer = _options.CurrentValue.GetParsedRecords()
             .TryAnswer(context.DomainMessage, context.ClientEndPoint?.Address);
         if (answer is null)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         context.DoNotCacheResponse = true;
+        context.AnsweredBy ??= Name;
         return answer with { Id = context.DomainMessage.Id };
     }
 }

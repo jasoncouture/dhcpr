@@ -80,6 +80,7 @@ var app = builder.Build();
 
 
 app.UseDhcprForwardedHeaders();
+app.UseIpv4MappedAddresses();
 
 // DNS Middleware
 app.MapDnsOverHttp();

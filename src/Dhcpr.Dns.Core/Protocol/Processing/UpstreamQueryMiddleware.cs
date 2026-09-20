@@ -6,6 +6,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
 /// Directed stub query to nameservers listed on <see cref="DomainMessageContext.UpstreamEndpoints"/>.
+/// Decorator around the remaining resolver walk; pass-through when no endpoints are set.
 /// </summary>
 public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 {
@@ -14,11 +15,16 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
     // Remaining peers are the next batch.
     public const int MaxParallelNameservers = 4;
 
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IDomainClientFactory _clientFactory;
     private readonly IEdnsProtocolService _ednsProtocolService;
 
-    public UpstreamQueryMiddleware(IDomainClientFactory clientFactory, IEdnsProtocolService ednsProtocolService)
+    public UpstreamQueryMiddleware(
+        IDomainMessageMiddleware inner,
+        IDomainClientFactory clientFactory,
+        IEdnsProtocolService ednsProtocolService)
     {
+        _inner = inner;
         _clientFactory = clientFactory;
         _ednsProtocolService = ednsProtocolService;
     }
@@ -31,7 +37,7 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         if (context.UpstreamEndpoints is not { Length: > 0 } endPoints)
-            return null;
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         using var remaining = endPoints.ToPooledList();
 
@@ -68,9 +74,11 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
                     nameErrorFallback = result;
                     if (remaining.Count > 0)
                         continue;
+                    context.AnsweredBy ??= Name;
                     return result;
                 }
 
+                context.AnsweredBy ??= Name;
                 return result;
             }
             catch (Exception ex) when (NameserverSelection.IsTransportFailure(ex))
@@ -80,10 +88,14 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         }
 
         if (nameErrorFallback is not null)
+        {
+            context.AnsweredBy ??= Name;
             return nameErrorFallback;
+        }
 
         // Every nameserver endpoint failed.
         context.ServFailReason = "all upstream nameservers failed";
+        context.AnsweredBy ??= Name;
         return DomainMessage.CreateResponse(
             context.DomainMessage,
             DomainResourceRecords.Empty,

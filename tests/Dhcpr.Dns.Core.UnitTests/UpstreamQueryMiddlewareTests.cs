@@ -30,7 +30,7 @@ public class UpstreamQueryMiddlewareTests
         var endpoints = Enumerable.Range(1, 8)
             .Select(i => new IPEndPoint(IPAddress.Parse($"192.0.2.{i}"), 53))
             .ToImmutableArray();
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -61,7 +61,7 @@ public class UpstreamQueryMiddlewareTests
                 return new ValueTask<IDomainClient>(new DomainClientParallelWrapper(clients));
             });
 
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("example.com");
         // Opening race is four peers; remaining batches still reach the good one.
         var context = new DomainMessageContext(null, null, request)
@@ -94,7 +94,7 @@ public class UpstreamQueryMiddlewareTests
                 return new ValueTask<IDomainClient>(new DomainClientParallelWrapper(clients));
             });
 
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -122,7 +122,7 @@ public class UpstreamQueryMiddlewareTests
                 return new ValueTask<IDomainClient>(client);
             });
 
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -156,7 +156,7 @@ public class UpstreamQueryMiddlewareTests
                 return new ValueTask<IDomainClient>(new DomainClientParallelWrapper(clients));
             });
 
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("example.com");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -187,7 +187,7 @@ public class UpstreamQueryMiddlewareTests
                 return new ValueTask<IDomainClient>(client);
             });
 
-        var middleware = new UpstreamQueryMiddleware(factory, CreateEdns());
+        var middleware = Create(factory);
         var request = DomainMessage.CreateRequest("missing.example");
         var context = new DomainMessageContext(null, null, request)
         {
@@ -200,6 +200,34 @@ public class UpstreamQueryMiddlewareTests
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+    }
+
+    [Fact]
+    public async Task PassesToInnerWhenNoUpstreamEndpoints()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("example.com");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var factory = Substitute.For<IDomainClientFactory>();
+        var middleware = new UpstreamQueryMiddleware(inner, factory, CreateEdns());
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await factory.DidNotReceive()
+            .GetParallelDomainClientAsync(Arg.Any<IEnumerable<DomainClientOptions>>(), Arg.Any<CancellationToken>());
+    }
+
+    private static UpstreamQueryMiddleware Create(IDomainClientFactory factory)
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return new UpstreamQueryMiddleware(inner, factory, CreateEdns());
     }
 
     private static IDomainClient CreateClientOrNameError(

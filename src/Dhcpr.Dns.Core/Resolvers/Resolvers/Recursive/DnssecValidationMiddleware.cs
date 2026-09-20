@@ -39,9 +39,6 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
     {
         var dnssecEnabled = _options.CurrentValue.Dnssec?.Enabled ?? true;
 
-        if (dnssecEnabled && context.DnssecScope is { } scope)
-            _validator.EnsureTrustAnchorsLoaded(scope);
-
         var result = await _innerMiddleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
         if (result is null)
             return null;
@@ -69,12 +66,19 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
 
         var before = context.DnssecScope.Status;
 
-        // Validate even on cache hits: RRSIGs are retained in cache, so crypto can
-        // re-verify and load DNSKEY/DS into scope without a network fetch for the answer.
-        await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
+        // Cache already stored the validation outcome. Trust it — do not
+        // re-run RRSIG crypto on the hit path. Unchecked (legacy) entries
+        // still go through the validator once so status can be written.
+        if (context.CacheHit && context.CachedDnssecStatus is not DnssecValidationStatus.Unchecked)
+            context.DnssecScope.Observe(context.CachedDnssecStatus);
+        else
+        {
+            _validator.EnsureTrustAnchorsLoaded(context.DnssecScope);
+            await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
 
-        if (!context.CacheHit && !context.DoNotCacheResponse)
-            _cache.UpdateSecurityStatus(context.DomainMessage, context.DnssecScope.Status);
+            if (!context.CacheHit && !context.DoNotCacheResponse)
+                _cache.UpdateSecurityStatus(context.DomainMessage, context.DnssecScope.Status);
+        }
 
         var after = context.DnssecScope.Status;
 

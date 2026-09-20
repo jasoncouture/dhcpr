@@ -214,6 +214,113 @@ public class DnssecPhase4Tests
     }
 
     [Fact]
+    public async Task Middleware_CacheHitWithStoredStatusSkipsValidation()
+    {
+        var request = DomainMessage.CreateRequest("hit.example");
+        var response = DomainMessage.CreateResponse(
+            request,
+            answers:
+            [
+                new DomainResourceRecord(
+                    new DomainLabels("hit.example"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(60),
+                    new IPAddressData(IPAddress.Parse("192.0.2.10")))
+            ],
+            responseCode: DomainResponseCode.NoError);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ctx = ci.ArgAt<DomainMessageContext>(0);
+                ctx.CacheHit = true;
+                ctx.CachedDnssecStatus = DnssecValidationStatus.Secure;
+                return new ValueTask<DomainMessage?>(response);
+            });
+
+        var validator = Substitute.For<IDnssecMessageValidator>();
+        var dnssec = new DnssecValidationMiddleware(
+            inner,
+            validator,
+            Substitute.For<IDnsResponseCache>(),
+            Monitor(new DnsConfiguration()),
+            NullLogger<DnssecValidationMiddleware>.Instance);
+
+        var scope = new DnssecScope();
+        var context = new DomainMessageContext(null, null, request) { DnssecScope = scope };
+        var result = await dnssec.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Flags.Authentic);
+        Assert.Equal(DnssecValidationStatus.Secure, scope.Status);
+        validator.DidNotReceive().EnsureTrustAnchorsLoaded(Arg.Any<DnssecScope>());
+        await validator.DidNotReceive()
+            .ValidateResponseAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Middleware_CacheHitUncheckedStillValidates()
+    {
+        var request = DomainMessage.CreateRequest("legacy.example");
+        var response = DomainMessage.CreateResponse(
+            request,
+            answers:
+            [
+                new DomainResourceRecord(
+                    new DomainLabels("legacy.example"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(60),
+                    new IPAddressData(IPAddress.Parse("192.0.2.11")))
+            ],
+            responseCode: DomainResponseCode.NoError);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var ctx = ci.ArgAt<DomainMessageContext>(0);
+                ctx.CacheHit = true;
+                ctx.CachedDnssecStatus = DnssecValidationStatus.Unchecked;
+                return new ValueTask<DomainMessage?>(response);
+            });
+
+        var validator = Substitute.For<IDnssecMessageValidator>();
+        validator.ValidateResponseAsync(
+                Arg.Any<DomainMessageContext>(),
+                Arg.Any<DomainMessage>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                ci.ArgAt<DomainMessageContext>(0).DnssecScope!.Observe(DnssecValidationStatus.Insecure);
+                return ValueTask.CompletedTask;
+            });
+
+        var dnssec = new DnssecValidationMiddleware(
+            inner,
+            validator,
+            Substitute.For<IDnsResponseCache>(),
+            Monitor(new DnsConfiguration()),
+            NullLogger<DnssecValidationMiddleware>.Instance);
+
+        var scope = new DnssecScope();
+        var context = new DomainMessageContext(null, null, request) { DnssecScope = scope };
+        var result = await dnssec.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.False(result!.Flags.Authentic);
+        Assert.Equal(DnssecValidationStatus.Insecure, scope.Status);
+        validator.Received(1).EnsureTrustAnchorsLoaded(scope);
+        await validator.Received(1)
+            .ValidateResponseAsync(context, Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Middleware_BypassCacheDoesNotUpdateSecurityStatus()
     {
         var cache = Substitute.For<IDnsResponseCache>();

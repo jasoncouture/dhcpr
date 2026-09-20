@@ -78,11 +78,12 @@ public sealed partial class AddressPrefetchMiddleware : IDomainMessageMiddleware
             return;
 
         LogPrefetch(_logger, question.Name, sibling);
-        _ = PrefetchAsync(context, siblingRequest);
+        PrefetchAsync(context, siblingRequest);
     }
 
-    private async Task PrefetchAsync(DomainMessageContext parent, DomainMessage siblingRequest)
+    private async void PrefetchAsync(DomainMessageContext parent, DomainMessage siblingRequest)
     {
+        await Task.Yield();
         try
         {
             using var timeout = new CancellationTokenSource(PrefetchTimeout);

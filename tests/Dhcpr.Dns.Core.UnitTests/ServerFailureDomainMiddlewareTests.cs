@@ -10,13 +10,13 @@ public class ServerFailureDomainMiddlewareTests
     {
         var middleware = new ServerFailureDomainMiddleware();
         var request = DomainMessage.CreateRequest("example.com");
+        var context = new DomainMessageContext(null, null, request);
 
-        var result = await middleware.ProcessAsync(
-            new DomainMessageContext(null, null, request),
-            CancellationToken.None);
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
         Assert.Empty(result.Records.Answers);
+        Assert.Equal("Server Failure Fallback", context.AnsweredBy);
     }
 }

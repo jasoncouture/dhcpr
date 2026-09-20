@@ -7,6 +7,7 @@ public sealed class ServerFailureDomainMiddleware : IDomainMessageMiddleware
     {
         await Task.Yield();
         context.ServFailReason = $"no handler answered ({Name})";
+        context.AnsweredBy ??= Name;
         return DomainMessage.CreateResponse(
             context.DomainMessage,
             DomainResourceRecords.Empty,

@@ -54,9 +54,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
         services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
-        services.AddScoped<ServerFailureDomainMiddleware>();
-        services.AddScoped<IDomainMessageMiddleware>(static sp => new CompositeDomainMessageMiddleware(
-            sp.GetRequiredService<ServerFailureDomainMiddleware>()));
+        services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
         // NsCut → Forward → Recursive → ServerFailure.

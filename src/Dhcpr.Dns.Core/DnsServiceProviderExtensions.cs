@@ -64,6 +64,8 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IDomainMessageMiddleware, RecursiveRootResolver>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
+        // Inside cache, inside ServFailRetry: sibling A/AAAA warm only on miss.
+        services.Decorate<IDomainMessageMiddleware, AddressPrefetchMiddleware>();
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         // Inside cache: sinkhole NXDOMAIN is stored so regex/suffix match runs once.
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
@@ -77,8 +79,6 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
-        // After CNAME assembly: warm the sibling A/AAAA in cache (no A⇄AAAA loop).
-        services.Decorate<IDomainMessageMiddleware, AddressPrefetchMiddleware>();
         // Outside CNAME so chased assemblies still get RA (previously stamped before chase).
         services.Decorate<IDomainMessageMiddleware, RecursionAvailableMiddleware>();
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();

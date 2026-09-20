@@ -2,9 +2,11 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using NSubstitute;
@@ -117,6 +119,52 @@ public class AddressPrefetchMiddlewareTests
         var middleware = Wrap(inner, Substitute.For<IDnsResponseCache>(), client);
 
         await middleware.ProcessAsync(Context(request), CancellationToken.None);
+        await Task.Delay(50);
+        await client.DidNotReceiveWithAnyArgs()
+            .SendPrefetchAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CacheHitDoesNotSchedulePrefetch()
+    {
+        var started = new TaskCompletionSource<DomainMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = Substitute.For<IInternalDomainClient>();
+        client.SendPrefetchAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                started.TrySetResult(call.Arg<DomainMessage>());
+                return new ValueTask<DomainMessage>(
+                    DomainMessage.CreateResponse(call.Arg<DomainMessage>(), DomainResourceRecords.Empty,
+                        DomainResponseCode.NoError));
+            });
+
+        var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(
+            request,
+            [
+                new DomainResourceRecord(
+                    new DomainLabels("example.com"),
+                    DomainRecordType.A,
+                    DomainRecordClass.IN,
+                    TimeSpan.FromSeconds(300),
+                    new IPAddressData(IPAddress.Parse("192.0.2.1")))
+            ],
+            responseCode: DomainResponseCode.NoError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+        var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache);
+
+        await pipeline.ProcessAsync(Context(request), CancellationToken.None);
+        var scheduled = await started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(DomainRecordType.AAAA, scheduled.Questions[0].Type);
+
+        client.ClearReceivedCalls();
+        var second = Context(DomainMessage.CreateRequest("example.com", DomainRecordType.A));
+        await pipeline.ProcessAsync(second, CancellationToken.None);
+
+        Assert.True(second.CacheHit);
         await Task.Delay(50);
         await client.DidNotReceiveWithAnyArgs()
             .SendPrefetchAsync(Arg.Any<DomainMessageContext>(), Arg.Any<DomainMessage>(), Arg.Any<CancellationToken>());

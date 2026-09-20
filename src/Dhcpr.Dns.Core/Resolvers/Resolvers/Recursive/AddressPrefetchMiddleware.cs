@@ -7,7 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 /// <summary>
-/// After an external IN A or AAAA answer, fill the sibling type in cache.
+/// After an external IN A or AAAA miss, fill the sibling type in cache.
+/// Lives inside the response cache (immediately inside ServFailRetry).
 /// Never prefetches from an internal hop or a prefetch hop (A ⇄ AAAA loop).
 /// </summary>
 public sealed partial class AddressPrefetchMiddleware : IDomainMessageMiddleware

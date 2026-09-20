@@ -58,6 +58,7 @@ public class BindChaosMiddlewareTests
 
         var text = Assert.IsType<TextData>(Assert.Single(result!.Records.Answers).Data);
         Assert.Equal("203.0.113.9", text.Text);
+        Assert.True(context.DoNotCacheResponse);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

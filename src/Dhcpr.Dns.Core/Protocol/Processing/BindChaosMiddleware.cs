@@ -56,18 +56,25 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 
         // CHAOS never leaves the process (a "." route would otherwise
         // send version.bind upstream).
-        context.DoNotCacheResponse = true;
         context.CacheHit = true;
         context.AnsweredBy = "bind-chaos";
-        var response = IsIpInfo(question.Name)
-            ? question.Type is DomainRecordType.TXT or DomainRecordType.ANY
+        if (IsIpInfo(question.Name))
+        {
+            // Per-client address. Must not be stored or another stub
+            // would be told the previous client's IP.
+            context.DoNotCacheResponse = true;
+            var ipResponse = question.Type is DomainRecordType.TXT or DomainRecordType.ANY
                 ? Txt(context.DomainMessage, ClientAddressText(context.ClientEndPoint))
-                : Nodata(context.DomainMessage)
-            : !IsIdentityName(question.Name)
-                ? NxDomain(context.DomainMessage)
-                : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-                    ? Txt(context.DomainMessage, TextFor(question.Name))
-                    : Nodata(context.DomainMessage);
+                : Nodata(context.DomainMessage);
+            return Local(ipResponse, ipResponse.Flags.ResponseCode, authoritative: true);
+        }
+
+        context.DoNotCacheResponse = true;
+        var response = !IsIdentityName(question.Name)
+            ? NxDomain(context.DomainMessage)
+            : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
+                ? Txt(context.DomainMessage, TextFor(question.Name))
+                : Nodata(context.DomainMessage);
 
         return Local(response, response.Flags.ResponseCode, authoritative: true);
     }

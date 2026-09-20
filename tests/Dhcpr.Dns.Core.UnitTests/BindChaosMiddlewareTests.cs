@@ -128,28 +128,25 @@ public class BindChaosMiddlewareTests
     }
 
     [Theory]
+    [InlineData(DomainRecordClass.IN)]
     [InlineData(DomainRecordClass.HS)]
     [InlineData(DomainRecordClass.CS)]
     [InlineData(DomainRecordClass.Any)]
     [InlineData(DomainRecordClass.None)]
     [InlineData((DomainRecordClass)99)]
-    public async Task NonInternetNonChaosIsNotImplemented(DomainRecordClass @class)
+    public async Task NonChaosPassesThrough(DomainRecordClass @class)
     {
-        var inner = Substitute.For<IDomainMessageMiddleware>();
-        var middleware = new BindChaosMiddleware(inner);
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.TXT, @class);
-        var context = Context(request);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NameError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+        var middleware = new BindChaosMiddleware(inner);
 
-        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+        var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(DomainResponseCode.NotImplemented, result!.Flags.ResponseCode);
-        Assert.False(result.Flags.Authoritative);
-        Assert.True(result.Flags.RecursionAvailable);
-        Assert.Empty(result.Records.Answers);
-        Assert.Equal("query-class", context.AnsweredBy);
-        await inner.DidNotReceiveWithAnyArgs()
-            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+        Assert.Same(response, result);
+        await inner.Received(1).ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

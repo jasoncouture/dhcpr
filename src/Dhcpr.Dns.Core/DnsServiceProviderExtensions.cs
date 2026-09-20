@@ -76,7 +76,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
-        // ANY / unknown QTYPE → NOTIMP; HINFO / AXFR / IXFR → REFUSED.
+        // Class other than IN/CH → NOTIMP; ANY / unknown QTYPE → NOTIMP;
+        // HINFO / AXFR / IXFR → REFUSED.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // RFC 6303 empty reverse zones — NXDOMAIN locally, no public leak/SERVFAIL.
         services.Decorate<IDomainMessageMiddleware, Rfc6303EmptyZoneMiddleware>();

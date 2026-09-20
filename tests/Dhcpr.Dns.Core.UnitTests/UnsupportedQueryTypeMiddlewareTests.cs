@@ -53,6 +53,52 @@ public class UnsupportedQueryTypeMiddlewareTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(DomainRecordClass.HS)]
+    [InlineData(DomainRecordClass.CS)]
+    [InlineData(DomainRecordClass.Any)]
+    [InlineData(DomainRecordClass.None)]
+    [InlineData((DomainRecordClass)99)]
+    public async Task NonInternetNonChaosIsNotImplemented(DomainRecordClass @class)
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new UnsupportedQueryTypeMiddleware(inner);
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.TXT, @class);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(DomainResponseCode.NotImplemented, result!.Flags.ResponseCode);
+        Assert.Empty(result.Records.Answers);
+        Assert.Equal("query-class", context.AnsweredBy);
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChaosClassPassesThrough()
+    {
+        var request = DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ValueTask<DomainMessage?>(response));
+        var middleware = new UnsupportedQueryTypeMiddleware(inner);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(response, result);
+        await inner.Received(1).ProcessAsync(context, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task KnownTypePassesThrough()
     {

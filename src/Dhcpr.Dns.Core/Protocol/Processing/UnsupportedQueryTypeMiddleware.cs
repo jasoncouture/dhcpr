@@ -1,8 +1,8 @@
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Rejects QTYPE ANY and unknown types with NOTIMP, and HINFO / AXFR / IXFR
-/// with REFUSED, before cache or upstream work.
+/// Rejects query class other than IN/CH with NOTIMP, QTYPE ANY and unknown
+/// types with NOTIMP, and HINFO / AXFR / IXFR with REFUSED.
 /// </summary>
 public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
 {
@@ -22,6 +22,15 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
     {
         foreach (var question in context.DomainMessage.Questions)
         {
+            if (question.Class is not DomainRecordClass.IN and not DomainRecordClass.CH)
+            {
+                context.AnsweredBy = "query-class";
+                return DomainMessage.CreateResponse(
+                    context.DomainMessage,
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.NotImplemented);
+            }
+
             if (RefuseCode(question.Type) is { } rcode)
             {
                 context.AnsweredBy = "UnsupportedQueryType";

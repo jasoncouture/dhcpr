@@ -5,9 +5,9 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// Only class IN is forwarded or recursed. CH is answered locally (BIND
-/// identity bait, <c>ip.info</c> client address, or NXDOMAIN). Every other
-/// class is NOTIMP.
+/// CH is answered locally (BIND identity bait, <c>ip.info</c> client
+/// address, or NXDOMAIN). IN and every other class pass through;
+/// <see cref="UnsupportedQueryTypeMiddleware"/> NOTIMPs non-IN/CH.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
@@ -51,20 +51,13 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         var question = context.DomainMessage.Questions[0];
-        if (question.Class is DomainRecordClass.IN)
+        if (question.Class is not DomainRecordClass.CH)
             return await _inner.ProcessAsync(context, cancellationToken);
 
-        // Non-IN never leaves the process (a "." route would otherwise
-        // send CHAOS / Hesiod / QCLASS ANY upstream).
+        // CHAOS never leaves the process (a "." route would otherwise
+        // send version.bind upstream).
         context.DoNotCacheResponse = true;
         context.CacheHit = true;
-
-        if (question.Class is not DomainRecordClass.CH)
-        {
-            context.AnsweredBy = "query-class";
-            return Local(context.DomainMessage, DomainResponseCode.NotImplemented, authoritative: false);
-        }
-
         context.AnsweredBy = "bind-chaos";
         var response = IsIpInfo(question.Name)
             ? question.Type is DomainRecordType.TXT or DomainRecordType.ANY

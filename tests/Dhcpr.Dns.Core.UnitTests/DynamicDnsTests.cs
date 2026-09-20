@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 
 using Dhcpr.Dns.Core.Authoritative;
@@ -6,6 +7,8 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
+
+using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -146,7 +149,7 @@ public class DynamicDnsTests
         using var harness = CreateHarness();
         Update(harness, "dyn.foo.bar", "203.0.113.50");
 
-        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
+        var middleware = CreateMiddleware(harness);
         var request = DomainMessage.CreateRequest("dyn.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -154,6 +157,7 @@ public class DynamicDnsTests
 
         Assert.NotNull(result);
         Assert.True(context.DoNotCacheResponse);
+        Assert.Equal("Dynamic DNS", context.AnsweredBy);
         Assert.True(result!.Flags.Authoritative);
         Assert.Contains(result.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
@@ -166,7 +170,7 @@ public class DynamicDnsTests
         using var harness = CreateHarness();
         Update(harness, "www.foo.bar", "203.0.113.60");
 
-        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
+        var middleware = CreateMiddleware(harness);
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -189,7 +193,7 @@ public class DynamicDnsTests
 
         harness.Zones.Publish([BuildZone(FooBarZone, "foo.bar.bind")]);
 
-        var middleware = new DynamicDnsMiddleware(harness.Store, harness.Zones);
+        var middleware = CreateMiddleware(harness);
         var request = DomainMessage.CreateRequest("dyn.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 
@@ -199,6 +203,62 @@ public class DynamicDnsTests
         Assert.Contains(result!.Records.Answers, r =>
             r.Type == DomainRecordType.A &&
             ((IPAddressData)r.Data).Address.Equals(IPAddress.Parse("203.0.113.70")));
+    }
+
+    [Fact]
+    public async Task MissCallsInner()
+    {
+        using var harness = CreateHarness();
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("missing.foo.bar");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var middleware = new DynamicDnsMiddleware(inner, harness.Store, harness.Zones);
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DirectedHopCallsInner()
+    {
+        using var harness = CreateHarness();
+        Update(harness, "dyn.foo.bar", "203.0.113.50");
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var request = DomainMessage.CreateRequest("dyn.foo.bar");
+        var passed = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(passed);
+
+        var middleware = new DynamicDnsMiddleware(inner, harness.Store, harness.Zones);
+        var context = new DomainMessageContext(null, null, request)
+        {
+            UpstreamEndpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Parse("1.1.1.1"), 53))
+        };
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(passed, result);
+        await inner.Received(1)
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    private static DynamicDnsMiddleware CreateMiddleware(Harness harness)
+        => new(PassThroughInner(), harness.Store, harness.Zones);
+
+    private static IDomainMessageMiddleware PassThroughInner()
+    {
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns((DomainMessage?)null);
+        return inner;
     }
 
     private static string Update(Harness harness, string hostname, string myip)

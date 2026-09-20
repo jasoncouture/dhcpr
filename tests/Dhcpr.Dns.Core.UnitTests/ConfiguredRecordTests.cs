@@ -295,7 +295,7 @@ public class ConfiguredRecordTests
     {
         var dyn = DynamicDnsTestHelpers.CreateStore();
         dyn.Upsert("www.home.arpa", IPAddress.Parse("203.0.113.50"), IPAddress.Parse("2001:db8::50"));
-        var dynMiddleware = new DynamicDnsMiddleware(dyn, new AuthoritativeZoneStore());
+        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, new AuthoritativeZoneStore());
         var configMiddleware = CreateMiddleware(ValidConfig(Rec("www.home.arpa", "A", "10.0.0.5")));
 
         var aContext = new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.home.arpa"));
@@ -323,7 +323,7 @@ public class ConfiguredRecordTests
     {
         var dyn = DynamicDnsTestHelpers.CreateStore();
         dyn.Upsert("dyn.home.arpa", IPAddress.Parse("203.0.113.60"), ipv6: null);
-        var dynMiddleware = new DynamicDnsMiddleware(dyn, new AuthoritativeZoneStore());
+        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, new AuthoritativeZoneStore());
         var configMiddleware = CreateMiddleware(ValidConfig(Rec("www.home.arpa", "A", "10.0.0.5")));
 
         var request = DomainMessage.CreateRequest("dyn.home.arpa");

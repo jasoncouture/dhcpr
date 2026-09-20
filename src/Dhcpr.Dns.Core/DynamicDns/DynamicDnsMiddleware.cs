@@ -5,15 +5,21 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 namespace Dhcpr.Dns.Core.DynamicDns;
 
 /// <summary>
-/// Exact-name DynDNS overlay (AA A/AAAA). Runs before forward/recurse so local updates win.
+/// Exact-name DynDNS overlay (AA A/AAAA). Decorator around the remaining
+/// walk so local updates win over forward/recurse. Directed hops skip.
 /// </summary>
 public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
 {
+    private readonly IDomainMessageMiddleware _inner;
     private readonly IDynamicDnsStore _store;
     private readonly IAuthoritativeZoneStore _zones;
 
-    public DynamicDnsMiddleware(IDynamicDnsStore store, IAuthoritativeZoneStore zones)
+    public DynamicDnsMiddleware(
+        IDomainMessageMiddleware inner,
+        IDynamicDnsStore store,
+        IAuthoritativeZoneStore zones)
     {
+        _inner = inner;
         _store = store;
         _zones = zones;
     }
@@ -27,14 +33,14 @@ public sealed class DynamicDnsMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         await Task.Yield();
-        if (context.UpstreamEndpoints is { Length: > 0 })
-            return null;
-
-        var answer = DynamicDnsAnswerer.TryAnswer(_store, _zones, context.DomainMessage);
-        if (answer is null)
-            return null;
+        if (
+            context.UpstreamEndpoints is { Length: > 0 } ||
+            DynamicDnsAnswerer.TryAnswer(_store, _zones, context.DomainMessage) is not { } answer
+            )
+            return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         context.DoNotCacheResponse = true;
+        context.AnsweredBy ??= Name;
         return answer with { Id = context.DomainMessage.Id };
     }
 }

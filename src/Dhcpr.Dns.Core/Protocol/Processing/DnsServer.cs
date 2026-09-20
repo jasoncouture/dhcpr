@@ -27,6 +27,12 @@ public sealed partial class DnsServer : BackgroundService
     /// </summary>
     public static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(1);
 
+    /// <summary>
+    /// Kernel accept-queue depth for classic TCP and DoT. Excess SYNs
+    /// are dropped instead of parking completed handshakes in the kernel.
+    /// </summary>
+    public const int ListenBacklog = 20;
+
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
 
@@ -496,7 +502,7 @@ public sealed partial class DnsServer : BackgroundService
         try
         {
             // Must Start before Accept — AcceptTcpClientAsync throws if not listening.
-            tcpServer.Start(ushort.MaxValue);
+            tcpServer.Start(ListenBacklog);
             _readiness?.MarkBound(listenerName);
             LogListening(_logger, "tcp", listenEndPoint, interfaceSuffix);
             acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
@@ -534,7 +540,7 @@ public sealed partial class DnsServer : BackgroundService
         Task<TcpClient?>? acceptTask = null;
         try
         {
-            tcpServer.Start(ushort.MaxValue);
+            tcpServer.Start(ListenBacklog);
             _readiness?.MarkBound(listenerName);
             LogListening(_logger, "tls", listenEndPoint, string.Empty);
             acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);

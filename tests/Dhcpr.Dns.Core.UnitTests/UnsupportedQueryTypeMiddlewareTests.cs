@@ -9,12 +9,14 @@ namespace Dhcpr.Dns.Core.UnitTests;
 
 public class UnsupportedQueryTypeMiddlewareTests
 {
-    [Fact]
-    public async Task AnyTypeReturnsNotImplementedWithoutCallingInner()
+    [Theory]
+    [InlineData(DomainRecordType.ANY)]
+    [InlineData(DomainRecordType.HINFO)]
+    public async Task BlockedTypeReturnsNotImplementedWithoutCallingInner(DomainRecordType type)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new UnsupportedQueryTypeMiddleware(inner);
-        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.ANY);
+        var request = DomainMessage.CreateRequest("example.com", type);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),

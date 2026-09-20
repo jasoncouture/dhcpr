@@ -74,7 +74,7 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
-        // Unknown QTYPE (e.g. ANY/255) → NOTIMP before cache/upstream.
+        // Unknown QTYPE (e.g. ANY/255, HINFO) → NOTIMP before cache/upstream.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();
         // Blackhole suffixes → NXDOMAIN (still outside cache/upstream).
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();

@@ -14,7 +14,7 @@ public sealed class BlackholeRuleSet
 {
     public static BlackholeRuleSet Empty { get; } = new([], []);
 
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(2);
     private static readonly RegexOptions PatternOptions =
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking;
 

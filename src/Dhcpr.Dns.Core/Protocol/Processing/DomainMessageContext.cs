@@ -114,4 +114,10 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// chains do not walk OPT again. Null means do not write a COOKIE on the reply.
     /// </summary>
     public ImmutableArray<byte>? ClientCookie { get; set; }
+
+    /// <summary>
+    /// True when the query presented a server cookie that matches this
+    /// client address. Optional — a missing or unknown cookie is not an error.
+    /// </summary>
+    public bool CookieConfirmed { get; set; }
 }

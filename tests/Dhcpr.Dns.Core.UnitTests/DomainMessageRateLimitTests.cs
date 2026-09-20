@@ -1,9 +1,11 @@
+using System.Collections.Immutable;
 using System.Net;
 using System.Net.Sockets;
 
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -137,6 +139,61 @@ public class DomainMessageRateLimitTests
     }
 
     [Fact]
+    public async Task ValidServerCookieSkipsClassicDnsLimit()
+    {
+        var limiter = Substitute.For<IUdpQueryRateLimiter>();
+        limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
+            .Returns(UdpRateLimitAction.Drop);
+        var middleware = PassthroughMiddleware();
+        var factory = new DnsServerCookieFactory(
+            new StaticDnsServerCookieSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
+            TimeProvider.System);
+        using var processor = Create(limiter, middleware, factory);
+        var clientCookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8);
+        var serverCookie = factory.Create(clientCookie.AsSpan(), Client.Address);
+        var request = WithOptCookie(
+            DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT),
+            clientCookie.AddRange(serverCookie));
+        using var udp = new UdpClient();
+        var context = new DomainMessageContext(Client, Server, request) { Source = DnsQuerySource.Udp };
+        var message = new UdpDnsPacketReceivedMessage(context, udp);
+
+        await processor.ProcessMessageAsync(message, CancellationToken.None);
+
+        await middleware.Received(1)
+            .ProcessAsync(context, Arg.Any<CancellationToken>());
+        limiter.DidNotReceive()
+            .Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>());
+        Assert.True(context.CookieConfirmed);
+    }
+
+    [Fact]
+    public async Task ClientCookieAloneDoesNotSkipLimit()
+    {
+        var limiter = Substitute.For<IUdpQueryRateLimiter>();
+        limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
+            .Returns(UdpRateLimitAction.Refuse);
+        var middleware = PassthroughMiddleware();
+        var factory = new DnsServerCookieFactory(
+            new StaticDnsServerCookieSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
+            TimeProvider.System);
+        using var processor = Create(limiter, middleware, factory);
+        var request = WithOptCookie(
+            DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT),
+            ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8));
+        using var udp = new UdpClient();
+        var context = new DomainMessageContext(Client, Server, request) { Source = DnsQuerySource.Udp };
+        var message = new UdpDnsPacketReceivedMessage(context, udp);
+
+        await processor.ProcessMessageAsync(message, CancellationToken.None);
+
+        await middleware.DidNotReceive()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+        Assert.Equal("UdpRateLimit", context.AnsweredBy);
+        Assert.False(context.CookieConfirmed);
+    }
+
+    [Fact]
     public async Task SharesWindowAcrossTransports()
     {
         var limiter = CreateSlidingWindowLimiter();
@@ -186,15 +243,32 @@ public class DomainMessageRateLimitTests
 
     private static DomainMessageContextMessageProcessor Create(
         IUdpQueryRateLimiter limiter,
-        IDomainMessageMiddleware middleware)
+        IDomainMessageMiddleware middleware,
+        IDnsServerCookieFactory? cookies = null)
     {
         return new DomainMessageContextMessageProcessor(
             [middleware],
             Substitute.For<ILiveQueryEventPublisher>(),
             limiter,
             NullLogger<DomainMessageContextMessageProcessor>.Instance,
-            Substitute.For<IDnsMetrics>());
+            Substitute.For<IDnsMetrics>(),
+            cookies);
     }
+
+    private static DomainMessage WithOptCookie(DomainMessage message, ImmutableArray<byte> cookie)
+        => message with
+        {
+            Records = message.Records with
+            {
+                Additional = ImmutableArray.Create(
+                    new DomainResourceRecord(
+                        DomainLabels.Empty,
+                        DomainRecordType.OPT,
+                        (DomainRecordClass)1232,
+                        TimeSpan.Zero,
+                        new OptionData(ImmutableArray.Create(new EdnsOption(EdnsCookie.OptionCode, cookie)))))
+            }
+        };
 
     private static IDomainMessageMiddleware PassthroughMiddleware(DomainMessage? response = null)
     {

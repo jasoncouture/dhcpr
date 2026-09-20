@@ -26,25 +26,28 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly IDnsMetrics _metrics;
+    private readonly IDnsServerCookieFactory? _cookies;
 
     public DomainMessageContextMessageProcessor(
         IEnumerable<IDomainMessageMiddleware> middlewareChain,
         ILiveQueryEventPublisher liveQueryPublisher,
         IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
-        IDnsMetrics metrics)
+        IDnsMetrics metrics,
+        IDnsServerCookieFactory? cookies = null)
     {
         _logger = logger;
         _liveQueryPublisher = liveQueryPublisher;
         _udpRateLimiter = udpRateLimiter;
         _metrics = metrics;
+        _cookies = cookies;
         _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
     }
 
     public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
     {
         var awaitable = message as IAwaitableDnsRequest;
-        EdnsCookie.Capture(message.Context);
+        EdnsCookie.Capture(message.Context, _cookies);
         using var activity = DnsInstrumentation.StartQuery(message);
         var started = Stopwatch.GetTimestamp();
         DomainMessage? response = null;
@@ -99,7 +102,11 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
             }
 
             if (!message.Context.IsInternal)
-                response = EdnsCookie.Apply(message.Context.ClientCookie, response);
+                response = EdnsCookie.Apply(
+                    message.Context.ClientCookie,
+                    response,
+                    _cookies,
+                    message.Context.ClientEndPoint?.Address);
 
             // Publish once per external client answer (UDP/TCP/DoH), independent of decorate order.
             await DnsQueryEventFactory.PublishAnswersAsync(
@@ -197,11 +204,13 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     }
 
     /// <summary>
-    /// Classic DNS only (UDP and TCP). DoT, DoH, and internal hops are not
-    /// limited.
+    /// Classic DNS only (UDP and TCP). DoT, DoH, internal hops, and queries
+    /// with a valid server cookie are not limited. A valid cookie means the
+    /// source is not spoofed; cookies are never required.
     /// </summary>
     private static bool ShouldRateLimit(DomainMessageContext context)
         => !context.IsInternal &&
+           !context.CookieConfirmed &&
            context.Source is DnsQuerySource.Udp or DnsQuerySource.Tcp;
 
     /// <summary>

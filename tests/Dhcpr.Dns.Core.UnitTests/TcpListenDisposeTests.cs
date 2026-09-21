@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -17,15 +16,21 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class TcpListenDisposeTests
 {
     [Fact]
-    public async Task DoesNotDisposeTcpClientUntilQueuedReplyFinishes()
+    public async Task DoesNotDisposeTcpClientUntilProcessAndSendFinishes()
     {
-        var queued = new TaskCompletionSource<DnsPacketReceivedMessage>(
+        var started = new TaskCompletionSource<DomainMessageContext>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
-        queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
-            .Do(ci => queued.TrySetResult(ci.Arg<DnsPacketReceivedMessage>()));
+        var release = new TaskCompletionSource<DomainMessage?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeline = Substitute.For<IDnsQueryPipeline>();
+        pipeline.ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                started.TrySetResult(call.Arg<DomainMessageContext>());
+                return new ValueTask<DomainMessage?>(release.Task);
+            });
         var server = new DnsServer(
-            queue,
+            pipeline,
             Monitor(new DnsConfiguration()),
             Monitor(new TlsConfiguration()),
             Substitute.For<ITlsServerCertificateProvider>(),
@@ -51,15 +56,13 @@ public class TcpListenDisposeTests
             await queryClient.GetStream().WriteAsync(framed);
             queryClient.Client.Shutdown(SocketShutdown.Send);
 
-            var item = await queued.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.IsType<TcpDnsPacketReceivedMessage>(item);
-            var tcpMessage = (TcpDnsPacketReceivedMessage)item;
-            Assert.Equal(DnsQuerySource.Tcp, tcpMessage.Context.Source);
+            var context = await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(DnsQuerySource.Tcp, context.Source);
 
             Assert.False(handleTask.IsCompleted);
             Assert.False(IsDisposed(accepted));
 
-            tcpMessage.SendCompleted.TrySetResult();
+            release.TrySetResult(null);
             await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.True(IsDisposed(accepted));
         }
@@ -72,9 +75,9 @@ public class TcpListenDisposeTests
     [Fact]
     public async Task ClosesConnectionIfFullPacketNotReadWithinTimeout()
     {
-        var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
+        var pipeline = Substitute.For<IDnsQueryPipeline>();
         var server = new DnsServer(
-            queue,
+            pipeline,
             Monitor(new DnsConfiguration()),
             Monitor(new TlsConfiguration()),
             Substitute.For<ITlsServerCertificateProvider>(),
@@ -95,7 +98,8 @@ public class TcpListenDisposeTests
 
             await handleTask.WaitAsync(DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
             Assert.True(IsDisposed(accepted));
-            queue.DidNotReceive().Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>());
+            await pipeline.DidNotReceive()
+                .ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
         }
         finally
         {

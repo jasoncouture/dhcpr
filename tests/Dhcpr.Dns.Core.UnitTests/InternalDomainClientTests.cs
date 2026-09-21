@@ -1,11 +1,8 @@
 using System.Collections.Immutable;
 using System.Net;
 
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
-
-using NSubstitute;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 
@@ -14,8 +11,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_AbortsWithServerFailure_WhenHopDepthExceedsLimit()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             InternalHopDepth = InternalDomainClient.MaxInternalHops
@@ -27,14 +24,14 @@ public class InternalDomainClientTests
             CancellationToken.None);
 
         Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
-        Assert.Equal(0, queue.EnqueueCount);
+        Assert.Equal(0, pipeline.ExecuteCount);
     }
 
     [Fact]
     public async Task SendAsync_DirectedUpstream_DoesNotConsumeBudgetOrIncrementDepth()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var budget = new QueryWorkBudget(limit: 1);
         var tips = new NameserverTipCache();
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -51,19 +48,19 @@ public class InternalDomainClientTests
             ImmutableArray.Create(new IPEndPoint(IPAddress.Loopback, 53)),
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, queue.EnqueueCount);
-        Assert.NotNull(queue.LastMessage);
-        Assert.Equal(3, queue.LastMessage!.Context.InternalHopDepth);
-        Assert.Same(budget, queue.LastMessage.Context.WorkBudget);
-        Assert.Same(tips, queue.LastMessage.Context.NameserverTips);
-        Assert.True(queue.LastMessage.Context.BypassCache);
-        Assert.True(queue.LastMessage.Context.DoNotCacheResponse);
-        Assert.Equal(parent.ClientCookie, queue.LastMessage.Context.ClientCookie);
+        Assert.Equal(1, pipeline.ExecuteCount);
+        Assert.NotNull(pipeline.LastContext);
+        Assert.Equal(3, pipeline.LastContext!.InternalHopDepth);
+        Assert.Same(budget, pipeline.LastContext.WorkBudget);
+        Assert.Same(tips, pipeline.LastContext.NameserverTips);
+        Assert.True(pipeline.LastContext.BypassCache);
+        Assert.True(pipeline.LastContext.DoNotCacheResponse);
+        Assert.Equal(parent.ClientCookie, pipeline.LastContext.ClientCookie);
         Assert.True(budget.TryConsume());
 
-        queue.LastMessage.TaskCompletionSource.TrySetResult(
+        pipeline.CompleteLast(
             DomainMessage.CreateResponse(
-                queue.LastMessage.Context.DomainMessage,
+                pipeline.LastContext.DomainMessage,
                 DomainResourceRecords.Empty,
                 DomainResponseCode.NoError));
 
@@ -73,8 +70,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_Undirected_IncrementsHopDepthAndConsumesBudget()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var budget = new QueryWorkBudget(limit: 1);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -88,15 +85,15 @@ public class InternalDomainClientTests
             DomainMessage.CreateRequest("ns.example.com"),
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, queue.EnqueueCount);
-        Assert.Equal(4, queue.LastMessage!.Context.InternalHopDepth);
-        Assert.False(queue.LastMessage.Context.BypassCache);
-        Assert.Equal(DnsQuerySource.Doh, queue.LastMessage.Context.Source);
+        Assert.Equal(1, pipeline.ExecuteCount);
+        Assert.Equal(4, pipeline.LastContext!.InternalHopDepth);
+        Assert.False(pipeline.LastContext.BypassCache);
+        Assert.Equal(DnsQuerySource.Doh, pipeline.LastContext.Source);
         Assert.False(budget.TryConsume());
 
-        queue.LastMessage.TaskCompletionSource.TrySetResult(
+        pipeline.CompleteLast(
             DomainMessage.CreateResponse(
-                queue.LastMessage.Context.DomainMessage,
+                pipeline.LastContext.DomainMessage,
                 DomainResourceRecords.Empty,
                 DomainResponseCode.NoError));
 
@@ -106,8 +103,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_AbortsWithServerFailure_WhenWorkBudgetExhausted()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             WorkBudget = new QueryWorkBudget(limit: 0)
@@ -119,14 +116,14 @@ public class InternalDomainClientTests
             CancellationToken.None);
 
         Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
-        Assert.Equal(0, queue.EnqueueCount);
+        Assert.Equal(0, pipeline.ExecuteCount);
     }
 
     [Fact]
     public async Task SendPrefetchAsync_UsesOwnScopeAndSetsSuppressAddressPrefetch()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var parentScope = new DnssecScope();
         var parentBudget = new QueryWorkBudget(limit: 0);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -141,18 +138,18 @@ public class InternalDomainClientTests
             DomainMessage.CreateRequest("example.com", DomainRecordType.AAAA),
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, queue.EnqueueCount);
-        Assert.NotNull(queue.LastMessage);
-        Assert.True(queue.LastMessage!.Context.IsInternal);
-        Assert.True(queue.LastMessage.Context.SuppressAddressPrefetch);
-        Assert.Equal(1, queue.LastMessage.Context.InternalHopDepth);
-        Assert.NotSame(parentScope, queue.LastMessage.Context.DnssecScope);
-        Assert.NotSame(parentBudget, queue.LastMessage.Context.WorkBudget);
-        Assert.False(queue.LastMessage.Context.BypassCache);
+        Assert.Equal(1, pipeline.ExecuteCount);
+        Assert.NotNull(pipeline.LastContext);
+        Assert.True(pipeline.LastContext!.IsInternal);
+        Assert.True(pipeline.LastContext.SuppressAddressPrefetch);
+        Assert.Equal(1, pipeline.LastContext.InternalHopDepth);
+        Assert.NotSame(parentScope, pipeline.LastContext.DnssecScope);
+        Assert.NotSame(parentBudget, pipeline.LastContext.WorkBudget);
+        Assert.False(pipeline.LastContext.BypassCache);
 
-        queue.LastMessage.TaskCompletionSource.TrySetResult(
+        pipeline.CompleteLast(
             DomainMessage.CreateResponse(
-                queue.LastMessage.Context.DomainMessage,
+                pipeline.LastContext.DomainMessage,
                 DomainResourceRecords.Empty,
                 DomainResponseCode.NoError));
 
@@ -162,8 +159,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendRefreshAsync_BypassesCacheAndUsesOwnScope()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var parentScope = new DnssecScope();
         var parentBudget = new QueryWorkBudget(limit: 0);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -178,17 +175,17 @@ public class InternalDomainClientTests
             DomainMessage.CreateRequest("example.com", DomainRecordType.A),
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, queue.EnqueueCount);
-        Assert.NotNull(queue.LastMessage);
-        Assert.True(queue.LastMessage!.Context.BypassCache);
-        Assert.True(queue.LastMessage.Context.IsInternal);
-        Assert.True(queue.LastMessage.Context.SuppressAddressPrefetch);
-        Assert.NotSame(parentScope, queue.LastMessage.Context.DnssecScope);
-        Assert.NotSame(parentBudget, queue.LastMessage.Context.WorkBudget);
+        Assert.Equal(1, pipeline.ExecuteCount);
+        Assert.NotNull(pipeline.LastContext);
+        Assert.True(pipeline.LastContext!.BypassCache);
+        Assert.True(pipeline.LastContext.IsInternal);
+        Assert.True(pipeline.LastContext.SuppressAddressPrefetch);
+        Assert.NotSame(parentScope, pipeline.LastContext.DnssecScope);
+        Assert.NotSame(parentBudget, pipeline.LastContext.WorkBudget);
 
-        queue.LastMessage.TaskCompletionSource.TrySetResult(
+        pipeline.CompleteLast(
             DomainMessage.CreateResponse(
-                queue.LastMessage.Context.DomainMessage,
+                pipeline.LastContext.DomainMessage,
                 DomainResourceRecords.Empty,
                 DomainResponseCode.NoError));
 
@@ -198,8 +195,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_CoalescesIdenticalDirectedHops()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var endpoints = ImmutableArray.Create(
             new IPEndPoint(IPAddress.Parse("192.0.2.1"), 53),
             new IPEndPoint(IPAddress.Parse("192.0.2.2"), 53));
@@ -213,14 +210,14 @@ public class InternalDomainClientTests
         var first = client.SendAsync(parent, request, endpoints, CancellationToken.None).AsTask();
         var second = client.SendAsync(parent, request, shuffled, CancellationToken.None).AsTask();
 
-        Assert.Equal(1, queue.EnqueueCount);
-        Assert.NotNull(queue.LastMessage);
+        Assert.Equal(1, pipeline.ExecuteCount);
+        Assert.NotNull(pipeline.LastContext);
 
         var response = DomainMessage.CreateResponse(
-            queue.LastMessage!.Context.DomainMessage,
+            pipeline.LastContext!.DomainMessage,
             DomainResourceRecords.Empty,
             DomainResponseCode.NoError);
-        queue.LastMessage.TaskCompletionSource.TrySetResult(response);
+        pipeline.CompleteLast(response);
 
         Assert.Same(response, await first);
         Assert.Same(response, await second);
@@ -229,8 +226,8 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_DoesNotCoalesceDifferentQuestions()
     {
-        var queue = new CountingQueue();
-        var client = new InternalDomainClient(queue.Queue);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline);
         var endpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Loopback, 53));
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -248,12 +245,13 @@ public class InternalDomainClientTests
             endpoints,
             CancellationToken.None).AsTask();
 
-        Assert.Equal(2, queue.EnqueueCount);
-        foreach (var queued in queue.Messages)
+        Assert.Equal(2, pipeline.ExecuteCount);
+        foreach (var completion in pipeline.Completions)
         {
-            queued.TaskCompletionSource.TrySetResult(
+            var context = pipeline.Contexts[pipeline.Completions.IndexOf(completion)];
+            completion.TrySetResult(
                 DomainMessage.CreateResponse(
-                    queued.Context.DomainMessage,
+                    context.DomainMessage,
                     DomainResourceRecords.Empty,
                     DomainResponseCode.NoError));
         }
@@ -262,24 +260,26 @@ public class InternalDomainClientTests
         await second;
     }
 
-    private sealed class CountingQueue
+    private sealed class CountingPipeline : IDnsQueryPipeline
     {
-        public IMessageQueue<DnsPacketReceivedMessage> Queue { get; }
-        public int EnqueueCount { get; private set; }
-        public InternalDnsRequestReceivedMessage? LastMessage { get; private set; }
-        public List<InternalDnsRequestReceivedMessage> Messages { get; } = [];
+        public int ExecuteCount { get; private set; }
+        public DomainMessageContext? LastContext { get; private set; }
+        public List<DomainMessageContext> Contexts { get; } = [];
+        public List<TaskCompletionSource<DomainMessage?>> Completions { get; } = [];
 
-        public CountingQueue()
+        public ValueTask<DomainMessage?> ExecuteAsync(
+            DomainMessageContext context,
+            CancellationToken cancellationToken)
         {
-            var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
-            queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
-                .Do(ci =>
-                {
-                    EnqueueCount++;
-                    LastMessage = (InternalDnsRequestReceivedMessage)ci.Arg<DnsPacketReceivedMessage>();
-                    Messages.Add(LastMessage);
-                });
-            Queue = queue;
+            ExecuteCount++;
+            LastContext = context;
+            Contexts.Add(context);
+            var tcs = new TaskCompletionSource<DomainMessage?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Completions.Add(tcs);
+            return new ValueTask<DomainMessage?>(tcs.Task);
         }
+
+        public void CompleteLast(DomainMessage response)
+            => Completions[^1].TrySetResult(response);
     }
 }

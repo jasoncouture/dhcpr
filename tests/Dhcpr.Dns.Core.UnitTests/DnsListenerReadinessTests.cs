@@ -1,4 +1,3 @@
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -36,7 +35,7 @@ public class DnsListenerReadinessTests
         var port = FreeTcpPort();
         var readiness = new DnsListenerReadiness();
         var server = new DnsServer(
-            Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>(),
+            Substitute.For<IDnsQueryPipeline>(),
             Monitor(new DnsConfiguration
             {
                 ListenAddresses = [$"udp://127.0.0.1:{port}", $"tcp://127.0.0.1:{port}"]

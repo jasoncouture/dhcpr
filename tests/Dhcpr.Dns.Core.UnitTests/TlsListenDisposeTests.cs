@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -19,7 +18,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class TlsListenDisposeTests
 {
     [Fact]
-    public async Task DoesNotDisposeTcpClientUntilQueuedTlsReplyFinishes()
+    public async Task DoesNotDisposeTcpClientUntilProcessAndSendFinishes()
     {
         var directory = Directory.CreateTempSubdirectory();
         try
@@ -27,13 +26,19 @@ public class TlsListenDisposeTests
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
             var tls = ValidTls(certificatePath, keyPath);
 
-            var queued = new TaskCompletionSource<DnsPacketReceivedMessage>(
+            var started = new TaskCompletionSource<DomainMessageContext>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            var queue = Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>();
-            queue.When(q => q.Enqueue(Arg.Any<DnsPacketReceivedMessage>(), Arg.Any<CancellationToken>()))
-                .Do(ci => queued.TrySetResult(ci.Arg<DnsPacketReceivedMessage>()));
+            var release = new TaskCompletionSource<DomainMessage?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var pipeline = Substitute.For<IDnsQueryPipeline>();
+            pipeline.ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    started.TrySetResult(call.Arg<DomainMessageContext>());
+                    return new ValueTask<DomainMessage?>(release.Task);
+                });
             var server = new DnsServer(
-                queue,
+                pipeline,
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
                 new FileTlsServerCertificateProvider(Monitor(tls)),
@@ -67,14 +72,13 @@ public class TlsListenDisposeTests
                 await ssl.FlushAsync();
                 queryClient.Client.Shutdown(SocketShutdown.Send);
 
-                var item = await queued.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                var tcpMessage = Assert.IsType<TcpDnsPacketReceivedMessage>(item);
-                Assert.Equal(DnsQuerySource.Dot, tcpMessage.Context.Source);
+                var context = await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Equal(DnsQuerySource.Dot, context.Source);
 
                 Assert.False(handleTask.IsCompleted);
                 Assert.False(IsDisposed(accepted));
 
-                tcpMessage.SendCompleted.TrySetResult();
+                release.TrySetResult(null);
                 await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
                 Assert.True(IsDisposed(accepted));
             }
@@ -98,7 +102,7 @@ public class TlsListenDisposeTests
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
             var tls = ValidTls(certificatePath, keyPath);
             var server = new DnsServer(
-                Substitute.For<IMessageQueue<DnsPacketReceivedMessage>>(),
+                Substitute.For<IDnsQueryPipeline>(),
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
                 new FileTlsServerCertificateProvider(Monitor(tls)),

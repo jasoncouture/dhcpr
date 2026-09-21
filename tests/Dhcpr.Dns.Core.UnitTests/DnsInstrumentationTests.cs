@@ -20,10 +20,12 @@ public class DnsInstrumentationTests
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53_000),
             new IPEndPoint(IPAddress.Loopback, 53),
-            request);
-        var message = new HttpDnsPacketReceivedMessage(context);
+            request)
+        {
+            Source = DnsQuerySource.Doh
+        };
 
-        using var activity = DnsInstrumentation.StartQuery(message);
+        using var activity = DnsInstrumentation.StartQuery(context);
 
         Assert.NotNull(activity);
         Assert.True(started.Value);
@@ -48,8 +50,7 @@ public class DnsInstrumentationTests
             Source = DnsQuerySource.Dot
         };
 
-        using var activity = DnsInstrumentation.StartQuery(
-            new TcpDnsPacketReceivedMessage(context, new System.Net.Sockets.TcpClient(), Stream.Null));
+        using var activity = DnsInstrumentation.StartQuery(context);
 
         Assert.NotNull(activity);
         Assert.True(started.Value);
@@ -73,7 +74,7 @@ public class DnsInstrumentationTests
             AnsweredBy = "RecursiveRootResolver"
         };
 
-        using var activity = DnsInstrumentation.StartQuery(new HttpDnsPacketReceivedMessage(context));
+        using var activity = DnsInstrumentation.StartQuery(context);
         DnsInstrumentation.CompleteQuery(activity, context, response);
 
         Assert.Equal(ActivityStatusCode.Error, activity!.Status);
@@ -100,7 +101,7 @@ public class DnsInstrumentationTests
             ParentTraceContext = parent!.Context
         };
 
-        using var activity = DnsInstrumentation.StartQuery(new HttpDnsPacketReceivedMessage(context));
+        using var activity = DnsInstrumentation.StartQuery(context);
 
         Assert.NotNull(activity);
         Assert.Equal(parent.TraceId, activity!.TraceId);

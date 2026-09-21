@@ -20,7 +20,7 @@ internal sealed class PrivateInfrastructureEndpointMiddleware(RequestDelegate ne
             return;
         }
 
-        await next(context);
+        await next.Invoke(context);
     }
 
     internal static bool IsInfrastructurePath(PathString path)

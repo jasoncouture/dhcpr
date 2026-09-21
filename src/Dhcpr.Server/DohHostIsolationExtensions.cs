@@ -16,7 +16,7 @@ public static class DohHostIsolationExtensions
             var dns = context.RequestServices.GetRequiredService<IOptionsMonitor<DnsConfiguration>>().CurrentValue;
             if (!dns.DnsOverHttp.IsolateHost)
             {
-                await next();
+                await next.Invoke();
                 return;
             }
 
@@ -29,7 +29,7 @@ public static class DohHostIsolationExtensions
                     tls,
                     certificate))
             {
-                await next();
+                await next.Invoke();
                 return;
             }
 

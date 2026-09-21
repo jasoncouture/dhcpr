@@ -11,7 +11,7 @@ internal sealed class Ipv4MappedAddressMiddleware(RequestDelegate next)
     public async Task Invoke(HttpContext context)
     {
         Unmap(context.Connection);
-        await next(context);
+        await next.Invoke(context);
     }
 
     internal static void Unmap(ConnectionInfo connection)

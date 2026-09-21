@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Net;
 
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
 using Microsoft.Extensions.Options;
@@ -12,14 +11,14 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
 {
     private static readonly IPEndPoint _healthCheckEndPoint = new(IPAddress.Loopback, 0);
 
-    private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
+    private readonly IDnsQueryPipeline _pipeline;
     private readonly DnsOverHttpConfiguration _dnsOverHttp;
 
     public DnsQueryExecutor(
-        IMessageQueue<DnsPacketReceivedMessage> messageQueue,
+        IDnsQueryPipeline pipeline,
         IOptions<DnsConfiguration> dnsConfiguration)
     {
-        _messageQueue = messageQueue;
+        _pipeline = pipeline;
         _dnsOverHttp = dnsConfiguration.Value.DnsOverHttp ?? new DnsOverHttpConfiguration();
     }
 
@@ -94,20 +93,9 @@ public sealed class DnsQueryExecutor : IDnsQueryExecutor
             Source = DnsQuerySource.Doh
         };
 
-        var queued = new HttpDnsPacketReceivedMessage(context);
-        await using var registration = cancellationToken.Register(
-            static state =>
-            {
-                var tcs = (TaskCompletionSource<DomainMessage?>)state!;
-                tcs.TrySetCanceled();
-            },
-            queued.TaskCompletionSource);
-
-        _messageQueue.Enqueue(queued, cancellationToken);
-
         try
         {
-            return await queued.TaskCompletionSource.Task.ConfigureAwait(false);
+            return await _pipeline.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

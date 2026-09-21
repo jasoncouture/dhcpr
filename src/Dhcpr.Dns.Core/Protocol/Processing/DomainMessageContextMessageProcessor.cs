@@ -5,15 +5,13 @@ using System.Net;
 using System.Net.Sockets;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Linq;
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
 using Microsoft.Extensions.Logging;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public sealed partial class DomainMessageContextMessageProcessor : IQueueMessageProcessor<DnsPacketReceivedMessage>, IDisposable
+public sealed partial class DomainMessageContextMessageProcessor
 {
     /// <summary>
     /// Hard UDP payload cap. Client EDNS sizes above this are ignored so a
@@ -22,181 +20,91 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
     public const int UdpResponseSizeLimit = 1232;
 
     private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
-    private readonly PooledList<IDomainMessageMiddleware> _middlewareChain;
+    private readonly IDomainMessageMiddleware _middleware;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly IDnsMetrics _metrics;
     private readonly IDnsServerCookieFactory? _cookies;
 
     public DomainMessageContextMessageProcessor(
-        IEnumerable<IDomainMessageMiddleware> middlewareChain,
+        IDomainMessageMiddleware middleware,
         ILiveQueryEventPublisher liveQueryPublisher,
         IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
         IDnsMetrics metrics,
         IDnsServerCookieFactory? cookies = null)
     {
+        _middleware = middleware;
         _logger = logger;
         _liveQueryPublisher = liveQueryPublisher;
         _udpRateLimiter = udpRateLimiter;
         _metrics = metrics;
         _cookies = cookies;
-        _middlewareChain = middlewareChain.OrderBy(i => i.Priority).ToPooledList();
     }
 
-    public async Task ProcessMessageAsync(DnsPacketReceivedMessage message, CancellationToken cancellationToken)
+    public async ValueTask<DomainMessage?> ExecuteAsync(
+        DomainMessageContext context,
+        CancellationToken cancellationToken)
     {
-        var awaitable = message as IAwaitableDnsRequest;
-        EdnsCookie.Capture(message.Context, _cookies);
-        using var activity = DnsInstrumentation.StartQuery(message);
+        EdnsCookie.Capture(context, _cookies);
+        using var activity = DnsInstrumentation.StartQuery(context);
         var started = Stopwatch.GetTimestamp();
         DomainMessage? response = null;
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            if (ShouldRateLimit(message.Context) &&
-                TryApplyRateLimit(message.Context, out response))
+            if (ShouldRateLimit(context) &&
+                TryApplyRateLimit(context, out response))
             {
                 // Rate-limit answers never enter MetricsDomainMessageMiddleware.
                 if (response is not null)
-                    _metrics.RecordQuery(message.Context, response);
+                    _metrics.RecordQuery(context, response);
                 else
-                    _metrics.RecordQuery(message.Context, DnsMetrics.DropRcode, error: true);
+                    _metrics.RecordQuery(context, DnsMetrics.DropRcode, error: true);
             }
             else
             {
-                foreach (var middleware in _middlewareChain)
-                {
-                    response = await middleware.ProcessAsync(message.Context, cancellationToken);
-                    if (message.Context.Cancel) // This is intended for things that want to ignore the request.
-                        break;
-                    answeredBy = middleware;
-                }
+                response = await _middleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
+                if (!context.Cancel)
+                    answeredBy = _middleware;
             }
 
-            if (message.Context.AnsweredBy is null && answeredBy is not null)
-                message.Context.AnsweredBy = answeredBy.Name;
+            if (context.AnsweredBy is null && answeredBy is not null)
+                context.AnsweredBy = answeredBy.Name;
 
-            DnsInstrumentation.CompleteQuery(activity, message.Context, response);
+            DnsInstrumentation.CompleteQuery(activity, context, response);
             _metrics.RecordDuration(
-                message.Context,
+                context,
                 response,
                 Stopwatch.GetElapsedTime(started));
 
-            // This is a directive to ignore the message.
-            // The middleware may have responded to it, or may be blocking this client.
-            // Awaitable clients (internal / DNS-over-HTTP) treat null as failure via TrySetResult(null).
             if (response is null)
-            {
-                awaitable?.TaskCompletionSource.TrySetResult(null);
-                return;
-            }
+                return null;
 
-            if (response.Id != message.Context.DomainMessage.Id)
-            {
-                response = response with { Id = message.Context.DomainMessage.Id };
-            }
+            if (response.Id != context.DomainMessage.Id)
+                response = response with { Id = context.DomainMessage.Id };
 
-            if (!message.Context.IsInternal)
+            if (!context.IsInternal)
                 response = EdnsCookie.Apply(
-                    message.Context.ClientCookie,
+                    context.ClientCookie,
                     response,
                     _cookies,
-                    message.Context.ClientEndPoint?.Address);
+                    context.ClientEndPoint?.Address);
 
-            // Publish once per external client answer (UDP/TCP/DoH), independent of decorate order.
             await DnsQueryEventFactory.PublishAnswersAsync(
                 _liveQueryPublisher,
-                message.Context,
+                context,
                 response,
-                message.Context.AnsweredBy ?? answeredBy?.Name ?? "unknown",
-                cancellationToken);
+                context.AnsweredBy ?? answeredBy?.Name ?? "unknown",
+                cancellationToken).ConfigureAwait(false);
 
-            if (awaitable is not null)
-            {
-                awaitable.TaskCompletionSource.TrySetResult(response);
-                return;
-            }
-
-            await SendResponseAsync(message, response, _logger, cancellationToken);
+            return response;
         }
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            if (awaitable is not null)
-            {
-                awaitable.TaskCompletionSource.TrySetException(ex);
-                return;
-            }
-
-            LogProcessMessageFailed(_logger, ex);
+            throw;
         }
-        finally
-        {
-            if (message is TcpDnsPacketReceivedMessage tcp)
-                tcp.SendCompleted.TrySetResult();
-        }
-    }
-
-    private static async Task SendResponseAsync(
-        DnsPacketReceivedMessage message,
-        DomainMessage response,
-        ILogger logger,
-        CancellationToken cancellationToken
-    )
-    {
-        var isTcp = message is TcpDnsPacketReceivedMessage;
-        // DNS-over-TCP prefixes every message with a 2-byte big-endian length.
-        var lengthPrefix = isTcp ? 2 : 0;
-        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize) + lengthPrefix);
-
-        if (!isTcp)
-            response = ApplyUdpAmplificationGuard(response, logger, message.Context.ClientEndPoint);
-
-        try
-        {
-            var byteCount = TruncateAndEncodeMessage(
-                response,
-                isTcp ? int.MaxValue : UdpResponseSizeLimit,
-                buffer.AsSpan(lengthPrefix)
-            );
-            if (isTcp)
-                BitConverter.TryWriteBytes(buffer.AsSpan(0, 2), ((ushort)byteCount).ToNetworkByteOrder());
-
-            var segment = new ArraySegment<byte>(buffer, 0, byteCount + lengthPrefix);
-            await SendResponseAsync(message, segment, cancellationToken);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
-    }
-
-    private static async Task SendResponseAsync(
-        DnsPacketReceivedMessage message,
-        ArraySegment<byte> segment,
-        CancellationToken cancellationToken
-    )
-    {
-        await (message switch
-        {
-            TcpDnsPacketReceivedMessage tcpMessage =>
-                SendResponseAsync(
-                    segment,
-                    tcpMessage.Stream,
-                    cancellationToken
-                ),
-            UdpDnsPacketReceivedMessage { Context.ClientEndPoint: { } clientEndPoint } udpMessage =>
-                SendResponseAsync(
-                    segment,
-                    udpMessage.Client,
-                    clientEndPoint,
-                    cancellationToken
-                ),
-            _ => Task.CompletedTask
-        })
-            .IgnoreExceptionsAsync(cancellationToken)
-            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -337,25 +245,49 @@ public sealed partial class DomainMessageContextMessageProcessor : IQueueMessage
         }
     }
 
-    private static async Task SendResponseAsync(ArraySegment<byte> segment, UdpClient client, IPEndPoint clientEndPoint,
+    public static async Task WriteUdpAsync(
+        UdpClient client,
+        IPEndPoint clientEndPoint,
+        DomainMessage response,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
-        await client.SendAsync(segment.AsMemory(), clientEndPoint, cancellationToken);
+        response = ApplyUdpAmplificationGuard(response, logger, clientEndPoint);
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize));
+        try
+        {
+            var byteCount = TruncateAndEncodeMessage(response, UdpResponseSizeLimit, buffer);
+            await client.SendAsync(buffer.AsMemory(0, byteCount), clientEndPoint, cancellationToken)
+                .AsTask()
+                .IgnoreExceptionsAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
-    private static async Task SendResponseAsync(ArraySegment<byte> segment, Stream stream,
+    public static async Task WriteTcpAsync(
+        Stream stream,
+        DomainMessage response,
         CancellationToken cancellationToken)
     {
-        await stream.WriteAsync(segment, cancellationToken);
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(65_535, response.EstimatedSize) + 2);
+        try
+        {
+            var byteCount = TruncateAndEncodeMessage(response, int.MaxValue, buffer.AsSpan(2));
+            BitConverter.TryWriteBytes(buffer.AsSpan(0, 2), ((ushort)byteCount).ToNetworkByteOrder());
+            await stream.WriteAsync(buffer.AsMemory(0, byteCount + 2), cancellationToken)
+                .AsTask()
+                .IgnoreExceptionsAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
-
-    public void Dispose()
-    {
-        _middlewareChain.Dispose();
-    }
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to process message due to an exception")]
-    private static partial void LogProcessMessageFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

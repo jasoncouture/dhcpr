@@ -9,7 +9,6 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Core;
-using Dhcpr.Core.Queue;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
 using Microsoft.Extensions.Hosting;
@@ -36,7 +35,7 @@ public sealed partial class DnsServer : BackgroundService
     private static readonly ConcurrentDictionary<(int Interface, AddressFamily Family), IPAddress> _localAddressCache =
         new();
 
-    private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
+    private readonly IDnsQueryPipeline _pipeline;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
     private readonly IOptionsMonitor<TlsConfiguration> _tlsOptions;
     private readonly ITlsServerCertificateProvider _certificates;
@@ -44,14 +43,14 @@ public sealed partial class DnsServer : BackgroundService
     private readonly IDnsListenerReadiness? _readiness;
 
     public DnsServer(
-        IMessageQueue<DnsPacketReceivedMessage> messageQueue,
+        IDnsQueryPipeline pipeline,
         IOptionsMonitor<DnsConfiguration> options,
         IOptionsMonitor<TlsConfiguration> tlsOptions,
         ITlsServerCertificateProvider certificates,
         ILogger<DnsServer> logger,
         IDnsListenerReadiness? readiness = null)
     {
-        _messageQueue = messageQueue;
+        _pipeline = pipeline;
         _options = options;
         _tlsOptions = tlsOptions;
         _certificates = certificates;
@@ -135,13 +134,17 @@ public sealed partial class DnsServer : BackgroundService
             var completed = await Task.WhenAny(tasks);
             if (stoppingToken.IsCancellationRequested)
             {
-                listenerTokenSource.Cancel();
+                await listenerTokenSource.CancelAsync();
+                // ReSharper disable once MethodSupportsCancellation
+#pragma warning disable CA2016
                 await Task.WhenAll(tasks).IgnoreExceptionsAsync();
+#pragma warning restore CA2016
                 return;
             }
 
             // A listener exited while the host is still running — tear down everything.
-            listenerTokenSource.Cancel();
+            await listenerTokenSource.CancelAsync();
+            // ReSharper disable once MethodSupportsCancellation
             await Task.WhenAll(tasks).IgnoreExceptionsAsync();
             await completed;
             throw new InvalidOperationException("DNS listener stopped unexpectedly.");
@@ -234,7 +237,7 @@ public sealed partial class DnsServer : BackgroundService
                 var result =
                     await udpClient.Client.ReceiveMessageFromAsync(buffer.AsMemory(), remoteEndPoint, cancellationToken);
 
-                CreateContextAndQueueForProcessing(
+                CreateContextAndProcessUdp(
                     result.RemoteEndPoint,
                     networkInterface: result.PacketInformation.Interface,
                     udpClient,
@@ -316,7 +319,7 @@ public sealed partial class DnsServer : BackgroundService
                     return;
 
                 await ReadExactAsync(stream, buffer.AsMemory(0, length), idleCancellationToken);
-                var pending = CreateContextAndQueueForProcessing(
+                var pending = CreateContextAndProcessTcp(
                     client,
                     stream,
                     buffer.AsSpan(0, length).ToArray(),
@@ -374,7 +377,7 @@ public sealed partial class DnsServer : BackgroundService
         }
     }
 
-    private Task? CreateContextAndQueueForProcessing(
+    private Task? CreateContextAndProcessTcp(
         TcpClient tcpClient,
         Stream stream,
         byte[] buffer,
@@ -399,12 +402,10 @@ public sealed partial class DnsServer : BackgroundService
             Source = source
         };
 
-        var messageToQueue = new TcpDnsPacketReceivedMessage(context, tcpClient, stream);
-        _messageQueue.Enqueue(messageToQueue, cancellationToken);
-        return messageToQueue.SendCompleted.Task;
+        return ProcessAndSendTcpAsync(context, stream, cancellationToken);
     }
 
-    private void CreateContextAndQueueForProcessing(
+    private void CreateContextAndProcessUdp(
         EndPoint remoteEndPoint,
         int networkInterface,
         UdpClient udpClient,
@@ -430,13 +431,55 @@ public sealed partial class DnsServer : BackgroundService
                 Source = DnsQuerySource.Udp
             };
 
-            var messageToQueue = new UdpDnsPacketReceivedMessage(context, udpClient);
-            _messageQueue.Enqueue(messageToQueue, cancellationToken);
+            ProcessAndSendUdp(context, udpClient, remoteIPEndPoint, cancellationToken);
         }
         catch
         {
             // Ignored.
         }
+    }
+
+    private async void ProcessAndSendUdp(
+        DomainMessageContext context,
+        UdpClient udpClient,
+        IPEndPoint clientEndPoint,
+        CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        try
+        {
+            var response = await _pipeline.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+            if (response is null)
+                return;
+
+            await DomainMessageContextMessageProcessor.WriteUdpAsync(
+                    udpClient,
+                    clientEndPoint,
+                    response,
+                    _logger,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            LogUdpProcessFault(_logger, exception);
+        }
+    }
+
+    private async Task ProcessAndSendTcpAsync(
+        DomainMessageContext context,
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        var response = await _pipeline.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+        if (response is null)
+            return;
+
+        await DomainMessageContextMessageProcessor.WriteTcpAsync(stream, response, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static IPAddress ResolveLocalAddress(
@@ -570,4 +613,7 @@ public sealed partial class DnsServer : BackgroundService
 
     [LoggerMessage(Level = LogLevel.Information, Message = "DNS server listening on {Scheme}://{EndPoint}{Interface}")]
     private static partial void LogListening(ILogger logger, string scheme, IPEndPoint endPoint, string @interface);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "UDP DNS process-and-send failed")]
+    private static partial void LogUdpProcessFault(ILogger logger, Exception exception);
 }

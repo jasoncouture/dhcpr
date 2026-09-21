@@ -1,25 +1,23 @@
 ﻿using System.Collections.Immutable;
 using System.Net;
 
-using Dhcpr.Core.Queue;
-
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public class InternalDomainClient : IInternalDomainClient
 {
     public const int MaxInternalHops = 20;
 
-    private readonly IMessageQueue<DnsPacketReceivedMessage> _messageQueue;
+    private readonly IDnsQueryPipeline _pipeline;
 
-    public InternalDomainClient(IMessageQueue<DnsPacketReceivedMessage> messageQueue)
+    public InternalDomainClient(IDnsQueryPipeline pipeline)
     {
-        _messageQueue = messageQueue;
+        _pipeline = pipeline;
     }
 
     private static readonly IPEndPoint _internalEndPoint = new(IPAddress.Any, 53);
 
     public async ValueTask<DomainMessage> SendAsync(DomainMessage domainMessage, CancellationToken cancellationToken)
-        => await EnqueueAsync(
+        => await ExecutePipelineAsync(
             new DomainMessageContext(_internalEndPoint, _internalEndPoint, domainMessage)
             {
                 IsInternal = true,
@@ -93,7 +91,7 @@ public class InternalDomainClient : IInternalDomainClient
             ClientCookie = parentContext.ClientCookie
         };
 
-        return await EnqueueAsync(context, cancellationToken);
+        return await ExecutePipelineAsync(context, cancellationToken);
     }
 
     public async ValueTask<DomainMessage> SendPrefetchAsync(
@@ -135,7 +133,7 @@ public class InternalDomainClient : IInternalDomainClient
             ClientCookie = parentContext.ClientCookie
         };
 
-        return await EnqueueAsync(context, cancellationToken);
+        return await ExecutePipelineAsync(context, cancellationToken);
     }
 
     public async ValueTask<DomainMessage> SendRefreshAsync(
@@ -161,7 +159,7 @@ public class InternalDomainClient : IInternalDomainClient
             ClientCookie = parentContext.ClientCookie
         };
 
-        return await EnqueueAsync(context, cancellationToken);
+        return await ExecutePipelineAsync(context, cancellationToken);
     }
 
     private static DomainMessage ServFail(DomainMessage message)
@@ -170,31 +168,11 @@ public class InternalDomainClient : IInternalDomainClient
             DomainResourceRecords.Empty,
             DomainResponseCode.ServerFailure);
 
-    private async ValueTask<DomainMessage> EnqueueAsync(
+    private async ValueTask<DomainMessage> ExecutePipelineAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        var message = new InternalDnsRequestReceivedMessage(context);
-        await using var registration = cancellationToken.Register(
-            static state =>
-            {
-                var tcs = (TaskCompletionSource<DomainMessage?>)state!;
-                tcs.TrySetCanceled();
-            },
-            message.TaskCompletionSource);
-
-        _messageQueue.Enqueue(message, cancellationToken);
-
-        DomainMessage? result;
-        try
-        {
-            result = await message.TaskCompletionSource.Task.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-
+        var result = await _pipeline.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
         if (result is null)
             throw new OperationCanceledException("Did not receive a response from the internal DNS chain");
 

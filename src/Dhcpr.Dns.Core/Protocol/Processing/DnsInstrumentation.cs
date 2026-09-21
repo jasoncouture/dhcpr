@@ -14,9 +14,8 @@ public static class DnsInstrumentation
     public static ActivityContext CaptureContext()
         => Activity.Current?.Context ?? default;
 
-    public static Activity? StartQuery(DnsPacketReceivedMessage message)
+    public static Activity? StartQuery(DomainMessageContext context)
     {
-        var context = message.Context;
         var name = context.IsInternal ? InternalSpanName : QuerySpanName;
         var kind = context.IsInternal ? ActivityKind.Internal : ActivityKind.Server;
         var activity = context.ParentTraceContext != default
@@ -25,7 +24,7 @@ public static class DnsInstrumentation
         if (activity is null)
             return null;
 
-        activity.SetTag("network.transport", Transport(message));
+        activity.SetTag("network.transport", Transport(context));
         if (context.ClientEndPoint is { } client)
         {
             activity.SetTag("network.peer.address", client.Address.ToString());
@@ -99,24 +98,18 @@ public static class DnsInstrumentation
         activity.SetTag("dns.question.count", message.Questions.Length);
     }
 
-    private static string Transport(DnsPacketReceivedMessage message)
+    private static string Transport(DomainMessageContext context)
     {
-        if (message.Context.IsInternal)
+        if (context.IsInternal)
             return "internal";
 
-        return message.Context.Source switch
+        return context.Source switch
         {
             DnsQuerySource.Udp => "udp",
             DnsQuerySource.Tcp => "tcp",
             DnsQuerySource.Dot => "dot",
             DnsQuerySource.Doh => "doh",
-            _ => message switch
-            {
-                UdpDnsPacketReceivedMessage => "udp",
-                TcpDnsPacketReceivedMessage => "tcp",
-                HttpDnsPacketReceivedMessage => "doh",
-                _ => "unknown"
-            }
+            _ => "unknown"
         };
     }
 }

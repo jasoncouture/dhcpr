@@ -1,5 +1,4 @@
-﻿using Dhcpr.Core;
-using Dhcpr.Dns.Core.Authoritative;
+﻿using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.ConfiguredRecords;
 using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
@@ -53,7 +52,8 @@ public static class DnsServiceProviderExtensions
 
         services.AddSingleton<IDnsListenerReadiness, DnsListenerReadiness>();
         services.AddHostedService<DnsServer>();
-        services.AddQueueProcessor<DnsPacketReceivedMessage, DomainMessageContextMessageProcessor>(maximumConcurrency: 4096);
+        services.AddSingleton<IDnsQueryPipeline, DnsQueryPipeline>();
+        services.AddScoped<DomainMessageContextMessageProcessor>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
         // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →

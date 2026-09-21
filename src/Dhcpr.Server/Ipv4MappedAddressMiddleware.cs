@@ -8,10 +8,10 @@ namespace Dhcpr.Server;
 /// </summary>
 internal sealed class Ipv4MappedAddressMiddleware(RequestDelegate next)
 {
-    public Task Invoke(HttpContext context)
+    public async Task Invoke(HttpContext context)
     {
         Unmap(context.Connection);
-        return next(context);
+        await next(context);
     }
 
     internal static void Unmap(ConnectionInfo connection)

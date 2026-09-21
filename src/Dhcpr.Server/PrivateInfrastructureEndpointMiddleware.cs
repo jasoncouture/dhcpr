@@ -11,16 +11,16 @@ namespace Dhcpr.Server;
 /// </summary>
 internal sealed class PrivateInfrastructureEndpointMiddleware(RequestDelegate next)
 {
-    public Task Invoke(HttpContext context)
+    public async Task Invoke(HttpContext context)
     {
-        if (!IsInfrastructurePath(context.Request.Path))
-            return next(context);
+        if (IsInfrastructurePath(context.Request.Path) &&
+            !IsAllowed(context.Connection.RemoteIpAddress))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
 
-        if (IsAllowed(context.Connection.RemoteIpAddress))
-            return next(context);
-
-        context.Response.StatusCode = StatusCodes.Status404NotFound;
-        return Task.CompletedTask;
+        await next(context);
     }
 
     internal static bool IsInfrastructurePath(PathString path)

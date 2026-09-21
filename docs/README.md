@@ -19,6 +19,5 @@ ships a Helm chart.
 | [DHCP](dhcp.md) | Optional DHCP server |
 | [Helm](helm.md) | Kubernetes chart, ports, `secureDns` |
 | [Operations](operations.md) | Health, metrics, OTLP, data directory, versions |
-| [Authoritative listen mode](plans/authoritative-listen-mode.md) | Deferred: per-socket auth-only (no recurse) |
 
 License: [AGPL-3.0](../LICENSE).

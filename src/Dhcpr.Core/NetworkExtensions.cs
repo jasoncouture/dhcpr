@@ -1,9 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
-
-using Dhcpr.Core.Linq;
 
 namespace Dhcpr.Core;
 
@@ -27,30 +24,10 @@ public static partial class NetworkExtensions
     {
         if (address.IsIPv4MappedToIPv6)
             address = address.MapToIPv4();
-
+        
         foreach (var network in PrivateNetworks)
         {
             if (network.Contains(address))
-                return true;
-        }
-
-        return false;
-    }
-
-    public static bool IsInLocalSubnet(this IPAddress address)
-    {
-        if (IPAddress.IsLoopback(address)) return false;
-        using var unicastAddresses = NetworkInterface.GetAllNetworkInterfaces().Select(i => i.GetIPProperties()).SelectMany(i => i.UnicastAddresses).ToPooledList().ToPooledList();
-        using var possibleNetworks = unicastAddresses.Where(i => i.Address.AddressFamily == address.AddressFamily).ToPooledList();
-
-        foreach (var network in possibleNetworks)
-        {
-
-            if (address.AddressFamily == AddressFamily.InterNetwork &&
-                address.IsInNetwork(network.Address, network.IPv4Mask))
-                return true;
-            if (address.AddressFamily == AddressFamily.InterNetworkV6 &&
-                address.IsInNetwork(network.Address, network.PrefixLength))
                 return true;
         }
 
@@ -125,10 +102,6 @@ public static partial class NetworkExtensions
 
         return new IPAddress(netmaskBytes);
     }
-
-    public static bool IsInNetwork(this IPAddress address, IPAddress network, int classlessInterDomainRoutingValue)
-        => address.IsInNetwork(network,
-            classlessInterDomainRoutingValue.ClasslessInterDomainRoutingToNetworkMask(network.AddressFamily));
 
     public static bool IsInNetwork(this IPAddress address, IPAddress network, IPAddress netmask)
     {

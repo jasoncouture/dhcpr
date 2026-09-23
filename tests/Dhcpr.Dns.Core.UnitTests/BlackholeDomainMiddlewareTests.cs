@@ -7,7 +7,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -91,7 +90,7 @@ public class BlackholeDomainMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var blackhole = Create(inner, @".+\..+\.localdomain$");
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(blackhole, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        var pipeline = new CacheResolverDecorator(blackhole, cache, Substitute.For<IServiceScopeFactory>());
         var request = DomainMessage.CreateRequest("a.b.localdomain", DomainRecordType.A);
         var firstContext = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),

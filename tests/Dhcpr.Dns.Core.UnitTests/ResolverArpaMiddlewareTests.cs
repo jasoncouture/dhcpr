@@ -10,7 +10,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -154,7 +153,7 @@ public class ResolverArpaMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(Create(inner), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        var pipeline = new CacheResolverDecorator(Create(inner), cache, Substitute.For<IServiceScopeFactory>());
         var firstContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
         var secondContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
 
@@ -182,7 +181,7 @@ public class ResolverArpaMiddlewareTests
                 Target = "dns.example.com"
             }),
             cache,
-            Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+            Substitute.For<IServiceScopeFactory>());
         var firstContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
         var secondContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
 

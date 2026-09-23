@@ -261,6 +261,7 @@ public class DnsResponseCacheTests
         services.AddSingleton<IDnsResponseCache>(cache);
         services.AddSingleton<IDnsCacheRefreshTracker>(new DnsCacheRefreshTracker());
         services.AddSingleton<ILogger<DnsCacheRefresh>>(NullLogger<DnsCacheRefresh>.Instance);
+        services.AddSingleton<ILogger<CacheResolverDecorator>>(NullLogger<CacheResolverDecorator>.Instance);
         services.AddScoped<IInternalDomainClient>(_ => client);
         services.AddScoped<IDnsCacheRefresh, DnsCacheRefresh>();
         await using var provider = services.BuildServiceProvider();
@@ -269,8 +270,7 @@ public class DnsResponseCacheTests
         IDomainMessageMiddleware decorator = new CacheResolverDecorator(
             inner,
             cache,
-            provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CacheResolverDecorator>.Instance);
+            provider.GetRequiredService<IServiceScopeFactory>());
         var context = new DomainMessageContext(null, null, request);
 
         var hit = await decorator.ProcessAsync(context, CancellationToken.None);
@@ -326,7 +326,7 @@ public class DnsResponseCacheTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>());
         var request = DomainMessage.CreateRequest("cached.example", DomainRecordType.A);
         var context = new DomainMessageContext(null, null, request);
 
@@ -367,7 +367,7 @@ public class DnsResponseCacheTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage>(response));
 
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>());
         var context = new DomainMessageContext(null, null, request) { BypassCache = true };
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);

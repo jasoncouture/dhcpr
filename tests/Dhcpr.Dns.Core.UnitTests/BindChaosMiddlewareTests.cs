@@ -8,7 +8,6 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -162,7 +161,7 @@ public class BindChaosMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var chaos = new BindChaosMiddleware(inner);
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IServiceScopeFactory>());
         var firstContext = Context(
             DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
         var secondContext = Context(
@@ -186,7 +185,7 @@ public class BindChaosMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var chaos = new BindChaosMiddleware(inner);
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
+        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IServiceScopeFactory>());
         var request = DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH);
         var firstContext = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.9"), 53000),

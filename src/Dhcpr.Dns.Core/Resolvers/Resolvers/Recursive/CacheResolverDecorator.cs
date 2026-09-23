@@ -12,18 +12,15 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
     private readonly IDomainMessageMiddleware _innerMiddleware;
     private readonly IDnsResponseCache _cache;
     private readonly IServiceScopeFactory _scopes;
-    private readonly ILogger<CacheResolverDecorator> _logger;
 
     public CacheResolverDecorator(
         IDomainMessageMiddleware innerMiddleware,
         IDnsResponseCache cache,
-        IServiceScopeFactory scopes,
-        ILogger<CacheResolverDecorator> logger)
+        IServiceScopeFactory scopes)
     {
         _innerMiddleware = innerMiddleware;
         _cache = cache;
         _scopes = scopes;
-        _logger = logger;
     }
 
     public async ValueTask<DomainMessage> ProcessAsync(DomainMessageContext context,
@@ -48,19 +45,21 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
         return result;
     }
 
+    // ReSharper disable once AsyncVoidMethod - If any of this throws, something is horribly wrong.
     private async void RefreshAsync(DomainMessageContext context)
     {
+        await Task.Yield();
+        await using var scope = _scopes.CreateAsyncScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<CacheResolverDecorator>>();
         try
         {
-            await Task.Yield();
-            await using var scope = _scopes.CreateAsyncScope();
             var refresh = scope.ServiceProvider.GetRequiredService<IDnsCacheRefresh>();
             await refresh.RefreshAsync(context).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             var question = context.DomainMessage.Questions[0];
-            LogRefreshFailed(_logger, exception, question.Name, question.Type);
+            LogRefreshFailed(logger, exception, question.Name, question.Type);
         }
     }
 

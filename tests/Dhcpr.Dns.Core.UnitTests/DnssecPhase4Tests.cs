@@ -10,6 +10,8 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 using Dhcpr.Dns.Core.Validation;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -192,7 +194,7 @@ public class DnssecPhase4Tests
             });
 
         // Use real cache decorator path.
-        IDomainMessageMiddleware cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache, Substitute.For<IDnsCacheRefresh>());
+        IDomainMessageMiddleware cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
         // Seed already done; second layer: dnssec around a hit-returning inner.
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
@@ -355,7 +357,7 @@ public class DnssecPhase4Tests
             });
 
         var dnssec = new DnssecValidationMiddleware(
-            new CacheResolverDecorator(leaf, cache, Substitute.For<IDnsCacheRefresh>()),
+            new CacheResolverDecorator(leaf, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>()),
             validator,
             cache,
             Monitor(new DnsConfiguration()),

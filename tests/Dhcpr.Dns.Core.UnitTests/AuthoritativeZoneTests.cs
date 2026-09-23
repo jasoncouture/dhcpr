@@ -11,6 +11,8 @@ using Dhcpr.Dns.Core.Resolvers.Resolvers.Forwarder;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -390,7 +392,7 @@ public class AuthoritativeZoneTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IDnsCacheRefresh>());
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
         var request = DomainMessage.CreateRequest("www.foo.bar");
         var context = new DomainMessageContext(null, null, request);
 

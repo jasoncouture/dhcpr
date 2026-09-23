@@ -6,6 +6,8 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -137,7 +139,7 @@ public class UnsupportedQueryTypeMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(new UnsupportedQueryTypeMiddleware(inner), cache, Substitute.For<IDnsCacheRefresh>());
+        var pipeline = new CacheResolverDecorator(new UnsupportedQueryTypeMiddleware(inner), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
         var firstContext = Context(DomainMessage.CreateRequest("example.com", type));
         var secondContext = Context(DomainMessage.CreateRequest("example.com", type));
 
@@ -157,7 +159,7 @@ public class UnsupportedQueryTypeMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(new UnsupportedQueryTypeMiddleware(inner), cache, Substitute.For<IDnsCacheRefresh>());
+        var pipeline = new CacheResolverDecorator(new UnsupportedQueryTypeMiddleware(inner), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
         var firstContext = Context(DomainMessage.CreateRequest("example.com", DomainRecordType.TXT, DomainRecordClass.HS));
         var secondContext = Context(DomainMessage.CreateRequest("example.com", DomainRecordType.TXT, DomainRecordClass.HS));
 

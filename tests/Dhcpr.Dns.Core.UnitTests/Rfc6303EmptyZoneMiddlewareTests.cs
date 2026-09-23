@@ -8,6 +8,8 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using NSubstitute;
@@ -74,7 +76,7 @@ public class Rfc6303EmptyZoneMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(Create(inner), cache, Substitute.For<IDnsCacheRefresh>());
+        var pipeline = new CacheResolverDecorator(Create(inner), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
         var firstContext = Context(DomainMessage.CreateRequest("232.0.168.192.in-addr.arpa", DomainRecordType.PTR));
         var secondContext = Context(DomainMessage.CreateRequest("232.0.168.192.in-addr.arpa", DomainRecordType.PTR));
 

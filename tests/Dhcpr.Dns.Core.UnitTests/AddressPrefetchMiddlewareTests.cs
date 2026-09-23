@@ -7,6 +7,8 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using NSubstitute;
@@ -154,7 +156,7 @@ public class AddressPrefetchMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage>(response));
-        var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache, Substitute.For<IDnsCacheRefresh>());
+        var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache, Substitute.For<IServiceScopeFactory>(), Substitute.For<ILogger<CacheResolverDecorator>>());
 
         await pipeline.ProcessAsync(Context(request), CancellationToken.None);
         var scheduled = await started.Task.WaitAsync(TimeSpan.FromSeconds(2));

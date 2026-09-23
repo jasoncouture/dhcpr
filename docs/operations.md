@@ -73,10 +73,11 @@ Blackhole, NOTIMP, and rate-limit **REFUSED** / **Drop**
 wire rcode): the query was ignored.
 
 Both duration histograms use second buckets
-`0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`.
+`0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`.
 The SDK default (5, 10, 25, …) treats those as milliseconds; with unit
 `s` a 50 ms miss sat in `le="5"` and `histogram_quantile` interpolated
-a multi-second p50. PromQL (Prometheus 3 quoted names):
+a multi-second p50. A 1 ms first bucket did the same thing to cache hits
+and drew them near 500 µs. PromQL (Prometheus 3 quoted names):
 
 ```
 histogram_quantile(0.5, sum by (le) (rate({"dns.query.duration_seconds_bucket", cache_hit="false"}[30m])))

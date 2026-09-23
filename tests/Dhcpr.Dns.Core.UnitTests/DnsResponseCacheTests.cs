@@ -7,6 +7,8 @@ using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using NSubstitute;
 
@@ -254,8 +256,18 @@ public class DnsResponseCacheTests
                         TaskScheduler.Default));
             });
 
+        var services = new ServiceCollection();
+        services.AddSingleton<IDnsResponseCache>(cache);
+        services.AddScoped<IInternalDomainClient>(_ => client);
+        await using var provider = services.BuildServiceProvider();
+        var refresh = new DnsCacheRefresh(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            cache,
+            new DnsCacheRefreshTracker(),
+            NullLogger<DnsCacheRefresh>.Instance);
+
         var inner = Substitute.For<IDomainMessageMiddleware>();
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, client, logger: null);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, refresh);
         var context = new DomainMessageContext(null, null, request);
 
         var hit = await decorator.ProcessAsync(context, CancellationToken.None);
@@ -311,7 +323,7 @@ public class DnsResponseCacheTests
                     responseCode: DomainResponseCode.NoError));
             });
 
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IDnsCacheRefresh>());
         var request = DomainMessage.CreateRequest("cached.example", DomainRecordType.A);
         var context = new DomainMessageContext(null, null, request);
 
@@ -352,7 +364,7 @@ public class DnsResponseCacheTests
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage>(response));
 
-        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache);
+        IDomainMessageMiddleware decorator = new CacheResolverDecorator(inner, cache, Substitute.For<IDnsCacheRefresh>());
         var context = new DomainMessageContext(null, null, request) { BypassCache = true };
 
         var result = await decorator.ProcessAsync(context, CancellationToken.None);

@@ -152,7 +152,7 @@ public class ResolverArpaMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(Create(inner), cache);
+        var pipeline = new CacheResolverDecorator(Create(inner), cache, Substitute.For<IDnsCacheRefresh>());
         var firstContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
         var secondContext = Context(DomainMessage.CreateRequest("foo.resolver.arpa", DomainRecordType.A));
 
@@ -179,7 +179,8 @@ public class ResolverArpaMiddlewareTests
                 Priority = 1,
                 Target = "dns.example.com"
             }),
-            cache);
+            cache,
+            Substitute.For<IDnsCacheRefresh>());
         var firstContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
         var secondContext = Context(DomainMessage.CreateRequest("_dns.resolver.arpa", DomainRecordType.SVCB));
 

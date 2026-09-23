@@ -192,7 +192,7 @@ public class DnssecPhase4Tests
             });
 
         // Use real cache decorator path.
-        IDomainMessageMiddleware cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache);
+        IDomainMessageMiddleware cacheDecorator = new CacheResolverDecorator(Substitute.For<IDomainMessageMiddleware>(), cache, Substitute.For<IDnsCacheRefresh>());
         // Seed already done; second layer: dnssec around a hit-returning inner.
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var options = Monitor(new DnsConfiguration
@@ -355,7 +355,7 @@ public class DnssecPhase4Tests
             });
 
         var dnssec = new DnssecValidationMiddleware(
-            new CacheResolverDecorator(leaf, cache),
+            new CacheResolverDecorator(leaf, cache, Substitute.For<IDnsCacheRefresh>()),
             validator,
             cache,
             Monitor(new DnsConfiguration()),

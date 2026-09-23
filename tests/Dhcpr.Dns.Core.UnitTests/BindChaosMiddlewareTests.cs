@@ -160,7 +160,7 @@ public class BindChaosMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var chaos = new BindChaosMiddleware(inner);
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(chaos, cache);
+        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IDnsCacheRefresh>());
         var firstContext = Context(
             DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
         var secondContext = Context(
@@ -184,7 +184,7 @@ public class BindChaosMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var chaos = new BindChaosMiddleware(inner);
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(chaos, cache);
+        var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IDnsCacheRefresh>());
         var request = DomainMessage.CreateRequest("ip.info", DomainRecordType.TXT, DomainRecordClass.CH);
         var firstContext = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.9"), 53000),

@@ -154,7 +154,7 @@ public class AddressPrefetchMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<DomainMessage>(response));
-        var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache);
+        var pipeline = new CacheResolverDecorator(Wrap(inner, cache, client), cache, Substitute.For<IDnsCacheRefresh>());
 
         await pipeline.ProcessAsync(Context(request), CancellationToken.None);
         var scheduled = await started.Task.WaitAsync(TimeSpan.FromSeconds(2));

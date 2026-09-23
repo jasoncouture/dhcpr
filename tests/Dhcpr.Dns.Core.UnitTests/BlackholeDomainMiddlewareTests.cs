@@ -90,7 +90,7 @@ public class BlackholeDomainMiddlewareTests
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var blackhole = Create(inner, @".+\..+\.localdomain$");
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
-        var pipeline = new CacheResolverDecorator(blackhole, cache);
+        var pipeline = new CacheResolverDecorator(blackhole, cache, Substitute.For<IDnsCacheRefresh>());
         var request = DomainMessage.CreateRequest("a.b.localdomain", DomainRecordType.A);
         var firstContext = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),

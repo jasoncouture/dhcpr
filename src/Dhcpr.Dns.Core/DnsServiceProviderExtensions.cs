@@ -32,6 +32,8 @@ public static class DnsServiceProviderExtensions
         // Process-bound: shared response cache across all queries.
         services.TryAddSingleton<IDnsCacheEventPublisher, NoOpDnsCacheEventPublisher>();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
+        // Process-bound: one in-flight set so two queries do not both refresh the same name.
+        services.AddSingleton<IDnsCacheRefreshTracker, DnsCacheRefreshTracker>();
 
         services.AddHttpClient(nameof(NamedRootHttpClient), ConfigureInternicHttpClient);
         services.AddHttpClient(nameof(RootZoneHttpClient), ConfigureInternicHttpClient);
@@ -98,6 +100,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsServerCookieFactory, DnsServerCookieFactory>();
 
         services.AddScoped<IReferralWalker, ReferralWalker>();
+        services.AddScoped<IDnsCacheRefresh, DnsCacheRefresh>();
         services.AddScoped<IInternalDomainClient, InternalDomainClient>();
         services.AddScoped<IDnsQueryExecutor, DnsQueryExecutor>();
         services.AddSingleton<IDnsMetrics, DnsMetricsPublisher>();

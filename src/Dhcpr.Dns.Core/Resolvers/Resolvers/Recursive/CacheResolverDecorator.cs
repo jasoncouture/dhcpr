@@ -73,19 +73,20 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
         var key = DnsCacheKey.FromQuestion(question);
         if (!_refreshing.TryAdd(key, 0))
             return;
-
-        if (_logger is not null)
-            LogRefresh(_logger, question.Name, question.Type);
-        _ = RefreshAsync(context, question, key);
+        
+        RefreshAsync(context, question, key);
     }
 
-    private async Task RefreshAsync(
+    private async void RefreshAsync(
         DomainMessageContext parent,
         DomainQuestion question,
         DnsCacheKey key)
     {
         try
         {
+            await Task.Yield();
+            if (_logger is not null)
+                LogRefresh(_logger, question.Name, question.Type);
             using var timeout = new CancellationTokenSource(RefreshTimeout);
             var request = DomainMessage.CreateRequest(question.Name, question.Type, question.Class);
             var fresh = await _internalClient!

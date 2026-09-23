@@ -72,7 +72,8 @@ Blackhole, NOTIMP, and rate-limit **REFUSED** / **Drop**
 (`answered_by=UdpRateLimit`) **are** counted. `Drop` is a label only (no
 wire rcode): the query was ignored.
 
-Both duration histograms use second buckets
+Every histogram whose unit is seconds uses these buckets, including
+`http.server.request.duration` and `http.client.request.duration`:
 `0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`.
 The SDK default (5, 10, 25, …) treats those as milliseconds; with unit
 `s` a 50 ms miss sat in `le="5"` and `histogram_quantile` interpolated

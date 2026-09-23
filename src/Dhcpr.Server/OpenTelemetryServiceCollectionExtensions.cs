@@ -1,3 +1,5 @@
+using System.Diagnostics.Metrics;
+
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
@@ -19,12 +21,15 @@ public static class OpenTelemetryServiceCollectionExtensions
             {
                 metrics.AddMeter(DnsMetrics.MeterName);
                 metrics.AddMeter(DhcpInstrumentation.MeterName);
-                var durationBuckets = new ExplicitBucketHistogramConfiguration
-                {
-                    Boundaries = DnsMetrics.DurationSecondsBuckets
-                };
-                metrics.AddView(DnsMetrics.DurationInstrumentName, durationBuckets);
-                metrics.AddView(DnsMetrics.UpstreamDurationInstrumentName, durationBuckets);
+                // Every duration histogram is in seconds. The SDK default starts
+                // at 5 ms, so a faster sample is drawn near the middle of that bucket.
+                metrics.AddView(static instrument =>
+                    instrument is Histogram<double> { Unit: "s" }
+                        ? new ExplicitBucketHistogramConfiguration
+                        {
+                            Boundaries = DnsMetrics.DurationSecondsBuckets
+                        }
+                        : null);
                 metrics.AddAspNetCoreInstrumentation();
                 metrics.AddHttpClientInstrumentation();
                 metrics.AddRuntimeInstrumentation();

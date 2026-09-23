@@ -73,6 +73,64 @@ public class TcpListenDisposeTests
     }
 
     [Fact]
+    public async Task InFlightQueryOutlivesIdleReadTimeout()
+    {
+        var started = new TaskCompletionSource<DomainMessageContext>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<DomainMessage?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeline = Substitute.For<IDnsQueryPipeline>();
+        pipeline.ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                started.TrySetResult(call.Arg<DomainMessageContext>());
+                return new ValueTask<DomainMessage?>(release.Task);
+            });
+        var server = new DnsServer(
+            pipeline,
+            Monitor(new DnsConfiguration()),
+            Monitor(new TlsConfiguration()),
+            Substitute.For<ITlsServerCertificateProvider>(),
+            NullLogger<DnsServer>.Instance);
+
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            using var queryClient = new TcpClient();
+            var connect = queryClient.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+            using var accepted = await listener.AcceptTcpClientAsync();
+            await connect;
+
+            var handleTask = server.HandleTcpClientAsync(accepted, CancellationToken.None);
+            var request = DomainMessage.CreateRequest("example.com");
+            var payload = new byte[512];
+            var payloadLength = DomainMessageEncoder.Encode(payload, request);
+            var framed = new byte[payloadLength + 2];
+            BitConverter.TryWriteBytes(framed.AsSpan(0, 2), ((ushort)payloadLength).ToNetworkByteOrder());
+            payload.AsSpan(0, payloadLength).CopyTo(framed.AsSpan(2));
+            await queryClient.GetStream().WriteAsync(framed);
+
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            // Client is still waiting for the answer. The idle-read deadline
+            // must not dispose the socket while that query is running.
+            await Task.Delay(DnsServer.TcpReadTimeout + DnsServer.TcpReadTimeout + TimeSpan.FromMilliseconds(500));
+
+            Assert.False(handleTask.IsCompleted);
+            Assert.False(IsDisposed(accepted));
+
+            release.TrySetResult(null);
+            queryClient.Client.Shutdown(SocketShutdown.Send);
+            await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(IsDisposed(accepted));
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
     public async Task ClosesConnectionIfFullPacketNotReadWithinTimeout()
     {
         var pipeline = Substitute.For<IDnsQueryPipeline>();

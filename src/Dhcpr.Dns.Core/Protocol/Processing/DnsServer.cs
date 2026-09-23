@@ -304,12 +304,12 @@ public sealed partial class DnsServer : BackgroundService
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pendingReplies = new List<Task>();
         try
         {
-            while (client.Connected && !cancellationTokenSource.IsCancellationRequested)
+            while (client.Connected && !cancellationToken.IsCancellationRequested)
             {
-                // Full length-prefixed DNS message must arrive within TcpReadTimeout (Slowloris).
+                // Incomplete message only. A query already in flight must not
+                // share this deadline — resolution can outlive an idle read.
                 cancellationTokenSource.CancelAfter(TcpReadTimeout);
                 var idleCancellationToken = cancellationTokenSource.Token;
 
@@ -319,20 +319,20 @@ public sealed partial class DnsServer : BackgroundService
                     return;
 
                 await ReadExactAsync(stream, buffer.AsMemory(0, length), idleCancellationToken);
-                var pending = CreateContextAndProcessTcp(
-                    client,
-                    stream,
-                    buffer.AsSpan(0, length).ToArray(),
-                    source,
-                    cancellationToken);
-                if (pending is not null)
-                    pendingReplies.Add(pending);
-
                 if (!cancellationTokenSource.TryReset())
                 {
                     cancellationTokenSource.Dispose();
                     cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 }
+
+                var reply = CreateContextAndProcessTcp(
+                    client,
+                    stream,
+                    buffer.AsSpan(0, length).ToArray(),
+                    source,
+                    cancellationToken);
+                if (reply is not null)
+                    await reply.ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -345,20 +345,6 @@ public sealed partial class DnsServer : BackgroundService
         }
         finally
         {
-            try
-            {
-                if (pendingReplies.Count > 0)
-                    await Task.WhenAll(pendingReplies).WaitAsync(TcpReadTimeout, cancellationToken);
-            }
-            catch (TimeoutException)
-            {
-                // Reply never left the queue — close anyway so we do not sit in CLOSE_WAIT.
-            }
-            catch (OperationCanceledException)
-            {
-                // Host is shutting down — close the socket even if a reply is still queued.
-            }
-
             cancellationTokenSource.Dispose();
             ArrayPool<byte>.Shared.Return(buffer);
             client.Dispose();

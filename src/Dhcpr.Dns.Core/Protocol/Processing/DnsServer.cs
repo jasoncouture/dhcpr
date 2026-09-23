@@ -530,7 +530,10 @@ public sealed partial class DnsServer : BackgroundService
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested) return null;
-        return await listener.AcceptTcpClientAsync(cancellationToken).AsTask().OperationCancelledToNull();
+        var client = await listener.AcceptTcpClientAsync(cancellationToken).AsTask().OperationCancelledToNull();
+        if (client is not null)
+            client.NoDelay = true;
+        return client;
     }
 
     private async Task ServeTcpDnsAsync(

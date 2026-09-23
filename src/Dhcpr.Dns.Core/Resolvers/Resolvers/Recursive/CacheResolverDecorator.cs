@@ -91,7 +91,7 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
             var fresh = await _internalClient!
                 .SendRefreshAsync(parent, request, timeout.Token)
                 .ConfigureAwait(false);
-            _cache.Set(request, fresh);
+            _cache.Set(request, fresh.Message, fresh.SecurityStatus);
         }
         catch (Exception exception)
         {

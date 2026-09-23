@@ -246,7 +246,12 @@ public class DnsResponseCacheTests
             .Returns(call =>
             {
                 started.TrySetResult();
-                return new ValueTask<DomainMessage>(finish.Task);
+                return new ValueTask<DomainRefreshResult>(
+                    finish.Task.ContinueWith(
+                        static task => new DomainRefreshResult(task.Result, DnssecValidationStatus.Secure),
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default));
             });
 
         var inner = Substitute.For<IDomainMessageMiddleware>();
@@ -268,7 +273,8 @@ public class DnsResponseCacheTests
         var shouldRefresh = true;
         while (DateTime.UtcNow < deadline)
         {
-            if (cache.TryGet(request, out after, out _, out shouldRefresh) &&
+            if (cache.TryGet(request, out after, out var status, out shouldRefresh) &&
+                status is DnssecValidationStatus.Secure &&
                 after?.Records.Answers is [{ Data: IPAddressData ip }] &&
                 ip.Address.Equals(IPAddress.Parse("203.0.113.12")))
                 break;
@@ -277,6 +283,8 @@ public class DnsResponseCacheTests
 
         Assert.False(shouldRefresh);
         Assert.Equal(IPAddress.Parse("203.0.113.12"), ((IPAddressData)after!.Records.Answers[0].Data).Address);
+        Assert.True(cache.TryGet(request, out _, out var storedStatus));
+        Assert.Equal(DnssecValidationStatus.Secure, storedStatus);
     }
 
     [Fact]

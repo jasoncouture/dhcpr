@@ -74,7 +74,10 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
             _validator.EnsureTrustAnchorsLoaded(context.DnssecScope);
             await _validator.ValidateResponseAsync(context, result, cancellationToken).ConfigureAwait(false);
 
-            if (!context.CacheHit && !context.DoNotCacheResponse)
+            // Unchecked hits (a refresh stored the RRset before validation, or a
+            // legacy entry) must record the outcome. Otherwise every later hit
+            // rebuilds canonical records and verifies RRSIGs again.
+            if (!context.DoNotCacheResponse)
                 _cache.UpdateSecurityStatus(context.DomainMessage, context.DnssecScope.Status);
         }
 

@@ -136,7 +136,7 @@ public class InternalDomainClient : IInternalDomainClient
         return await ExecutePipelineAsync(context, cancellationToken);
     }
 
-    public async ValueTask<DomainMessage> SendRefreshAsync(
+    public async ValueTask<DomainRefreshResult> SendRefreshAsync(
         DomainMessageContext parentContext,
         DomainMessage message,
         CancellationToken cancellationToken)
@@ -159,7 +159,8 @@ public class InternalDomainClient : IInternalDomainClient
             ClientCookie = parentContext.ClientCookie
         };
 
-        return await ExecutePipelineAsync(context, cancellationToken);
+        var response = await ExecutePipelineAsync(context, cancellationToken);
+        return new DomainRefreshResult(response, context.DnssecScope.Status);
     }
 
     private static DomainMessage ServFail(DomainMessage message)

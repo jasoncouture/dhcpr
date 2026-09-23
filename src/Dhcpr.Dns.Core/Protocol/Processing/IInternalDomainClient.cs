@@ -37,10 +37,16 @@ public interface IInternalDomainClient : IDomainClient
     /// <summary>
     /// Re-enter the pipeline to replace a soon-to-expire cache entry. Bypasses
     /// the response cache so the origin is queried again. Own DNSSEC scope and
-    /// work budget. Caller stores the result.
+    /// work budget. Caller stores the message and the scope's validation status.
     /// </summary>
-    ValueTask<DomainMessage> SendRefreshAsync(
+    ValueTask<DomainRefreshResult> SendRefreshAsync(
         DomainMessageContext parentContext,
         DomainMessage message,
         CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Fresh answer from <see cref="IInternalDomainClient.SendRefreshAsync"/> plus the
+/// DNSSEC status of that refresh, so the cache does not store it as Unchecked.
+/// </summary>
+public readonly record struct DomainRefreshResult(DomainMessage Message, DnssecValidationStatus SecurityStatus);

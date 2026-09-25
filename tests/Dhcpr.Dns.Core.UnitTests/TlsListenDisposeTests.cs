@@ -53,7 +53,7 @@ public class TlsListenDisposeTests
                 using var accepted = await listener.AcceptTcpClientAsync();
                 await connect;
 
-                var handleTask = server.HandleTlsClientAsync(accepted, CancellationToken.None);
+                server.HandleTlsClientAsync(accepted, CancellationToken.None);
                 await using var ssl = new SslStream(queryClient.GetStream(), false, static (_, _, _, _) => true);
                 await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
                 {
@@ -75,11 +75,10 @@ public class TlsListenDisposeTests
                 var context = await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 Assert.Equal(DnsQuerySource.Dot, context.Source);
 
-                Assert.False(handleTask.IsCompleted);
                 Assert.False(IsDisposed(accepted));
 
                 release.TrySetResult(null);
-                await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
+                await WaitUntilDisposed(accepted, TimeSpan.FromSeconds(5));
                 Assert.True(IsDisposed(accepted));
             }
             finally
@@ -117,8 +116,8 @@ public class TlsListenDisposeTests
                 using var accepted = await listener.AcceptTcpClientAsync();
                 await connect;
 
-                var handleTask = server.HandleTlsClientAsync(accepted, CancellationToken.None);
-                await handleTask.WaitAsync(DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
+                server.HandleTlsClientAsync(accepted, CancellationToken.None);
+                await WaitUntilDisposed(accepted, DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
                 Assert.True(IsDisposed(accepted));
             }
             finally
@@ -143,6 +142,13 @@ public class TlsListenDisposeTests
         };
         Assert.True(tls.TryValidate(out _));
         return tls;
+    }
+
+    private static async Task WaitUntilDisposed(TcpClient client, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!IsDisposed(client) && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
     }
 
     private static bool IsDisposed(TcpClient client)

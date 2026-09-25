@@ -253,10 +253,21 @@ public sealed partial class DnsServer : BackgroundService
         }
     }
 
-    public Task HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
-        => HandleStreamClientAsync(client, client.GetStream(), DnsQuerySource.Tcp, cancellationToken);
+    // ReSharper disable once AsyncVoidMethod
+    public async void HandleTcpClientAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await HandleStreamClientAsync(client, client.GetStream(), DnsQuerySource.Tcp, cancellationToken);
+        }
+        catch
+        {
+            client.Dispose();
+        }
+    }
 
-    public async Task HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
+    // ReSharper disable once AsyncVoidMethod
+    public async void HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
         SslStream? sslStream = null;
         try
@@ -529,36 +540,23 @@ public sealed partial class DnsServer : BackgroundService
         CancellationToken stoppingToken)
     {
         var tcpServer = new TcpListener(listenEndPoint);
-        var activeTasks = new List<Task>();
-        Task<TcpClient?>? acceptTask = null;
         try
         {
             // Must Start before Accept — AcceptTcpClientAsync throws if not listening.
             tcpServer.Start(ListenBacklog);
             _readiness?.MarkBound(listenerName);
             LogListening(_logger, "tcp", listenEndPoint, interfaceSuffix);
-            acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                var completedTask = await Task.WhenAny(activeTasks.Append(acceptTask));
-                await completedTask;
-                activeTasks.Remove(completedTask);
-                if (completedTask == acceptTask)
-                {
-                    var client = await acceptTask;
-                    if (client is not null)
-                        activeTasks.Add(HandleTcpClientAsync(client, stoppingToken));
-                    if (stoppingToken.IsCancellationRequested)
-                        return;
-                    acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
-                }
+                var client = await AcceptNextConnectionAsync(tcpServer, stoppingToken);
+                if (client is null)
+                    return;
+                HandleTcpClientAsync(client, stoppingToken);
             }
         }
         finally
         {
             tcpServer.Stop();
-            var pending = acceptTask is null ? activeTasks : activeTasks.Append(acceptTask);
-            await Task.WhenAll(pending).IgnoreExceptionsAsync();
         }
     }
 
@@ -568,35 +566,22 @@ public sealed partial class DnsServer : BackgroundService
         CancellationToken stoppingToken)
     {
         var tcpServer = new TcpListener(listenEndPoint);
-        var activeTasks = new List<Task>();
-        Task<TcpClient?>? acceptTask = null;
         try
         {
             tcpServer.Start(ListenBacklog);
             _readiness?.MarkBound(listenerName);
             LogListening(_logger, "tls", listenEndPoint, string.Empty);
-            acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                var completedTask = await Task.WhenAny(activeTasks.Append(acceptTask));
-                await completedTask;
-                activeTasks.Remove(completedTask);
-                if (completedTask == acceptTask)
-                {
-                    var client = await acceptTask;
-                    if (client is not null)
-                        activeTasks.Add(HandleTlsClientAsync(client, stoppingToken));
-                    if (stoppingToken.IsCancellationRequested)
-                        return;
-                    acceptTask = AcceptNextConnectionAsync(tcpServer, stoppingToken);
-                }
+                var client = await AcceptNextConnectionAsync(tcpServer, stoppingToken);
+                if (client is null)
+                    return;
+                HandleTlsClientAsync(client, stoppingToken);
             }
         }
         finally
         {
             tcpServer.Stop();
-            var pending = acceptTask is null ? activeTasks : activeTasks.Append(acceptTask);
-            await Task.WhenAll(pending).IgnoreExceptionsAsync();
         }
     }
 

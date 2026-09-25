@@ -45,7 +45,7 @@ public class TcpListenDisposeTests
             using var accepted = await listener.AcceptTcpClientAsync();
             await connect;
 
-            var handleTask = server.HandleTcpClientAsync(accepted, CancellationToken.None);
+            server.HandleTcpClientAsync(accepted, CancellationToken.None);
 
             var request = DomainMessage.CreateRequest("example.com");
             var payload = new byte[512];
@@ -59,11 +59,10 @@ public class TcpListenDisposeTests
             var context = await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(DnsQuerySource.Tcp, context.Source);
 
-            Assert.False(handleTask.IsCompleted);
             Assert.False(IsDisposed(accepted));
 
             release.TrySetResult(null);
-            await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitUntilDisposed(accepted, TimeSpan.FromSeconds(5));
             Assert.True(IsDisposed(accepted));
         }
         finally
@@ -102,7 +101,7 @@ public class TcpListenDisposeTests
             using var accepted = await listener.AcceptTcpClientAsync();
             await connect;
 
-            var handleTask = server.HandleTcpClientAsync(accepted, CancellationToken.None);
+            server.HandleTcpClientAsync(accepted, CancellationToken.None);
             var request = DomainMessage.CreateRequest("example.com");
             var payload = new byte[512];
             var payloadLength = DomainMessageEncoder.Encode(payload, request);
@@ -116,12 +115,11 @@ public class TcpListenDisposeTests
             // must not dispose the socket while that query is running.
             await Task.Delay(DnsServer.TcpReadTimeout + DnsServer.TcpReadTimeout + TimeSpan.FromMilliseconds(500));
 
-            Assert.False(handleTask.IsCompleted);
             Assert.False(IsDisposed(accepted));
 
             release.TrySetResult(null);
             queryClient.Client.Shutdown(SocketShutdown.Send);
-            await handleTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitUntilDisposed(accepted, TimeSpan.FromSeconds(5));
             Assert.True(IsDisposed(accepted));
         }
         finally
@@ -150,11 +148,11 @@ public class TcpListenDisposeTests
             using var accepted = await listener.AcceptTcpClientAsync();
             await connect;
 
-            var handleTask = server.HandleTcpClientAsync(accepted, CancellationToken.None);
+            server.HandleTcpClientAsync(accepted, CancellationToken.None);
             // One byte of the 2-byte length prefix — not a full packet.
             await queryClient.GetStream().WriteAsync(new byte[] { 0x00 });
 
-            await handleTask.WaitAsync(DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
+            await WaitUntilDisposed(accepted, DnsServer.TcpReadTimeout + TimeSpan.FromSeconds(2));
             Assert.True(IsDisposed(accepted));
             await pipeline.DidNotReceive()
                 .ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
@@ -163,6 +161,13 @@ public class TcpListenDisposeTests
         {
             listener.Stop();
         }
+    }
+
+    private static async Task WaitUntilDisposed(TcpClient client, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!IsDisposed(client) && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
     }
 
     private static bool IsDisposed(TcpClient client)

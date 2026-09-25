@@ -270,6 +270,10 @@ public sealed partial class DnsServer : BackgroundService
     // ReSharper disable once AsyncVoidMethod
     public async void HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
+        // The handshake runs on this thread until it awaits. A stuck or
+        // failing handshake must not sit in the accept loop. TCP yields on
+        // its first read; DoT has to yield before AuthenticateAsServerAsync.
+        await Task.Yield();
         SslStream? sslStream = null;
         try
         {

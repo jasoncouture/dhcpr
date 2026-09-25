@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Dns.Core;
 
-public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProvider, IDisposable
+public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProvider
 {
     private readonly IOptionsMonitor<TlsConfiguration> _options;
     private readonly Lock _sync = new();
@@ -20,9 +20,15 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
     public X509Certificate2 GetCertificate()
     {
         var config = _options.CurrentValue;
+        var current = _current;
         var certificateWriteTime = File.GetLastWriteTimeUtc(config.CertificatePath);
         var keyWriteTime = File.GetLastWriteTimeUtc(config.PrivateKeyPath);
 
+        // Skip the lock entirely, when possible.
+        if (current is not null &&
+            certificateWriteTime == _certificateWriteTime &&
+            keyWriteTime == _keyWriteTime)
+            return current;
         lock (_sync)
         {
             if (_current is not null &&
@@ -35,20 +41,11 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
                 loaded.Export(X509ContentType.Pfx),
                 (string?)null);
 
-            _current?.Dispose();
+            // Callers already hold the previous instance. Leave it for the GC.
             _current = exported;
             _certificateWriteTime = certificateWriteTime;
             _keyWriteTime = keyWriteTime;
             return exported;
-        }
-    }
-
-    public void Dispose()
-    {
-        lock (_sync)
-        {
-            _current?.Dispose();
-            _current = null;
         }
     }
 }

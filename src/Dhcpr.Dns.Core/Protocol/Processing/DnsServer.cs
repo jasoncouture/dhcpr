@@ -260,8 +260,9 @@ public sealed partial class DnsServer : BackgroundService
         {
             await HandleStreamClientAsync(client, client.GetStream(), DnsQuerySource.Tcp, cancellationToken);
         }
-        catch
+        catch (Exception exception)
         {
+            LogTcpClientFailed(_logger, exception, TryRemoteEndPoint(client));
             client.Dispose();
         }
     }
@@ -282,9 +283,9 @@ public sealed partial class DnsServer : BackgroundService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch
+        catch (Exception exception)
         {
-            // Handshake, idle timeout, remote close, or malformed client — drop the connection.
+            LogDotClientFailed(_logger, exception, TryRemoteEndPoint(client));
         }
         finally
         {
@@ -350,9 +351,13 @@ public sealed partial class DnsServer : BackgroundService
         {
             // Host is shutting down.
         }
-        catch
+        catch (OperationCanceledException exception)
         {
-            // Read timeout, remote close, or malformed client — drop the connection.
+            LogStreamClientDropped(_logger, exception, source, TryRemoteEndPoint(client));
+        }
+        catch (Exception exception)
+        {
+            LogStreamClientFailed(_logger, exception, source, TryRemoteEndPoint(client));
         }
         finally
         {
@@ -430,9 +435,9 @@ public sealed partial class DnsServer : BackgroundService
 
             ProcessAndSendUdp(context, udpClient, remoteIPEndPoint, cancellationToken);
         }
-        catch
+        catch (Exception exception)
         {
-            // Ignored.
+            LogUdpDecodeFailed(_logger, exception, remoteEndPoint);
         }
     }
 
@@ -590,4 +595,31 @@ public sealed partial class DnsServer : BackgroundService
 
     [LoggerMessage(Level = LogLevel.Error, Message = "UDP DNS process-and-send failed")]
     private static partial void LogUdpProcessFault(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "UDP DNS datagram from {RemoteEndPoint} dropped")]
+    private static partial void LogUdpDecodeFailed(ILogger logger, Exception exception, EndPoint remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "TCP DNS client {RemoteEndPoint} failed")]
+    private static partial void LogTcpClientFailed(ILogger logger, Exception exception, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "DoT client {RemoteEndPoint} failed")]
+    private static partial void LogDotClientFailed(ILogger logger, Exception exception, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DNS {Source} client {RemoteEndPoint} idle read timed out")]
+    private static partial void LogStreamClientDropped(ILogger logger, Exception exception, DnsQuerySource source, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "DNS {Source} client {RemoteEndPoint} dropped")]
+    private static partial void LogStreamClientFailed(ILogger logger, Exception exception, DnsQuerySource source, EndPoint? remoteEndPoint);
+
+    private static EndPoint? TryRemoteEndPoint(TcpClient client)
+    {
+        try
+        {
+            return client.Client.RemoteEndPoint;
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+    }
 }

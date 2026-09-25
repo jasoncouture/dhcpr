@@ -108,7 +108,7 @@ public sealed partial class DnsServer : BackgroundService
             {
                 if (!tls.TryValidate(out var tlsError))
                     throw new InvalidOperationException(tlsError);
-                _ = _certificates.GetCertificate();
+                _ = _certificates.GetServerCertificateContext();
 
                 foreach (var listener in tls.GetParsedListeners())
                 {
@@ -343,11 +343,8 @@ public sealed partial class DnsServer : BackgroundService
             CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
             ClientCertificateRequired = false,
             ApplicationProtocols = [new SslApplicationProtocol("dot")],
-            ServerCertificateSelectionCallback = SelectTlsCertificate
+            ServerCertificateContext = _certificates.GetServerCertificateContext()
         };
-
-    private X509Certificate SelectTlsCertificate(object sender, string? hostName)
-        => _certificates.GetCertificate();
 
     internal async Task HandleStreamClientAsync(
         TcpClient client,

@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 
 using Microsoft.Extensions.Options;
@@ -8,7 +9,7 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
 {
     private readonly IOptionsMonitor<TlsConfiguration> _options;
     private readonly Lock _sync = new();
-    private X509Certificate2? _current;
+    private SslStreamCertificateContext? _context;
     private DateTime _certificateWriteTime;
     private DateTime _keyWriteTime;
 
@@ -18,34 +19,52 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
     }
 
     public X509Certificate2 GetCertificate()
+        => GetServerCertificateContext().TargetCertificate;
+
+    public SslStreamCertificateContext GetServerCertificateContext()
     {
         var config = _options.CurrentValue;
-        var current = _current;
+        var context = _context;
         var certificateWriteTime = File.GetLastWriteTimeUtc(config.CertificatePath);
         var keyWriteTime = File.GetLastWriteTimeUtc(config.PrivateKeyPath);
-
-        // Skip the lock entirely, when possible.
-        if (current is not null &&
+        if (context is not null &&
             certificateWriteTime == _certificateWriteTime &&
             keyWriteTime == _keyWriteTime)
-            return current;
+            return context;
+
         lock (_sync)
         {
-            if (_current is not null &&
+            if (_context is not null &&
                 certificateWriteTime == _certificateWriteTime &&
                 keyWriteTime == _keyWriteTime)
-                return _current;
+                return _context;
 
+            config = _options.CurrentValue;
             using var loaded = X509Certificate2.CreateFromPemFile(config.CertificatePath, config.PrivateKeyPath);
             var exported = X509CertificateLoader.LoadPkcs12(
                 loaded.Export(X509ContentType.Pfx),
                 (string?)null);
-
-            // Callers already hold the previous instance. Leave it for the GC.
-            _current = exported;
+            _context = SslStreamCertificateContext.Create(
+                exported,
+                LoadIntermediates(config.CertificatePath, exported),
+                offline: true);
             _certificateWriteTime = certificateWriteTime;
             _keyWriteTime = keyWriteTime;
-            return exported;
+            return _context;
         }
+    }
+
+    private static X509Certificate2Collection? LoadIntermediates(string certificatePath, X509Certificate2 leaf)
+    {
+        var parsed = new X509Certificate2Collection();
+        parsed.ImportFromPem(File.ReadAllText(certificatePath));
+        var extra = new X509Certificate2Collection();
+        foreach (var certificate in parsed)
+        {
+            if (!string.Equals(certificate.Thumbprint, leaf.Thumbprint, StringComparison.Ordinal))
+                extra.Add(certificate);
+        }
+
+        return extra.Count == 0 ? null : extra;
     }
 }

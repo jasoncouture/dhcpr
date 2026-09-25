@@ -1,3 +1,5 @@
+using System.Security.Cryptography.X509Certificates;
+
 using Dhcpr.Dns.Core;
 
 namespace Dhcpr.Server;
@@ -14,10 +16,14 @@ public static class KestrelTlsExtensions
 
             options.ConfigureHttpsDefaults(https =>
             {
-                https.ServerCertificateSelector = (_, _) =>
-                    options.ApplicationServices
-                        .GetRequiredService<ITlsServerCertificateProvider>()
-                        .GetCertificate();
+                var context = options.ApplicationServices
+                    .GetRequiredService<ITlsServerCertificateProvider>()
+                    .GetServerCertificateContext();
+                https.ServerCertificate = context.TargetCertificate;
+                var chain = new X509Certificate2Collection();
+                foreach (var certificate in context.IntermediateCertificates)
+                    chain.Add(certificate);
+                https.ServerCertificateChain = chain;
             });
         });
         return builder;

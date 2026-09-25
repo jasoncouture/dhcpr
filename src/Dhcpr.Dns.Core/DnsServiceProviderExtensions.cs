@@ -10,6 +10,7 @@ using Dhcpr.Dns.Core.RootZone;
 using Dhcpr.Dns.Core.Validation;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
@@ -20,6 +21,8 @@ public static class DnsServiceProviderExtensions
 {
     public static IServiceCollection AddDns(this IServiceCollection services)
     {
+        // Before Kestrel, so the certificate is loaded before HTTPS binds.
+        services.Insert(0, ServiceDescriptor.Singleton<IHostedService, TlsCertificateRefreshService>());
         services.AddMemoryCache(o =>
         {
             // Size is per DnsResponseCache entry (Size = 1). 100M was effectively unbounded

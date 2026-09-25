@@ -13,13 +13,14 @@ public class FileTlsServerCertificateProviderTests
         try
         {
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "first");
-            ITlsServerCertificateProvider provider = new FileTlsServerCertificateProvider(Monitor(new TlsConfiguration
+            var provider = new FileTlsServerCertificateProvider(Monitor(new TlsConfiguration
             {
                 Enabled = true,
                 Listeners = ["127.0.0.1:853"],
                 CertificatePath = certificatePath,
                 PrivateKeyPath = keyPath
             }));
+            provider.Refresh();
 
             var first = provider.GetCertificate();
             var firstThumbprint = first.Thumbprint;
@@ -27,6 +28,7 @@ public class FileTlsServerCertificateProviderTests
             TlsCertificateFiles.WritePemPair(directory.FullName, "second");
             File.SetLastWriteTimeUtc(certificatePath, DateTime.UtcNow.AddMinutes(1));
             File.SetLastWriteTimeUtc(keyPath, DateTime.UtcNow.AddMinutes(1));
+            provider.Refresh();
 
             var second = provider.GetCertificate();
             Assert.NotEqual(firstThumbprint, second.Thumbprint);
@@ -44,13 +46,14 @@ public class FileTlsServerCertificateProviderTests
         try
         {
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "cached");
-            ITlsServerCertificateProvider provider = new FileTlsServerCertificateProvider(Monitor(new TlsConfiguration
+            var provider = new FileTlsServerCertificateProvider(Monitor(new TlsConfiguration
             {
                 Enabled = true,
                 Listeners = ["127.0.0.1:853"],
                 CertificatePath = certificatePath,
                 PrivateKeyPath = keyPath
             }));
+            provider.Refresh();
 
             var first = provider.GetCertificate();
             var second = provider.GetCertificate();

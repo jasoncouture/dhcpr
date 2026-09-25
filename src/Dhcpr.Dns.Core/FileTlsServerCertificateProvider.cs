@@ -22,35 +22,40 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
         => GetServerCertificateContext().TargetCertificate;
 
     public SslStreamCertificateContext GetServerCertificateContext()
+        => _context ?? throw new InvalidOperationException("TLS certificate is not loaded.");
+
+    public void Refresh()
     {
         var config = _options.CurrentValue;
-        var context = _context;
+        if (!config.Enabled)
+            return;
+
         var certificateWriteTime = File.GetLastWriteTimeUtc(config.CertificatePath);
         var keyWriteTime = File.GetLastWriteTimeUtc(config.PrivateKeyPath);
-        if (context is not null &&
+        if (_context is not null &&
             certificateWriteTime == _certificateWriteTime &&
             keyWriteTime == _keyWriteTime)
-            return context;
+            return;
 
         lock (_sync)
         {
             if (_context is not null &&
                 certificateWriteTime == _certificateWriteTime &&
                 keyWriteTime == _keyWriteTime)
-                return _context;
+                return;
 
             config = _options.CurrentValue;
             using var loaded = X509Certificate2.CreateFromPemFile(config.CertificatePath, config.PrivateKeyPath);
             var exported = X509CertificateLoader.LoadPkcs12(
                 loaded.Export(X509ContentType.Pfx),
                 (string?)null);
-            _context = SslStreamCertificateContext.Create(
+            var context = SslStreamCertificateContext.Create(
                 exported,
                 LoadIntermediates(config.CertificatePath, exported),
                 offline: true);
             _certificateWriteTime = certificateWriteTime;
             _keyWriteTime = keyWriteTime;
-            return _context;
+            _context = context;
         }
     }
 

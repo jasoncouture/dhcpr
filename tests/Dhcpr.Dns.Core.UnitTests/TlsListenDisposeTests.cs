@@ -37,11 +37,13 @@ public class TlsListenDisposeTests
                     started.TrySetResult(call.Arg<DomainMessageContext>());
                     return new ValueTask<DomainMessage?>(release.Task);
                 });
+            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
+            certificates.Refresh();
             var server = new DnsServer(
                 pipeline,
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
-                new FileTlsServerCertificateProvider(Monitor(tls)),
+                certificates,
                 NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -100,11 +102,13 @@ public class TlsListenDisposeTests
         {
             var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
             var tls = ValidTls(certificatePath, keyPath);
+            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
+            certificates.Refresh();
             var server = new DnsServer(
                 Substitute.For<IDnsQueryPipeline>(),
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
-                new FileTlsServerCertificateProvider(Monitor(tls)),
+                certificates,
                 NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);

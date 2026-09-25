@@ -1,12 +1,10 @@
 using System.Xml.Linq;
 
+using Dhcpr.Core;
 using Dhcpr.Server.Orleans.DataProtection;
 
 using Microsoft.Extensions.Logging.Abstractions;
-
-using Orleans;
-
-using NSubstitute;
+using Microsoft.Extensions.Options;
 
 namespace Dhcpr.Server.UnitTests;
 
@@ -26,34 +24,41 @@ public class OrleansDataProtectionKeyRepositoryTests
             """<key id="a" version="1"/>""",
             """<key id="b" version="1"/>"""
         ]);
-        var grain = Substitute.For<IDataProtectionKeyGrain>();
-        var grains = Substitute.For<IGrainFactory>();
-        grains.GetGrain<IDataProtectionKeyGrain>(DataProtectionKeyGrain.Key).Returns(grain);
 
-        var repository = new OrleansDataProtectionKeyRepository(grains);
+        var repository = new OrleansDataProtectionKeyRepository(CreateFiles());
         var elements = repository.GetAllElements();
 
         Assert.Equal(2, elements.Count);
         Assert.Contains(elements, static e => e.Attribute("id")?.Value == "a");
         Assert.Contains(elements, static e => e.Attribute("id")?.Value == "b");
-        grain.DidNotReceive().GetAllAsync();
     }
 
     [Fact]
-    public void StoreElementWritesXmlToGrainAndSnapshot()
+    public void StoreElementWritesXmlToDiskAndSnapshot()
     {
-        var grain = Substitute.For<IDataProtectionKeyGrain>();
-        grain.StoreAsync(Arg.Any<string>(), Arg.Any<string?>()).Returns(Task.CompletedTask);
-        var grains = Substitute.For<IGrainFactory>();
-        grains.GetGrain<IDataProtectionKeyGrain>(DataProtectionKeyGrain.Key).Returns(grain);
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var files = CreateFiles(directory.FullName);
+            var repository = new OrleansDataProtectionKeyRepository(files);
+            repository.StoreElement(new XElement("key", new XAttribute("id", "c")), "key-c");
 
-        var repository = new OrleansDataProtectionKeyRepository(grains);
-        repository.StoreElement(new XElement("key", new XAttribute("id", "c")), "key-c");
+            Assert.Contains(DataProtectionKeySnapshot.Copy(), xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'"));
 
-        grain.Received(1).StoreAsync(
-            Arg.Is<string>(xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'")),
-            "key-c");
-        Assert.Contains(DataProtectionKeySnapshot.Copy(), xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'"));
+            DataProtectionKeySnapshot.Clear();
+            _ = CreateFiles(directory.FullName);
+            Assert.Contains(DataProtectionKeySnapshot.Copy(), xml => xml.Contains("id=\"c\"") || xml.Contains("id='c'"));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    private static DataProtectionKeyFiles CreateFiles(string? path = null)
+    {
+        path ??= Directory.CreateTempSubdirectory().FullName;
+        return new DataProtectionKeyFiles(Options.Create(new ApplicationConfiguration { DataPath = path }));
     }
 }
 

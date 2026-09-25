@@ -44,6 +44,7 @@ builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
     .Validate(static o => o.Validate(), "DataPath must be set");
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
+builder.Services.AddSingleton<DataProtectionKeyFiles>();
 builder.Services.AddSingleton<IXmlRepository, OrleansDataProtectionKeyRepository>();
 builder.Services.AddOptions<KeyManagementOptions>()
     .Configure<IXmlRepository>((options, repository) => options.XmlRepository = repository);

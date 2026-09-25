@@ -10,6 +10,7 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
 
     private readonly IGrainFactory _grainFactory;
     private readonly IClusterMembershipService _membership;
+    private readonly DataProtectionKeyFiles _files;
     private readonly ILogger<DataProtectionKeyOrleansBridge> _logger;
 
     private HubObserver? _observerInstance;
@@ -21,17 +22,19 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     public DataProtectionKeyOrleansBridge(
         IGrainFactory grainFactory,
         IClusterMembershipService membership,
+        DataProtectionKeyFiles files,
         ILogger<DataProtectionKeyOrleansBridge> logger)
     {
         _grainFactory = grainFactory;
         _membership = membership;
+        _files = files;
         _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        _observerInstance = new HubObserver();
+        _observerInstance = new HubObserver(_files);
         _observer = _grainFactory.CreateObjectReference<IDataProtectionKeyObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<IDataProtectionKeyGrain>(DataProtectionKeyGrain.Key);
 
@@ -139,12 +142,12 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to refresh Data Protection grain subscription")]
     private static partial void LogRefreshSubscriptionFailed(ILogger logger, Exception exception);
 
-    private sealed class HubObserver : IDataProtectionKeyObserver
+    private sealed class HubObserver(DataProtectionKeyFiles files) : IDataProtectionKeyObserver
     {
         public async Task OnKeysAsync(IEnumerable<string> elementXml, CancellationToken cancellationToken)
         {
             await Task.Yield();
-            DataProtectionKeySnapshot.Replace(elementXml);
+            files.Replace(elementXml);
         }
     }
 }

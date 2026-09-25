@@ -275,6 +275,7 @@ public sealed partial class DnsServer : BackgroundService
         // to that Task, so it never arms while the handshake is stuck, and
         // the accept loop never gets back to accept. TCP's first read returns
         // a Task immediately. Close the socket from a timer started first.
+        var remoteEndPoint = TryRemoteEndPoint(client);
         await Task.Yield();
         SslStream? sslStream = null;
         var abort = new HandshakeAbort(client);
@@ -293,9 +294,13 @@ public sealed partial class DnsServer : BackgroundService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+        catch (Exception) when (abort.Closed)
+        {
+            LogDotHandshakeTimedOut(_logger, remoteEndPoint);
+        }
         catch (Exception exception)
         {
-            LogDotClientFailed(_logger, exception, TryRemoteEndPoint(client));
+            LogDotClientFailed(_logger, exception, remoteEndPoint);
         }
         finally
         {
@@ -307,13 +312,15 @@ public sealed partial class DnsServer : BackgroundService
 
     private sealed class HandshakeAbort(TcpClient client)
     {
-        private int _finished;
+        private int _state;
 
-        public void Finish() => Interlocked.Exchange(ref _finished, 1);
+        public bool Closed => Volatile.Read(ref _state) == ClosedState;
+
+        public void Finish() => Interlocked.CompareExchange(ref _state, FinishedState, 0);
 
         public void TryClose()
         {
-            if (Interlocked.Exchange(ref _finished, 1) != 0)
+            if (Interlocked.CompareExchange(ref _state, ClosedState, 0) != 0)
                 return;
 
             try
@@ -324,6 +331,9 @@ public sealed partial class DnsServer : BackgroundService
             {
             }
         }
+
+        private const int FinishedState = 1;
+        private const int ClosedState = 2;
     }
 
     private SslServerAuthenticationOptions CreateTlsServerOptions()
@@ -635,6 +645,9 @@ public sealed partial class DnsServer : BackgroundService
 
     [LoggerMessage(Level = LogLevel.Error, Message = "DoT client {RemoteEndPoint} failed")]
     private static partial void LogDotClientFailed(ILogger logger, Exception exception, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DoT client {RemoteEndPoint} handshake timed out")]
+    private static partial void LogDotHandshakeTimedOut(ILogger logger, EndPoint? remoteEndPoint);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNS {Source} client {RemoteEndPoint} idle read timed out")]
     private static partial void LogStreamClientDropped(ILogger logger, Exception exception, DnsQuerySource source, EndPoint? remoteEndPoint);

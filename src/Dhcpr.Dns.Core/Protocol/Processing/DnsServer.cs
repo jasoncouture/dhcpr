@@ -270,18 +270,24 @@ public sealed partial class DnsServer : BackgroundService
     // ReSharper disable once AsyncVoidMethod
     public async void HandleTlsClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
-        // The handshake runs on this thread until it awaits. A stuck or
-        // failing handshake must not sit in the accept loop. TCP yields on
-        // its first read; DoT has to yield before AuthenticateAsServerAsync.
+        // AuthenticateAsServerAsync runs DoSslHandshake on this thread and
+        // does not return a Task until that call yields. WaitAsync is applied
+        // to that Task, so it never arms while the handshake is stuck, and
+        // the accept loop never gets back to accept. TCP's first read returns
+        // a Task immediately. Close the socket from a timer started first.
         await Task.Yield();
         SslStream? sslStream = null;
+        var abort = new HandshakeAbort(client);
+        using var abortHandshake = new Timer(
+            static state => ((HandshakeAbort)state!).TryClose(),
+            abort,
+            TcpReadTimeout,
+            Timeout.InfiniteTimeSpan);
         try
         {
             sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
-            // CancelAfter is not enough: SslStream often ignores the token until the
-            // next read. WaitAsync lets finally dispose the socket and abort it.
-            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken)
-                .WaitAsync(TcpReadTimeout, cancellationToken);
+            await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken);
+            abort.Finish();
             await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -296,6 +302,27 @@ public sealed partial class DnsServer : BackgroundService
             if (sslStream is not null)
                 await sslStream.DisposeAsync();
             client.Dispose();
+        }
+    }
+
+    private sealed class HandshakeAbort(TcpClient client)
+    {
+        private int _finished;
+
+        public void Finish() => Interlocked.Exchange(ref _finished, 1);
+
+        public void TryClose()
+        {
+            if (Interlocked.Exchange(ref _finished, 1) != 0)
+                return;
+
+            try
+            {
+                client.Client.Close();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
     }
 

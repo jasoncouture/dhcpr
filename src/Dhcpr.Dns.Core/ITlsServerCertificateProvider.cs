@@ -5,6 +5,8 @@ namespace Dhcpr.Dns.Core;
 
 public interface ITlsServerCertificateProvider
 {
+    Task Ready { get; }
+
     X509Certificate2 GetCertificate();
 
     SslStreamCertificateContext GetServerCertificateContext();

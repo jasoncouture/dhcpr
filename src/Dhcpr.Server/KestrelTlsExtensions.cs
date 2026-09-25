@@ -16,9 +16,11 @@ public static class KestrelTlsExtensions
 
             options.ConfigureHttpsDefaults(https =>
             {
-                var context = options.ApplicationServices
-                    .GetRequiredService<ITlsServerCertificateProvider>()
-                    .GetServerCertificateContext();
+                var certificates = options.ApplicationServices
+                    .GetRequiredService<ITlsServerCertificateProvider>();
+                if (certificates is FileTlsServerCertificateProvider files)
+                    files.Refresh();
+                var context = certificates.GetServerCertificateContext();
                 https.ServerCertificate = context.TargetCertificate;
                 var chain = new X509Certificate2Collection();
                 foreach (var certificate in context.IntermediateCertificates)

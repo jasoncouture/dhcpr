@@ -9,9 +9,12 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
 {
     private readonly IOptionsMonitor<TlsConfiguration> _options;
     private readonly Lock _sync = new();
+    private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private SslStreamCertificateContext? _context;
     private DateTime _certificateWriteTime;
     private DateTime _keyWriteTime;
+
+    public Task Ready => _ready.Task;
 
     public FileTlsServerCertificateProvider(IOptionsMonitor<TlsConfiguration> options)
     {
@@ -22,7 +25,7 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
         => GetServerCertificateContext().TargetCertificate;
 
     public SslStreamCertificateContext GetServerCertificateContext()
-        => _context ?? throw new InvalidOperationException("TLS certificate is not loaded.");
+        => Volatile.Read(ref _context) ?? throw new InvalidOperationException("TLS certificate is not loaded.");
 
     public void Refresh()
     {
@@ -32,17 +35,23 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
 
         var certificateWriteTime = File.GetLastWriteTimeUtc(config.CertificatePath);
         var keyWriteTime = File.GetLastWriteTimeUtc(config.PrivateKeyPath);
-        if (_context is not null &&
+        if (Volatile.Read(ref _context) is not null &&
             certificateWriteTime == _certificateWriteTime &&
             keyWriteTime == _keyWriteTime)
+        {
+            _ready.TrySetResult();
             return;
+        }
 
         lock (_sync)
         {
             if (_context is not null &&
                 certificateWriteTime == _certificateWriteTime &&
                 keyWriteTime == _keyWriteTime)
+            {
+                _ready.TrySetResult();
                 return;
+            }
 
             config = _options.CurrentValue;
             using var loaded = X509Certificate2.CreateFromPemFile(config.CertificatePath, config.PrivateKeyPath);
@@ -55,7 +64,8 @@ public sealed class FileTlsServerCertificateProvider : ITlsServerCertificateProv
                 offline: true);
             _certificateWriteTime = certificateWriteTime;
             _keyWriteTime = keyWriteTime;
-            _context = context;
+            Volatile.Write(ref _context, context);
+            _ready.TrySetResult();
         }
     }
 

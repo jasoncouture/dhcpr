@@ -108,6 +108,7 @@ public sealed partial class DnsServer : BackgroundService
             {
                 if (!tls.TryValidate(out var tlsError))
                     throw new InvalidOperationException(tlsError);
+                await _certificates.Ready.WaitAsync(stoppingToken).ConfigureAwait(false);
                 _ = _certificates.GetServerCertificateContext();
 
                 foreach (var listener in tls.GetParsedListeners())

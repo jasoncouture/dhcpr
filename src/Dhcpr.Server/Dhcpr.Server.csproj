@@ -9,7 +9,7 @@
         <!-- Force Blazor JS static assets even when restore runs before .razor files exist (Docker layer cache). -->
         <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
         <ThreadPoolMinThreads>64</ThreadPoolMinThreads>
-        <ThreadPoolMaxThreads>1024</ThreadPoolMaxThreads>
+        <ThreadPoolMaxThreads>16384</ThreadPoolMaxThreads>
         <TieredPGO>true</TieredPGO>
         <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
         <PublishReadyToRun>true</PublishReadyToRun>

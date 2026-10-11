@@ -18,6 +18,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     private readonly IDnssecValidator _crypto;
     private readonly IInternalDomainClient _internalClient;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
+    private readonly ITrustAnchorStore? _trustAnchors;
     private readonly ILogger<DnssecMessageValidator> _logger;
     private readonly TimeProvider _time;
 
@@ -26,13 +27,15 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         IInternalDomainClient internalClient,
         IOptionsMonitor<DnsConfiguration> options,
         ILogger<DnssecMessageValidator> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ITrustAnchorStore? trustAnchors = null)
     {
         _crypto = crypto;
         _internalClient = internalClient;
         _options = options;
         _logger = logger;
         _time = timeProvider ?? TimeProvider.System;
+        _trustAnchors = trustAnchors;
     }
 
     public void EnsureTrustAnchorsLoaded(DnssecScope scope)
@@ -40,7 +43,9 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         if (scope.TryGetDelegation(".", out _))
             return;
 
-        var anchors = _options.CurrentValue.TrustAnchors ?? Array.Empty<TrustAnchorConfiguration>();
+        var anchors = _trustAnchors is null
+            ? _options.CurrentValue.TrustAnchors ?? Array.Empty<TrustAnchorConfiguration>()
+            : _trustAnchors.GetActiveAnchors();
         scope.LoadTrustAnchors(anchors);
         LogLoadedTrustAnchors(_logger, anchors.Length);
     }

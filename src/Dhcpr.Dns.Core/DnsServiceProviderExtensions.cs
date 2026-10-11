@@ -45,10 +45,13 @@ public static class DnsServiceProviderExtensions
         // Process-bound mutable state.
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
+        // Process-bound: RFC 5011 state shared by validation and the probe.
+        services.AddSingleton<ITrustAnchorStore, TrustAnchorStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();
         services.AddSingleton<IDynamicDnsStore, DynamicDnsStore>();
         // Tips bootstrap before root.zone refresh (registration order = start order).
         services.AddHostedService<RootServerTipsBootstrapService>();
+        services.AddHostedService<TrustAnchorRefreshService>();
         services.AddHostedService<RootZoneRefreshService>();
         services.AddHostedService<AuthoritativeZoneLoader>();
         services.AddHostedService<DynamicDnsLoader>();

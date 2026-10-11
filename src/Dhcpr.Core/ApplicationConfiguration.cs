@@ -11,6 +11,7 @@ public sealed class ApplicationConfiguration : IValidateSelf
     public const string SettingsFileName = "settings.json";
     public const string NamedRootFileName = "root-servers.txt";
     public const string RootZoneFileName = "root.zone";
+    public const string TrustAnchorFileName = "trust-anchors.json";
 
     public string DataPath { get; set; } = ".";
 
@@ -41,6 +42,9 @@ public sealed class ApplicationConfiguration : IValidateSelf
 
     public string GetSettingsPath()
         => Path.Combine(GetDataDirectory(), SettingsFileName);
+
+    public string GetTrustAnchorPath()
+        => Path.Combine(GetDataDirectory(), TrustAnchorFileName);
 
     /// <summary>Path under the data directory (used by root-zone helpers).</summary>
     public string GetZoneFilePath(string fileName)

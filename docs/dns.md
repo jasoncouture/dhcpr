@@ -146,7 +146,11 @@ When disabled: never set AD, never SERVFAIL solely because validation failed.
 `DeniedAlgorithms` always lose. Algorithm `0` is invalid.
 
 Trust anchors are `DNS:TrustAnchors` (DS records). The compiled default is the
-current root KSK (key tag 20326). Override only when you intend to.
+root KSK set: key tag 20326 (KSK-2017) and key tag 38696 (KSK-2024). A background
+probe follows RFC 5011: a new SEP key seen in a DNSKEY set signed by a key already
+trusted is held for 30 days, then trusted, and the state is written to
+`trust-anchors.json`. A revoked key is removed and is not put back from the
+compiled default. Adding a DS to `TrustAnchors` trusts it immediately.
 
 ## UDP size (amplification)
 

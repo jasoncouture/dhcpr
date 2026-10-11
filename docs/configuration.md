@@ -139,8 +139,11 @@ Client behavior when enabled:
 
 ### Trust anchors
 
-`DNS:TrustAnchors` — DS records. The built-in default is the current root KSK
-(key tag 20326, algorithm 8, digest type 2). Override only if you know why.
+`DNS:TrustAnchors` — DS records. The built-in default trusts both root KSKs
+(key tag 20326 and key tag 38696, algorithm 8, digest type 2). The process
+also keeps `trust-anchors.json` and updates it with RFC 5011: a newly published
+SEP key is trusted after it has been signed-for continuously for 30 days, and a
+revoked key is dropped. Add a DS here to trust a key immediately.
 
 ```json
 "TrustAnchors": [
@@ -150,6 +153,13 @@ Client behavior when enabled:
     "Algorithm": 8,
     "DigestType": 2,
     "DigestHex": "E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"
+  },
+  {
+    "Name": ".",
+    "KeyTag": 38696,
+    "Algorithm": 8,
+    "DigestType": 2,
+    "DigestHex": "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A4C0FB2B16"
   }
 ]
 ```

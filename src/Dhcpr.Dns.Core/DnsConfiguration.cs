@@ -50,7 +50,7 @@ public sealed class DnsConfiguration : IValidateSelf
     /// </summary>
     public DesignatedResolverConfiguration[] DesignatedResolvers { get; set; } = [];
 
-    public TrustAnchorConfiguration[] TrustAnchors { get; set; } = { new TrustAnchorConfiguration() };
+    public TrustAnchorConfiguration[] TrustAnchors { get; set; } = TrustAnchorConfiguration.DefaultRootAnchors();
 
     /// <summary>DNSSEC validation enable/disable and algorithm policy.</summary>
     public DnssecConfiguration Dnssec { get; set; } = new();

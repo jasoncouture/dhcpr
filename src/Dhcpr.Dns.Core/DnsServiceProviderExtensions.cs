@@ -65,7 +65,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsQueryPipeline, DnsQueryPipeline>();
         services.AddScoped<DomainMessageContextMessageProcessor>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → Shuffle → DNSSEC → …
+        // Outermost last: Logging → Metrics → Loop → Shuffle → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
         // NsCut → Forward → Recursive → ServerFailure.
         services.Decorate<IDomainMessageMiddleware, RecursiveRootResolver>();
@@ -96,6 +96,9 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
+        // Outside the cache and DNSSEC: NXDOMAIN before the looped packet can
+        // join the in-flight lookup or be rewritten as Bogus.
+        services.Decorate<IDomainMessageMiddleware, LoopQueryMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.

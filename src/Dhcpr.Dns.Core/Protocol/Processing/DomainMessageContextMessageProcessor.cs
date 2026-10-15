@@ -26,7 +26,6 @@ public sealed partial class DomainMessageContextMessageProcessor
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly IDnsMetrics _metrics;
     private readonly IDnsServerCookieFactory? _cookies;
-    private readonly IEdnsLoopTag _loopTag;
 
     public DomainMessageContextMessageProcessor(
         IDomainMessageMiddleware middleware,
@@ -34,7 +33,6 @@ public sealed partial class DomainMessageContextMessageProcessor
         IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
         IDnsMetrics metrics,
-        IEdnsLoopTag loopTag,
         IDnsServerCookieFactory? cookies = null)
     {
         _middleware = middleware;
@@ -43,7 +41,6 @@ public sealed partial class DomainMessageContextMessageProcessor
         _udpRateLimiter = udpRateLimiter;
         _metrics = metrics;
         _cookies = cookies;
-        _loopTag = loopTag;
     }
 
     public async ValueTask<DomainMessage?> ExecuteAsync(
@@ -57,19 +54,7 @@ public sealed partial class DomainMessageContextMessageProcessor
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            if (_loopTag.IsOurs(context.DomainMessage))
-            {
-                var question = context.DomainMessage.Questions is [{ } looped, ..] ? looped : null;
-                context.AnsweredBy = "Loop";
-                response = DomainMessage.CreateResponse(
-                    context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.NameError);
-                _metrics.RecordQuery(context, response);
-                if (question is not null)
-                    LogLoopedQuery(_logger, context.ClientEndPoint, question.Type, question.Name);
-            }
-            else if (ShouldRateLimit(context) &&
+            if (ShouldRateLimit(context) &&
                 TryApplyRateLimit(context, out response))
             {
                 // Rate-limit answers never enter MetricsDomainMessageMiddleware.
@@ -304,15 +289,6 @@ public sealed partial class DomainMessageContextMessageProcessor
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Looped query {Name}/{QueryType} from {Client}")]
-    private static partial void LogLoopedQuery(
-        ILogger logger,
-        IPEndPoint? client,
-        DomainRecordType queryType,
-        DomainLabels name);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

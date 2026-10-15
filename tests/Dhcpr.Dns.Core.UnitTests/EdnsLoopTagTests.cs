@@ -119,7 +119,7 @@ public class EdnsLoopTagTests
     }
 
     [Fact]
-    public async Task LoopedQueryIsNameErrorBeforeThePipeline()
+    public async Task LoopedQueryIsNameErrorBeforeTheInnerMiddleware()
     {
         IEdnsLoopTag tag = Tag();
         var request = DomainMessage.CreateRequest("netdimensional.top");
@@ -129,24 +129,20 @@ public class EdnsLoopTagTests
             request,
             new EdnsProtocolService(),
             marked.SelfQueryCookie);
-        var middleware = Substitute.For<IDomainMessageMiddleware>();
-        var processor = new DomainMessageContextMessageProcessor(
-            middleware,
-            Substitute.For<ILiveQueryEventPublisher>(),
-            Substitute.For<IUdpQueryRateLimiter>(),
-            NullLogger<DomainMessageContextMessageProcessor>.Instance,
-            Substitute.For<IDnsMetrics>(),
-            tag);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new LoopQueryMiddleware(
+            inner,
+            tag,
+            NullLogger<LoopQueryMiddleware>.Instance);
         var inbound = new DomainMessageContext(Client, Server, wire) { Source = DnsQuerySource.Udp };
 
-        var response = await processor.ExecuteAsync(inbound, CancellationToken.None);
+        var response = await middleware.ProcessAsync(inbound, CancellationToken.None);
 
-        Assert.NotNull(response);
-        Assert.Equal(DomainResponseCode.NameError, response!.Flags.ResponseCode);
+        Assert.Equal(DomainResponseCode.NameError, response.Flags.ResponseCode);
         Assert.True(response.Flags.Response);
         Assert.Equal(wire.Id, response.Id);
         Assert.Equal("Loop", inbound.AnsweredBy);
-        await middleware.DidNotReceive()
+        await inner.DidNotReceive()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 

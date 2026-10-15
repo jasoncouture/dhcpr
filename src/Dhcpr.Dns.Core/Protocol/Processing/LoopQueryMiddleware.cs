@@ -43,8 +43,8 @@ public sealed partial class LoopQueryMiddleware : IDomainMessageMiddleware
 
         return DomainMessage.CreateResponse(
             context.DomainMessage,
-            DomainResourceRecords.Empty,
-            DomainResponseCode.Refused);
+            additional: [EdnsExtendedError.Create(EdnsExtendedError.Other, EdnsExtendedError.LoopDetectedText)],
+            responseCode: DomainResponseCode.Refused);
     }
 
     [LoggerMessage(

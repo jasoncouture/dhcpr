@@ -1,5 +1,7 @@
+using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Net;
+using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -142,6 +144,24 @@ public class EdnsLoopTagTests
         Assert.True(response.Flags.Response);
         Assert.Equal(wire.Id, response.Id);
         Assert.Equal("Loop", inbound.AnsweredBy);
+        EdnsOption? ede = null;
+        foreach (var record in response.Records.Additional)
+        {
+            if (record.Data is not OptionData data)
+                continue;
+
+            foreach (var option in data.Options)
+            {
+                if (option.Code == EdnsExtendedError.OptionCode)
+                    ede = option;
+            }
+        }
+
+        Assert.NotNull(ede);
+        Assert.Equal(EdnsExtendedError.Other, BinaryPrimitives.ReadUInt16BigEndian(ede.Data.AsSpan()));
+        Assert.Equal(
+            EdnsExtendedError.LoopDetectedText,
+            Encoding.UTF8.GetString(ede.Data.AsSpan()[2..]));
         await inner.DidNotReceive()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

@@ -24,6 +24,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         using var exceptions = ListPool<Exception>.Default.Get();
         DomainMessage? truncatedFallback = null;
         DomainMessage? nameErrorFallback = null;
+        DomainMessage? refusedFallback = null;
 
         while (tasks.Count > 0)
         {
@@ -48,6 +49,8 @@ public sealed class DomainClientParallelWrapper : IDomainClient
 
                 if (result.Flags.ResponseCode is DomainResponseCode.NameError)
                     nameErrorFallback ??= result;
+                else if (result.Flags.ResponseCode is DomainResponseCode.Refused)
+                    refusedFallback ??= result;
             }
             catch (AggregateException ex)
             {
@@ -71,6 +74,9 @@ public sealed class DomainClientParallelWrapper : IDomainClient
 
         if (nameErrorFallback is not null && exceptions.Count == 0)
             return nameErrorFallback;
+
+        if (refusedFallback is not null && exceptions.Count == 0)
+            return refusedFallback;
 
         // Prefer a SERVFAIL response over throwing — callers can try more nameservers.
         return DomainMessage.CreateResponse(

@@ -76,6 +76,40 @@ public class DomainClientParallelWrapperTests
     }
 
     [Fact]
+    public async Task AllRefusedResponsesReturnRefused()
+    {
+        var refused = CreateResponse(DomainResponseCode.Refused, truncated: false);
+
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            GatedClient(refused, Task.CompletedTask),
+            GatedClient(refused, Task.CompletedTask)
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        Assert.Equal(DomainResponseCode.Refused, result.Flags.ResponseCode);
+    }
+
+    [Fact]
+    public async Task PrefersNoErrorOverFasterRefused()
+    {
+        var refused = CreateResponse(DomainResponseCode.Refused, truncated: false);
+        var success = CreateResponse(DomainResponseCode.NoError, truncated: false);
+
+        var successGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            GatedClient(refused, Task.CompletedTask),
+            GatedClient(success, successGate.Task)
+        });
+
+        var send = wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+        successGate.SetResult();
+        var result = await send;
+        Assert.Equal(DomainResponseCode.NoError, result.Flags.ResponseCode);
+    }
+
+    [Fact]
     public async Task AllNameErrorResponsesReturnNameError()
     {
         var nameError = CreateResponse(DomainResponseCode.NameError, truncated: false);

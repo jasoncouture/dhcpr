@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// REFUSED when the query carries this resolver's loop tag. Outside the
+/// NXDOMAIN when the query carries this resolver's loop tag. Outside the
 /// cache so the packet does not join the in-flight lookup it is the reply to.
 /// </summary>
 public sealed partial class LoopQueryMiddleware : IDomainMessageMiddleware
@@ -44,7 +44,7 @@ public sealed partial class LoopQueryMiddleware : IDomainMessageMiddleware
         return DomainMessage.CreateResponse(
             context.DomainMessage,
             additional: [EdnsExtendedError.Create(EdnsExtendedError.Other, EdnsExtendedError.LoopDetectedText)],
-            responseCode: DomainResponseCode.Refused);
+            responseCode: DomainResponseCode.NameError);
     }
 
     [LoggerMessage(

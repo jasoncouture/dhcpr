@@ -7,7 +7,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// <summary>
 /// REFUSED or drop for classic DNS (UDP and TCP) over the shared sliding
 /// window. Outside the cache. Inside the loop check, so a tagged self-query
-/// is REFUSED before this counts it.
+/// is NXDOMAIN before this counts it.
 /// </summary>
 public sealed partial class UdpRateLimitMiddleware : IDomainMessageMiddleware
 {

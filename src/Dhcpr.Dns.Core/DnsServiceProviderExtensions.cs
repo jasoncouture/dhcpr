@@ -97,9 +97,9 @@ public static class DnsServiceProviderExtensions
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
         // Outside the cache. Inside the loop check so a tagged self-query is
-        // REFUSED before the limiter counts it.
+        // NXDOMAIN before the limiter counts it.
         services.Decorate<IDomainMessageMiddleware, UdpRateLimitMiddleware>();
-        // Outside the cache and DNSSEC: REFUSED before the looped packet can
+        // Outside the cache and DNSSEC: NXDOMAIN before the looped packet can
         // join the in-flight lookup or be rewritten as Bogus.
         services.Decorate<IDomainMessageMiddleware, LoopQueryMiddleware>();
         // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.

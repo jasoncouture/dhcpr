@@ -23,6 +23,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
     /// </summary>
     public static readonly TimeSpan PolicyResponseTtl = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// How long a SERVFAIL is reused. Absolute, not sliding, so a dead delegation
+    /// is retried and a flood of the same name does not walk on every packet.
+    /// </summary>
+    public static readonly TimeSpan ServFailTtl = TimeSpan.FromSeconds(30);
+
     private readonly IMemoryCache _memoryCache;
     private readonly IDnsCacheEventPublisher _events;
 
@@ -151,8 +157,6 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return false;
         if (response.Flags.Truncated)
             return false;
-        if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure)
-            return false;
         if (securityStatus is DnssecValidationStatus.Bogus)
             return false;
 
@@ -182,11 +186,12 @@ public sealed class DnsResponseCache : IDnsResponseCache
         DnssecValidationStatus securityStatus,
         DateTimeOffset cachedAt)
     {
+        var servFail = response.Flags.ResponseCode is DomainResponseCode.ServerFailure;
         var originalLifetime = ComputeLifetime(response);
         if (originalLifetime <= TimeSpan.Zero)
             return false;
 
-        if (originalLifetime > _maxCacheTtl)
+        if (!servFail && originalLifetime > _maxCacheTtl)
             originalLifetime = _maxCacheTtl;
 
         var age = DateTimeOffset.UtcNow - cachedAt;
@@ -204,12 +209,16 @@ public sealed class DnsResponseCache : IDnsResponseCache
             SecurityStatus = securityStatus
         };
 
-        _memoryCache.Set(key, entry, new MemoryCacheEntryOptions
+        var options = new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = lifetime,
-            SlidingExpiration = lifetime / 2,
             Size = 1
-        });
+        };
+        // Sliding would keep a SERVFAIL alive for as long as the flood continues.
+        if (!servFail)
+            options.SlidingExpiration = lifetime / 2;
+
+        _memoryCache.Set(key, entry, options);
         return true;
     }
 
@@ -281,6 +290,9 @@ public sealed class DnsResponseCache : IDnsResponseCache
 
         if (response.Flags.ResponseCode is DomainResponseCode.NotImplemented or DomainResponseCode.Refused)
             return PolicyResponseTtl;
+
+        if (response.Flags.ResponseCode is DomainResponseCode.ServerFailure)
+            return ServFailTtl;
 
         return TimeSpan.Zero;
     }

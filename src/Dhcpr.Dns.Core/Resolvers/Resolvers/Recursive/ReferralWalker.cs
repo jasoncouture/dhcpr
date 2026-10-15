@@ -7,6 +7,7 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;
 
@@ -20,10 +21,12 @@ public sealed class ReferralWalker : IReferralWalker
     public const int MaxGlueNamesPerCut = 4;
 
     private readonly IInternalDomainClient _internalClient;
+    private readonly IUnreachableAuthorityCache? _unreachable;
 
-    public ReferralWalker(IInternalDomainClient internalClient)
+    public ReferralWalker(IInternalDomainClient internalClient, IUnreachableAuthorityCache? unreachable = null)
     {
         _internalClient = internalClient;
+        _unreachable = unreachable;
     }
 
     public async ValueTask<DomainMessage> FollowAsync(
@@ -54,7 +57,7 @@ public sealed class ReferralWalker : IReferralWalker
                     if (!await TrySeedEndpointsAsync(
                             context, localCut.Message, endPoints, cancellationToken, options)
                         .ConfigureAwait(false))
-                        return RecursiveResponseNormalizer.ServFail(request);
+                        return FailUnreachable(context, request, localCut.Message);
                     continue;
                 }
             }
@@ -95,7 +98,7 @@ public sealed class ReferralWalker : IReferralWalker
                     await ResolveNameserverAddressesAsync(
                         context, nsNames, cancellationToken, options.IgnoreGlueHopDnssecStatus));
                 if (referralAddresses.Count == 0)
-                    return RecursiveResponseNormalizer.ServFail(request);
+                    return FailUnreachable(context, request, last);
             }
 
             if (options.DetectSelfReferral)
@@ -117,11 +120,16 @@ public sealed class ReferralWalker : IReferralWalker
             !last!.Flags.Authoritative &&
             request.Questions[0].Type is DomainRecordType.NS or DomainRecordType.SOA
                 or DomainRecordType.DNSKEY)
+        {
+            context.ServFailReason ??= "referral walk exhausted";
             return RecursiveResponseNormalizer.ServFail(request);
+        }
 
-        return IsUnresolvedReferral(last!, options)
-            ? RecursiveResponseNormalizer.ServFail(request)
-            : last!;
+        if (!IsUnresolvedReferral(last!, options))
+            return last!;
+
+        context.ServFailReason ??= "unresolved referral";
+        return RecursiveResponseNormalizer.ServFail(request);
     }
 
     public async ValueTask<bool> TrySeedEndpointsAsync(
@@ -147,7 +155,10 @@ public sealed class ReferralWalker : IReferralWalker
         }
 
         if (addresses.Count == 0)
+        {
+            RememberUnreachable(referral);
             return false;
+        }
 
         endPoints.Clear();
         endPoints.AddRange(addresses.Select(i => new IPEndPoint(i, 53)));
@@ -258,6 +269,22 @@ public sealed class ReferralWalker : IReferralWalker
         return message.Records.Answers.Length == 0
                && message.Flags.ResponseCode is DomainResponseCode.NoError
                && message.Records.Any(r => r.Type is DomainRecordType.NS);
+    }
+
+    private DomainMessage FailUnreachable(
+        DomainMessageContext context,
+        DomainMessage request,
+        DomainMessage referral)
+    {
+        RememberUnreachable(referral);
+        context.ServFailReason ??= "no reachable authority";
+        return RecursiveResponseNormalizer.ServFail(request);
+    }
+
+    private void RememberUnreachable(DomainMessage referral)
+    {
+        if (GetNsOwner(referral.Records) is { Length: > 0 } zone)
+            _unreachable?.Remember(zone);
     }
 
     private static string? GetNsOwner(IEnumerable<DomainResourceRecord> records)

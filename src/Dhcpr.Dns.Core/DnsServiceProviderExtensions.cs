@@ -35,6 +35,8 @@ public static class DnsServiceProviderExtensions
         // Process-bound: shared response cache across all queries.
         services.TryAddSingleton<IDnsCacheEventPublisher, NoOpDnsCacheEventPublisher>();
         services.AddSingleton<IDnsResponseCache, DnsResponseCache>();
+        services.AddSingleton<IUnreachableAuthorityCache, UnreachableAuthorityCache>();
+        services.AddSingleton<IQuerySingleFlight, QuerySingleFlight>();
         // Process-bound: one in-flight set so two queries do not both refresh the same name.
         services.AddSingleton<IDnsCacheRefreshTracker, DnsCacheRefreshTracker>();
 

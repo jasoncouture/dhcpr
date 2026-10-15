@@ -72,7 +72,7 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
-    public void DoesNotCacheServerFailure()
+    public void CachesServerFailureForAShortTime()
     {
         var cache = CreateCache();
         var request = DomainMessage.CreateRequest("broken.example", DomainRecordType.A);
@@ -80,6 +80,22 @@ public class DnsResponseCacheTests
             DomainResponseCode.ServerFailure);
 
         cache.Set(request, response);
+
+        Assert.True(cache.TryGet(request, out var cached));
+        Assert.NotNull(cached);
+        Assert.Equal(DomainResponseCode.ServerFailure, cached!.Flags.ResponseCode);
+        Assert.Equal(TimeSpan.FromSeconds(30), DnsResponseCache.ServFailTtl);
+    }
+
+    [Fact]
+    public void DoesNotCacheBogusServerFailure()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("bogus.example", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(request, DomainResourceRecords.Empty,
+            DomainResponseCode.ServerFailure);
+
+        cache.Set(request, response, DnssecValidationStatus.Bogus);
 
         Assert.False(cache.TryGet(request, out _));
     }

@@ -3,6 +3,7 @@
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Logging;
@@ -15,18 +16,20 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
     private readonly ILogger<RecursiveRootResolver> _logger;
     private readonly IReferralWalker _referralWalker;
     private readonly IRootServerTips _rootServerTips;
+    private readonly IUnreachableAuthorityCache? _unreachable;
 
     public RecursiveRootResolver(
         IDomainMessageMiddleware inner,
         IRootServerTips rootServerTips,
         IReferralWalker referralWalker,
-        ILogger<RecursiveRootResolver> logger
-    )
+        ILogger<RecursiveRootResolver> logger,
+        IUnreachableAuthorityCache? unreachable = null)
     {
         _inner = inner;
         _rootServerTips = rootServerTips;
         _referralWalker = referralWalker;
         _logger = logger;
+        _unreachable = unreachable;
     }
 
     public async ValueTask<DomainMessage> ProcessAsync(
@@ -38,6 +41,16 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
 
         var question = context.DomainMessage.Questions[0];
+        if (_unreachable?.Contains(question.Name) == true)
+        {
+            context.ServFailReason = "no reachable authority";
+            context.AnsweredBy ??= Name;
+            return DomainMessage.CreateResponse(
+                context.DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.ServerFailure);
+        }
+
         using var startPoints = ListPool<IPEndPoint>.Default.Get();
         if (context.NameserverTips is { } tips &&
             tips.TryGetClosest(question.Name, question.Type, out var cachedTips, out _))

@@ -13,9 +13,9 @@ public class QueueProcessorServiceTests
 
         await QueueProcessorService<object>.RemoveCompletedTasksAsync(tasks, CancellationToken.None);
 
-        Assert.Single(tasks);
-        Assert.Same(running, tasks[0]);
+        var remaining = Assert.Single(tasks);
+        Assert.Same(running, remaining);
         pending.SetResult();
-        await running;
+        await remaining;
     }
 }

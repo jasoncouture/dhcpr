@@ -65,6 +65,33 @@ public class MetricsDomainMessageMiddlewareTests
         metrics.Received(1).RecordQuery(context, response);
     }
 
+    [Fact]
+    public async Task CountsACancelledQueryAsADrop()
+    {
+        var request = DomainMessage.CreateRequest("example.com");
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.Refused);
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                call.Arg<DomainMessageContext>().Cancel = true;
+                call.Arg<DomainMessageContext>().AnsweredBy = "UdpRateLimit";
+                return new ValueTask<DomainMessage>(response);
+            });
+        var metrics = Substitute.For<IDnsMetrics>();
+        var middleware = new MetricsDomainMessageMiddleware(inner, metrics);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Loopback, 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        var result = await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Same(response, result);
+        metrics.Received(1).RecordQuery(context, DnsMetrics.DropRcode, error: true);
+        metrics.DidNotReceive().RecordQuery(context, response);
+    }
+
     private static (MetricsDomainMessageMiddleware Middleware, IDnsMetrics Metrics) CreateMiddleware(
         DomainMessage response)
     {

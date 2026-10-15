@@ -19,7 +19,10 @@ public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware
         CancellationToken cancellationToken)
     {
         var result = await _inner.ProcessAsync(context, cancellationToken);
-        _metrics.RecordQuery(context, result);
+        if (context.Cancel)
+            _metrics.RecordQuery(context, DnsMetrics.DropRcode, error: true);
+        else
+            _metrics.RecordQuery(context, result);
         return result;
     }
 }

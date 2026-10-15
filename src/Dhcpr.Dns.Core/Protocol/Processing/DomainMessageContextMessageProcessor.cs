@@ -20,25 +20,19 @@ public sealed partial class DomainMessageContextMessageProcessor
     /// </summary>
     public const int UdpResponseSizeLimit = 1232;
 
-    private readonly ILogger<DomainMessageContextMessageProcessor> _logger;
     private readonly IDomainMessageMiddleware _middleware;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
-    private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly IDnsMetrics _metrics;
     private readonly IDnsServerCookieFactory? _cookies;
 
     public DomainMessageContextMessageProcessor(
         IDomainMessageMiddleware middleware,
         ILiveQueryEventPublisher liveQueryPublisher,
-        IUdpQueryRateLimiter udpRateLimiter,
-        ILogger<DomainMessageContextMessageProcessor> logger,
         IDnsMetrics metrics,
         IDnsServerCookieFactory? cookies = null)
     {
         _middleware = middleware;
-        _logger = logger;
         _liveQueryPublisher = liveQueryPublisher;
-        _udpRateLimiter = udpRateLimiter;
         _metrics = metrics;
         _cookies = cookies;
     }
@@ -53,25 +47,13 @@ public sealed partial class DomainMessageContextMessageProcessor
         DomainMessage? response = null;
         try
         {
-            IDomainMessageMiddleware? answeredBy = null;
-            if (ShouldRateLimit(context) &&
-                TryApplyRateLimit(context, out response))
-            {
-                // Rate-limit answers never enter MetricsDomainMessageMiddleware.
-                if (response is not null)
-                    _metrics.RecordQuery(context, response);
-                else
-                    _metrics.RecordQuery(context, DnsMetrics.DropRcode, error: true);
-            }
-            else
-            {
-                response = await _middleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
-                if (!context.Cancel)
-                    answeredBy = _middleware;
-            }
-
-            if (context.AnsweredBy is null && answeredBy is not null)
-                context.AnsweredBy = answeredBy.Name;
+            response = await _middleware.ProcessAsync(context, cancellationToken).ConfigureAwait(false);
+            // Drop sets Cancel. The middleware still has to return a message;
+            // nothing is written and the duration rcode stays Drop.
+            if (context.Cancel)
+                response = null;
+            else if (context.AnsweredBy is null)
+                context.AnsweredBy = _middleware.Name;
 
             DnsInstrumentation.CompleteQuery(activity, context, response);
             _metrics.RecordDuration(
@@ -96,7 +78,7 @@ public sealed partial class DomainMessageContextMessageProcessor
                 _liveQueryPublisher,
                 context,
                 response,
-                context.AnsweredBy ?? answeredBy?.Name ?? "unknown",
+                context.AnsweredBy ?? "unknown",
                 cancellationToken).ConfigureAwait(false);
 
             return response;
@@ -106,59 +88,6 @@ public sealed partial class DomainMessageContextMessageProcessor
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Classic DNS only (UDP and TCP). DoT, DoH, internal hops, and queries
-    /// with a valid server cookie are not limited. A valid cookie means the
-    /// source is not spoofed; cookies are never required.
-    /// </summary>
-    private static bool ShouldRateLimit(DomainMessageContext context)
-        => !context.IsInternal &&
-           !context.CookieConfirmed &&
-           context.Source is DnsQuerySource.Udp or DnsQuerySource.Tcp;
-
-    /// <summary>
-    /// Returns <see langword="true"/> when a UDP/TCP client is over the
-    /// sliding window. <paramref name="response"/> is a REFUSED message, or
-    /// null to drop.
-    /// </summary>
-    private bool TryApplyRateLimit(DomainMessageContext context, out DomainMessage? response)
-    {
-        var question = context.DomainMessage.Questions is [{ } q, ..] ? q : null;
-        var action = _udpRateLimiter.Record(
-            context.ClientEndPoint?.Address,
-            question?.Name ?? DomainLabels.Empty,
-            question?.Type ?? default);
-        if (action is UdpRateLimitAction.Allow)
-        {
-            response = null;
-            return false;
-        }
-
-        context.AnsweredBy = "UdpRateLimit";
-        if (action is UdpRateLimitAction.Drop)
-        {
-            context.Cancel = true;
-            LogUdpRateLimitDrop(
-                _logger,
-                context.ClientEndPoint,
-                question?.Type ?? default,
-                question?.Name ?? DomainLabels.Empty);
-            response = null;
-            return true;
-        }
-
-        LogUdpRateLimitRefuse(
-            _logger,
-            context.ClientEndPoint,
-            question?.Type ?? default,
-            question?.Name ?? DomainLabels.Empty);
-        response = DomainMessage.CreateResponse(
-            context.DomainMessage,
-            DomainResourceRecords.Empty,
-            DomainResponseCode.Refused);
-        return true;
     }
 
     /// <summary>
@@ -289,24 +218,6 @@ public sealed partial class DomainMessageContextMessageProcessor
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Rate limit REFUSED {Name}/{QueryType} from {Client}")]
-    private static partial void LogUdpRateLimitRefuse(
-        ILogger logger,
-        IPEndPoint? client,
-        DomainRecordType queryType,
-        DomainLabels name);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Rate limit drop {Name}/{QueryType} from {Client}")]
-    private static partial void LogUdpRateLimitDrop(
-        ILogger logger,
-        IPEndPoint? client,
-        DomainRecordType queryType,
-        DomainLabels name);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

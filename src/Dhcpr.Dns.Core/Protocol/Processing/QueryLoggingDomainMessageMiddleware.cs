@@ -29,7 +29,7 @@ public sealed partial class QueryLoggingDomainMessageMiddleware : IDomainMessage
     {
         var result = await _inner.ProcessAsync(context, cancellationToken);
 
-        if (context.IsInternal)
+        if (context.IsInternal || context.AnsweredBy == "UdpRateLimit")
             return result;
 
         var queryId = Guid.CreateVersion7();

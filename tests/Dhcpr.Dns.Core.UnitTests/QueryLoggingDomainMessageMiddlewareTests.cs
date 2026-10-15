@@ -100,6 +100,33 @@ public class QueryLoggingDomainMessageMiddlewareTests
     }
 
     [Fact]
+    public async Task DoesNotLogRateLimitedQueries()
+    {
+        var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
+        var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.Refused);
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                call.Arg<DomainMessageContext>().AnsweredBy = "UdpRateLimit";
+                return new ValueTask<DomainMessage>(response);
+            });
+
+        var logger = CreateLogger();
+        var middleware = new QueryLoggingDomainMessageMiddleware(inner, logger);
+        var context = new DomainMessageContext(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
+            new IPEndPoint(IPAddress.Loopback, 53),
+            request);
+
+        await middleware.ProcessAsync(context, CancellationToken.None);
+
+        Assert.Equal(0, CountLogs(logger, LogLevel.Information));
+        Assert.Equal(0, CountLogs(logger, LogLevel.Error));
+    }
+
+    [Fact]
     public async Task LogsServFailAsErrorWithReason()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.ANY);

@@ -222,11 +222,13 @@ public class DomainMessageRateLimitTests
         IDomainMessageMiddleware middleware,
         IDnsServerCookieFactory? cookies = null)
     {
-        return new DomainMessageContextMessageProcessor(
+        IDomainMessageMiddleware pipeline = new UdpRateLimitMiddleware(
             middleware,
-            Substitute.For<ILiveQueryEventPublisher>(),
             limiter,
-            NullLogger<DomainMessageContextMessageProcessor>.Instance,
+            NullLogger<UdpRateLimitMiddleware>.Instance);
+        return new DomainMessageContextMessageProcessor(
+            pipeline,
+            Substitute.For<ILiveQueryEventPublisher>(),
             Substitute.For<IDnsMetrics>(),
             cookies);
     }

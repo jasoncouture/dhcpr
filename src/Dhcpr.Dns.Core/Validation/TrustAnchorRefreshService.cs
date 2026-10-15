@@ -72,13 +72,13 @@ public sealed partial class TrustAnchorRefreshService : BackgroundService
             var clients = scope.ServiceProvider.GetRequiredService<IDomainClientFactory>();
             var edns = scope.ServiceProvider.GetRequiredService<IEdnsProtocolService>();
             var crypto = scope.ServiceProvider.GetRequiredService<IDnssecValidator>();
+            var loopTag = scope.ServiceProvider.GetRequiredService<EdnsLoopTag>();
 
-            var request = DirectedQueryEdns.AddOptRecordWithDoBit(
-                DomainMessage.CreateRequest(
-                    DomainLabels.Empty,
-                    DomainRecordType.DNSKEY,
-                    recursionRequested: false),
-                edns);
+            var request = DomainMessage.CreateRequest(
+                DomainLabels.Empty,
+                DomainRecordType.DNSKEY,
+                recursionRequested: false);
+            request = DirectedQueryEdns.AddOptRecordWithDoBit(request, edns, loopTag.Create(request));
 
             using var client = await clients.GetParallelDomainClientAsync(
                 endpoints.Select(endpoint => new DomainClientOptions

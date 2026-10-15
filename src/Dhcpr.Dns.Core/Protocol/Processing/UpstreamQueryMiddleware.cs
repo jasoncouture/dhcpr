@@ -41,7 +41,10 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 
         using var remaining = endPoints.ToPooledList();
 
-        var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(context.DomainMessage, _ednsProtocolService);
+        var queryMessage = DirectedQueryEdns.AddOptRecordWithDoBit(
+            context.DomainMessage,
+            _ednsProtocolService,
+            context.SelfQueryCookie);
         DomainMessage? nameErrorFallback = null;
 
         while (remaining.Count > 0)

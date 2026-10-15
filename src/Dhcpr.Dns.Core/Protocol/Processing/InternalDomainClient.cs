@@ -1,6 +1,8 @@
 ﻿using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Dns.Core.Protocol;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public class InternalDomainClient : IInternalDomainClient
@@ -8,10 +10,12 @@ public class InternalDomainClient : IInternalDomainClient
     public const int MaxInternalHops = 20;
 
     private readonly IDnsQueryPipeline _pipeline;
+    private readonly EdnsLoopTag? _loopTag;
 
-    public InternalDomainClient(IDnsQueryPipeline pipeline)
+    public InternalDomainClient(IDnsQueryPipeline pipeline, EdnsLoopTag? loopTag = null)
     {
         _pipeline = pipeline;
+        _loopTag = loopTag;
     }
 
     private static readonly IPEndPoint _internalEndPoint = new(IPAddress.Any, 53);
@@ -88,7 +92,8 @@ public class InternalDomainClient : IInternalDomainClient
             BypassCache = parentContext.BypassCache || directed,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
-            ClientCookie = parentContext.ClientCookie
+            ClientCookie = parentContext.ClientCookie,
+            SelfQueryCookie = _loopTag?.Share(parentContext, message)
         };
 
         return await ExecutePipelineAsync(context, cancellationToken);
@@ -130,7 +135,8 @@ public class InternalDomainClient : IInternalDomainClient
             SuppressAddressPrefetch = true,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
-            ClientCookie = parentContext.ClientCookie
+            ClientCookie = parentContext.ClientCookie,
+            SelfQueryCookie = _loopTag?.Share(parentContext, message)
         };
 
         return await ExecutePipelineAsync(context, cancellationToken);
@@ -156,7 +162,8 @@ public class InternalDomainClient : IInternalDomainClient
             SuppressAddressPrefetch = true,
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
-            ClientCookie = parentContext.ClientCookie
+            ClientCookie = parentContext.ClientCookie,
+            SelfQueryCookie = _loopTag?.Share(parentContext, message)
         };
 
         var response = await ExecutePipelineAsync(context, cancellationToken);

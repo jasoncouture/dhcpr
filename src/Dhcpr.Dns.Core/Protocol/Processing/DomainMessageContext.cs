@@ -120,4 +120,10 @@ public record DomainMessageContext(IPEndPoint? ClientEndPoint, IPEndPoint? Serve
     /// client address. Optional — a missing or unknown cookie is not an error.
     /// </summary>
     public bool CookieConfirmed { get; set; }
+
+    /// <summary>
+    /// EDNS loop tag for this request's question. Computed once on the first
+    /// send and copied onto hops that ask the same question.
+    /// </summary>
+    public ImmutableArray<byte>? SelfQueryCookie { get; set; }
 }

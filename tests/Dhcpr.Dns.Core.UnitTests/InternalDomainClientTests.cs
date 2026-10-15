@@ -260,6 +260,75 @@ public class InternalDomainClientTests
         await second;
     }
 
+    [Fact]
+    public async Task SendAsync_SameQuestionReusesTheSelfQueryCookie()
+    {
+        var clock = new CountingTimeProvider(new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.Zero));
+        var tag = new EdnsLoopTag(
+            new StaticSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
+            clock);
+        var pipeline = new CountingPipeline();
+        var client = new InternalDomainClient(pipeline, tag);
+        var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"));
+        var endpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Loopback, 53));
+
+        var first = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("example.com"),
+            endpoints,
+            CancellationToken.None).AsTask();
+        var second = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("Example.COM"),
+            endpoints,
+            CancellationToken.None).AsTask();
+        var glue = client.SendAsync(
+            parent,
+            DomainMessage.CreateRequest("ns.example.com"),
+            endpoints,
+            CancellationToken.None).AsTask();
+
+        Assert.Equal(1, clock.Calls);
+        Assert.NotNull(parent.SelfQueryCookie);
+        Assert.Equal(parent.SelfQueryCookie, pipeline.Contexts[0].SelfQueryCookie);
+        Assert.Equal(parent.SelfQueryCookie, pipeline.Contexts[1].SelfQueryCookie);
+        Assert.Null(pipeline.Contexts[2].SelfQueryCookie);
+
+        foreach (var completion in pipeline.Completions)
+        {
+            var context = pipeline.Contexts[pipeline.Completions.IndexOf(completion)];
+            completion.TrySetResult(
+                DomainMessage.CreateResponse(
+                    context.DomainMessage,
+                    DomainResourceRecords.Empty,
+                    DomainResponseCode.NoError));
+        }
+
+        await first;
+        await second;
+        await glue;
+    }
+
+    private sealed class CountingTimeProvider(DateTimeOffset utc) : TimeProvider
+    {
+        public int Calls { get; private set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            Calls++;
+            return utc;
+        }
+    }
+
+    private sealed class StaticSecretSource(byte[] secret) : IDnsServerCookieSecretSource
+    {
+        public bool TryGetSecret(out ReadOnlyMemory<byte> value)
+        {
+            value = secret;
+            return true;
+        }
+    }
+
     private sealed class CountingPipeline : IDnsQueryPipeline
     {
         public int ExecuteCount { get; private set; }

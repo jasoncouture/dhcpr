@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 
+using Dhcpr.Dns.Core.Protocol.RecordData;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
@@ -9,10 +11,18 @@ public static class DirectedQueryEdns
 {
     public static DomainMessage AddOptRecordWithDoBit(
         DomainMessage message,
-        IEdnsProtocolService ednsProtocolService)
+        IEdnsProtocolService ednsProtocolService,
+        ImmutableArray<byte>? selfQueryCookie = null)
     {
         // Our OPT only. Do not forward the stub's COOKIE/NSID/etc. to nameservers.
-        var optRecord = ednsProtocolService.CreateOptRecord(4096, dnssecOk: true);
+        OptionData? optData = null;
+        if (selfQueryCookie is { Length: > 0 } cookie)
+        {
+            optData = new OptionData(ImmutableArray.Create(
+                new EdnsOption(EdnsLoopTag.OptionCode, cookie)));
+        }
+
+        var optRecord = ednsProtocolService.CreateOptRecord(4096, dnssecOk: true, optData: optData);
 
         var newAdditional = message.Records.Additional
             .Where(r => r.Type != DomainRecordType.OPT)

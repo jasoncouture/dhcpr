@@ -228,6 +228,7 @@ public class DomainMessageRateLimitTests
             limiter,
             NullLogger<DomainMessageContextMessageProcessor>.Instance,
             Substitute.For<IDnsMetrics>(),
+            Substitute.For<IEdnsLoopTag>(),
             cookies);
     }
 

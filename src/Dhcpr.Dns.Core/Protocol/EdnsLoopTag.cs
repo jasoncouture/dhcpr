@@ -7,13 +7,7 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol;
 
-/// <summary>
-/// Stateless mark on queries this resolver sends. The value is an HMAC of the
-/// question and a timestamp, keyed with the silo-shared cookie secret, so any
-/// pod can recognize a packet that came back without keeping a table.
-/// Other servers ignore the unknown EDNS option (RFC 6891).
-/// </summary>
-public sealed class EdnsLoopTag
+public sealed class EdnsLoopTag : IEdnsLoopTag
 {
     public const ushort OptionCode = 65534;
     public const byte Version = 1;
@@ -35,10 +29,6 @@ public sealed class EdnsLoopTag
         _time = timeProvider;
     }
 
-    /// <summary>
-    /// Computes the tag for <paramref name="context"/>'s question the first
-    /// time this request needs one. Later calls keep the stored value.
-    /// </summary>
     public void Ensure(DomainMessageContext context)
     {
         if (context.SelfQueryCookie is not null)
@@ -47,10 +37,6 @@ public sealed class EdnsLoopTag
             context.SelfQueryCookie = cookie;
     }
 
-    /// <summary>
-    /// Tag to copy onto a hop that asks the parent's question. A different
-    /// question (glue, CNAME) gets its own tag when that request is sent.
-    /// </summary>
     public ImmutableArray<byte>? Share(DomainMessageContext parent, DomainMessage message)
     {
         if (!SameQuestion(parent.DomainMessage, message))
@@ -63,7 +49,7 @@ public sealed class EdnsLoopTag
     public ImmutableArray<byte>? Create(DomainMessage message)
         => TryCreate(message, out var cookie) ? cookie : null;
 
-    public bool TryCreate(DomainMessage message, out ImmutableArray<byte> cookie)
+    private bool TryCreate(DomainMessage message, out ImmutableArray<byte> cookie)
     {
         cookie = default;
         if (message.Questions.IsDefaultOrEmpty)

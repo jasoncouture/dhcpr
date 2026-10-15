@@ -72,7 +72,7 @@ public sealed partial class TrustAnchorRefreshService : BackgroundService
             var clients = scope.ServiceProvider.GetRequiredService<IDomainClientFactory>();
             var edns = scope.ServiceProvider.GetRequiredService<IEdnsProtocolService>();
             var crypto = scope.ServiceProvider.GetRequiredService<IDnssecValidator>();
-            var loopTag = scope.ServiceProvider.GetRequiredService<EdnsLoopTag>();
+            var loopTag = scope.ServiceProvider.GetRequiredService<IEdnsLoopTag>();
 
             var request = DomainMessage.CreateRequest(
                 DomainLabels.Empty,

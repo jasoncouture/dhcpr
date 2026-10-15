@@ -4,6 +4,8 @@ using System.Net;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class InternalDomainClientTests
@@ -12,7 +14,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_AbortsWithServerFailure_WhenHopDepthExceedsLimit()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             InternalHopDepth = InternalDomainClient.MaxInternalHops
@@ -31,7 +33,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_DirectedUpstream_DoesNotConsumeBudgetOrIncrementDepth()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var budget = new QueryWorkBudget(limit: 1);
         var tips = new NameserverTipCache();
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -71,7 +73,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_Undirected_IncrementsHopDepthAndConsumesBudget()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var budget = new QueryWorkBudget(limit: 1);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -104,7 +106,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_AbortsWithServerFailure_WhenWorkBudgetExhausted()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("a2.info.afilias-nst.info"))
         {
             WorkBudget = new QueryWorkBudget(limit: 0)
@@ -123,7 +125,7 @@ public class InternalDomainClientTests
     public async Task SendPrefetchAsync_UsesOwnScopeAndSetsSuppressAddressPrefetch()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var parentScope = new DnssecScope();
         var parentBudget = new QueryWorkBudget(limit: 0);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -160,7 +162,7 @@ public class InternalDomainClientTests
     public async Task SendRefreshAsync_BypassesCacheAndUsesOwnScope()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var parentScope = new DnssecScope();
         var parentBudget = new QueryWorkBudget(limit: 0);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
@@ -196,7 +198,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_CoalescesIdenticalDirectedHops()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var endpoints = ImmutableArray.Create(
             new IPEndPoint(IPAddress.Parse("192.0.2.1"), 53),
             new IPEndPoint(IPAddress.Parse("192.0.2.2"), 53));
@@ -227,7 +229,7 @@ public class InternalDomainClientTests
     public async Task SendAsync_DoesNotCoalesceDifferentQuestions()
     {
         var pipeline = new CountingPipeline();
-        var client = new InternalDomainClient(pipeline);
+        var client = new InternalDomainClient(pipeline, Substitute.For<IEdnsLoopTag>());
         var endpoints = ImmutableArray.Create(new IPEndPoint(IPAddress.Loopback, 53));
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"))
         {
@@ -263,10 +265,22 @@ public class InternalDomainClientTests
     [Fact]
     public async Task SendAsync_SameQuestionReusesTheSelfQueryCookie()
     {
-        var clock = new CountingTimeProvider(new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.Zero));
-        var tag = new EdnsLoopTag(
-            new StaticSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
-            clock);
+        var calls = 0;
+        var clock = Substitute.For<TimeProvider>();
+        clock.GetUtcNow().Returns(_ =>
+        {
+            calls++;
+            return new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.Zero);
+        });
+        var secrets = Substitute.For<IDnsServerCookieSecretSource>();
+        var secret = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        secrets.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>())
+            .Returns(call =>
+            {
+                call[0] = new ReadOnlyMemory<byte>(secret);
+                return true;
+            });
+        IEdnsLoopTag tag = new EdnsLoopTag(secrets, clock);
         var pipeline = new CountingPipeline();
         var client = new InternalDomainClient(pipeline, tag);
         var parent = new DomainMessageContext(null, null, DomainMessage.CreateRequest("example.com"));
@@ -288,7 +302,7 @@ public class InternalDomainClientTests
             endpoints,
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, clock.Calls);
+        Assert.Equal(1, calls);
         Assert.NotNull(parent.SelfQueryCookie);
         Assert.Equal(parent.SelfQueryCookie, pipeline.Contexts[0].SelfQueryCookie);
         Assert.Equal(parent.SelfQueryCookie, pipeline.Contexts[1].SelfQueryCookie);
@@ -307,26 +321,6 @@ public class InternalDomainClientTests
         await first;
         await second;
         await glue;
-    }
-
-    private sealed class CountingTimeProvider(DateTimeOffset utc) : TimeProvider
-    {
-        public int Calls { get; private set; }
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            Calls++;
-            return utc;
-        }
-    }
-
-    private sealed class StaticSecretSource(byte[] secret) : IDnsServerCookieSecretSource
-    {
-        public bool TryGetSecret(out ReadOnlyMemory<byte> value)
-        {
-            value = secret;
-            return true;
-        }
     }
 
     private sealed class CountingPipeline : IDnsQueryPipeline

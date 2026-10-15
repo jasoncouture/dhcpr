@@ -10,9 +10,9 @@ public class InternalDomainClient : IInternalDomainClient
     public const int MaxInternalHops = 20;
 
     private readonly IDnsQueryPipeline _pipeline;
-    private readonly EdnsLoopTag? _loopTag;
+    private readonly IEdnsLoopTag _loopTag;
 
-    public InternalDomainClient(IDnsQueryPipeline pipeline, EdnsLoopTag? loopTag = null)
+    public InternalDomainClient(IDnsQueryPipeline pipeline, IEdnsLoopTag loopTag)
     {
         _pipeline = pipeline;
         _loopTag = loopTag;
@@ -93,7 +93,7 @@ public class InternalDomainClient : IInternalDomainClient
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
             ClientCookie = parentContext.ClientCookie,
-            SelfQueryCookie = _loopTag?.Share(parentContext, message)
+            SelfQueryCookie = _loopTag.Share(parentContext, message)
         };
 
         return await ExecutePipelineAsync(context, cancellationToken);
@@ -136,7 +136,7 @@ public class InternalDomainClient : IInternalDomainClient
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
             ClientCookie = parentContext.ClientCookie,
-            SelfQueryCookie = _loopTag?.Share(parentContext, message)
+            SelfQueryCookie = _loopTag.Share(parentContext, message)
         };
 
         return await ExecutePipelineAsync(context, cancellationToken);
@@ -163,7 +163,7 @@ public class InternalDomainClient : IInternalDomainClient
             Source = parentContext.Source,
             ParentTraceContext = DnsInstrumentation.CaptureContext(),
             ClientCookie = parentContext.ClientCookie,
-            SelfQueryCookie = _loopTag?.Share(parentContext, message)
+            SelfQueryCookie = _loopTag.Share(parentContext, message)
         };
 
         var response = await ExecutePipelineAsync(context, cancellationToken);

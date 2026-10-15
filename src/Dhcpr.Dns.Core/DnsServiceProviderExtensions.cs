@@ -106,7 +106,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IUdpQueryRateLimiter, SlidingWindowUdpQueryRateLimiter>();
         services.TryAddSingleton<IDnsServerCookieSecretSource, ProcessLocalDnsServerCookieSecretSource>();
         services.AddSingleton<IDnsServerCookieFactory, DnsServerCookieFactory>();
-        services.AddSingleton<EdnsLoopTag>();
+        services.AddScoped<IEdnsLoopTag, EdnsLoopTag>();
 
         services.AddScoped<IReferralWalker, ReferralWalker>();
         services.AddScoped<IDnsCacheRefresh, DnsCacheRefresh>();

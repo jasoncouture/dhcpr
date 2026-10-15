@@ -21,22 +21,22 @@ public class EdnsLoopTagTests
     [Fact]
     public void EnsureComputesTheCookieOncePerRequest()
     {
-        var clock = new CountingTimeProvider(FrozenNow);
-        var tag = Tag(clock);
+        var calls = 0;
+        var tag = Tag(FrozenNow, () => calls++);
         var context = Context("example.com");
 
         tag.Ensure(context);
         tag.Ensure(context);
 
-        Assert.Equal(1, clock.Calls);
+        Assert.Equal(1, calls);
         Assert.Equal(EdnsLoopTag.TagLength, context.SelfQueryCookie?.Length);
     }
 
     [Fact]
     public void ShareReusesTheParentCookieForTheSameQuestion()
     {
-        var clock = new CountingTimeProvider(FrozenNow);
-        var tag = Tag(clock);
+        var calls = 0;
+        var tag = Tag(FrozenNow, () => calls++);
         var parent = Context("example.com", DomainRecordType.A);
         var same = DomainMessage.CreateRequest("Example.COM", DomainRecordType.A);
         var other = DomainMessage.CreateRequest("example.com", DomainRecordType.AAAA);
@@ -44,16 +44,16 @@ public class EdnsLoopTagTests
         var first = tag.Share(parent, parent.DomainMessage);
         var second = tag.Share(parent, same);
 
-        Assert.Equal(1, clock.Calls);
+        Assert.Equal(1, calls);
         Assert.Equal(first, second);
         Assert.Null(tag.Share(parent, other));
-        Assert.Equal(1, clock.Calls);
+        Assert.Equal(1, calls);
     }
 
     [Fact]
     public void IsOursAcceptsTheQuestionWeMarked()
     {
-        var tag = Tag();
+        IEdnsLoopTag tag = Tag();
         var context = Context("Example.COM");
         tag.Ensure(context);
         var wire = DirectedQueryEdns.AddOptRecordWithDoBit(
@@ -70,7 +70,7 @@ public class EdnsLoopTagTests
     [Fact]
     public void IsOursRejectsADifferentTypeAndATamperedTag()
     {
-        var tag = Tag();
+        IEdnsLoopTag tag = Tag();
         var context = Context("example.com");
         tag.Ensure(context);
         var wire = DirectedQueryEdns.AddOptRecordWithDoBit(
@@ -89,8 +89,8 @@ public class EdnsLoopTagTests
     [Fact]
     public void IsOursRejectsAnExpiredTag()
     {
-        var minted = Tag(new FrozenTimeProvider(FrozenNow));
-        var later = Tag(new FrozenTimeProvider(FrozenNow + EdnsLoopTag.Lifetime + TimeSpan.FromSeconds(1)));
+        IEdnsLoopTag minted = Tag(FrozenNow);
+        IEdnsLoopTag later = Tag(FrozenNow + EdnsLoopTag.Lifetime + TimeSpan.FromSeconds(1));
         var context = Context("example.com");
         minted.Ensure(context);
         var wire = DirectedQueryEdns.AddOptRecordWithDoBit(
@@ -105,7 +105,11 @@ public class EdnsLoopTagTests
     [Fact]
     public void MissingSecretLeavesTheRequestUnmarked()
     {
-        var tag = new EdnsLoopTag(new EmptySecretSource(), new FrozenTimeProvider(FrozenNow));
+        var secrets = Substitute.For<IDnsServerCookieSecretSource>();
+        secrets.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>()).Returns(false);
+        var clock = Substitute.For<TimeProvider>();
+        clock.GetUtcNow().Returns(FrozenNow);
+        IEdnsLoopTag tag = new EdnsLoopTag(secrets, clock);
         var context = Context("example.com");
 
         tag.Ensure(context);
@@ -117,7 +121,7 @@ public class EdnsLoopTagTests
     [Fact]
     public async Task LoopedQueryIsNameErrorBeforeThePipeline()
     {
-        var tag = Tag();
+        IEdnsLoopTag tag = Tag();
         var request = DomainMessage.CreateRequest("netdimensional.top");
         var marked = Context("netdimensional.top");
         tag.Ensure(marked);
@@ -132,8 +136,7 @@ public class EdnsLoopTagTests
             Substitute.For<IUdpQueryRateLimiter>(),
             NullLogger<DomainMessageContextMessageProcessor>.Instance,
             Substitute.For<IDnsMetrics>(),
-            cookies: null,
-            loopTag: tag);
+            tag);
         var inbound = new DomainMessageContext(Client, Server, wire) { Source = DnsQuerySource.Udp };
 
         var response = await processor.ExecuteAsync(inbound, CancellationToken.None);
@@ -147,8 +150,23 @@ public class EdnsLoopTagTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    private static EdnsLoopTag Tag(TimeProvider? time = null)
-        => new(new StaticSecretSource(Secret), time ?? new FrozenTimeProvider(FrozenNow));
+    private static IEdnsLoopTag Tag(DateTimeOffset? now = null, Action? onClock = null)
+    {
+        var secrets = Substitute.For<IDnsServerCookieSecretSource>();
+        secrets.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>())
+            .Returns(call =>
+            {
+                call[0] = new ReadOnlyMemory<byte>(Secret);
+                return true;
+            });
+        var clock = Substitute.For<TimeProvider>();
+        clock.GetUtcNow().Returns(_ =>
+        {
+            onClock?.Invoke();
+            return now ?? FrozenNow;
+        });
+        return new EdnsLoopTag(secrets, clock);
+    }
 
     private static DomainMessageContext Context(string name, DomainRecordType type = DomainRecordType.A)
         => new(null, null, DomainMessage.CreateRequest(name, type));
@@ -170,37 +188,4 @@ public class EdnsLoopTagTests
         };
     }
 
-    private sealed class StaticSecretSource(byte[] secret) : IDnsServerCookieSecretSource
-    {
-        public bool TryGetSecret(out ReadOnlyMemory<byte> value)
-        {
-            value = secret;
-            return true;
-        }
-    }
-
-    private sealed class EmptySecretSource : IDnsServerCookieSecretSource
-    {
-        public bool TryGetSecret(out ReadOnlyMemory<byte> secret)
-        {
-            secret = default;
-            return false;
-        }
-    }
-
-    private sealed class FrozenTimeProvider(DateTimeOffset utc) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => utc.ToUniversalTime();
-    }
-
-    private sealed class CountingTimeProvider(DateTimeOffset utc) : TimeProvider
-    {
-        public int Calls { get; private set; }
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            Calls++;
-            return utc.ToUniversalTime();
-        }
-    }
 }

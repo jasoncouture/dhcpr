@@ -26,7 +26,7 @@ public sealed partial class DomainMessageContextMessageProcessor
     private readonly IUdpQueryRateLimiter _udpRateLimiter;
     private readonly IDnsMetrics _metrics;
     private readonly IDnsServerCookieFactory? _cookies;
-    private readonly EdnsLoopTag? _loopTag;
+    private readonly IEdnsLoopTag _loopTag;
 
     public DomainMessageContextMessageProcessor(
         IDomainMessageMiddleware middleware,
@@ -34,8 +34,8 @@ public sealed partial class DomainMessageContextMessageProcessor
         IUdpQueryRateLimiter udpRateLimiter,
         ILogger<DomainMessageContextMessageProcessor> logger,
         IDnsMetrics metrics,
-        IDnsServerCookieFactory? cookies = null,
-        EdnsLoopTag? loopTag = null)
+        IEdnsLoopTag loopTag,
+        IDnsServerCookieFactory? cookies = null)
     {
         _middleware = middleware;
         _logger = logger;
@@ -57,7 +57,7 @@ public sealed partial class DomainMessageContextMessageProcessor
         try
         {
             IDomainMessageMiddleware? answeredBy = null;
-            if (_loopTag?.IsOurs(context.DomainMessage) == true)
+            if (_loopTag.IsOurs(context.DomainMessage))
             {
                 var question = context.DomainMessage.Questions is [{ } looped, ..] ? looped : null;
                 context.AnsweredBy = "Loop";

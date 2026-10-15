@@ -121,7 +121,7 @@ public class EdnsLoopTagTests
     }
 
     [Fact]
-    public async Task LoopedQueryIsNameErrorBeforeTheInnerMiddleware()
+    public async Task LoopedQueryIsRefusedBeforeTheInnerMiddleware()
     {
         IEdnsLoopTag tag = Tag();
         var request = DomainMessage.CreateRequest("netdimensional.top");
@@ -140,7 +140,7 @@ public class EdnsLoopTagTests
 
         var response = await middleware.ProcessAsync(inbound, CancellationToken.None);
 
-        Assert.Equal(DomainResponseCode.NameError, response.Flags.ResponseCode);
+        Assert.Equal(DomainResponseCode.Refused, response.Flags.ResponseCode);
         Assert.True(response.Flags.Response);
         Assert.Equal(wire.Id, response.Id);
         Assert.Equal("Loop", inbound.AnsweredBy);

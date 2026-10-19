@@ -15,21 +15,45 @@ public static class DnssecRrsetVerifier
         IReadOnlyList<DomainResourceRecord> rrsigs,
         IReadOnlyList<DomainResourceRecord> dnsKeys,
         DateTimeOffset now)
+        => TryVerifyRrset(validator, rrset, rrsigs, dnsKeys, now, out _, out _);
+
+    public static bool TryVerifyRrset(
+        IDnssecValidator validator,
+        IReadOnlyList<DomainResourceRecord> rrset,
+        IReadOnlyList<DomainResourceRecord> rrsigs,
+        IReadOnlyList<DomainResourceRecord> dnsKeys,
+        DateTimeOffset now,
+        out bool expired,
+        out bool notYetValid)
     {
+        expired = false;
+        notYetValid = false;
         if (rrset.Count == 0 || rrsigs.Count == 0 || dnsKeys.Count == 0)
             return false;
 
+        var sawExpired = false;
+        var sawNotYetValid = false;
+        var sawCryptoFailure = false;
         var nowUnix = (uint)now.ToUnixTimeSeconds();
         foreach (var sigRecord in rrsigs)
         {
             if (sigRecord.Data is not ResourceRecordSignatureData rrsig)
                 continue;
 
-            if (nowUnix < rrsig.SignatureInception || nowUnix > rrsig.SignatureExpiration)
-                continue;
-
             if (rrsig.TypeCovered != rrset[0].Type)
                 continue;
+
+            if (nowUnix > rrsig.SignatureExpiration)
+            {
+                sawExpired = true;
+                continue;
+            }
+
+            if (nowUnix < rrsig.SignatureInception)
+            {
+                sawNotYetValid = true;
+                continue;
+            }
 
             foreach (var keyRecord in dnsKeys)
             {
@@ -50,9 +74,13 @@ public static class DnssecRrsetVerifier
                 var rrsigPrefix = EncodeRrsigWithoutSignature(rrsig);
                 if (validator.VerifySignature(rrsig, rrsigPrefix, canonicalRrset, dnsKey))
                     return true;
+
+                sawCryptoFailure = true;
             }
         }
 
+        expired = sawExpired && !sawCryptoFailure;
+        notYetValid = !expired && sawNotYetValid && !sawCryptoFailure;
         return false;
     }
 

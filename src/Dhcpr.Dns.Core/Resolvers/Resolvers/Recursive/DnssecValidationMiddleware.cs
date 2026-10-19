@@ -112,11 +112,13 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
             if (!context.DomainMessage.Flags.CheckingDisabled)
             {
                 LogServFailBogus(_logger, name, question?.Type);
-                context.ServFailReason = $"DNSSEC validation bogus for {name}/{question?.Type}";
+                var code = context.DnssecScope.ExtendedErrorCode ?? EdnsExtendedError.DnssecBogus;
+                var text = context.DnssecScope.ExtendedErrorText ?? $"DNSSEC Bogus for {name}/{question?.Type}";
+                context.ServFailReason = text;
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.ServerFailure);
+                    additional: [EdnsExtendedError.Create(code, text)],
+                    responseCode: DomainResponseCode.ServerFailure);
             }
 
             LogReturningBogusAnswer(_logger, name, question?.Type);

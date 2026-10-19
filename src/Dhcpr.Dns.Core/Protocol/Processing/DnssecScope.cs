@@ -19,6 +19,10 @@ public sealed class DnssecScope
 
     public DnssecValidationStatus Status { get; private set; } = DnssecValidationStatus.Unchecked;
 
+    public ushort? ExtendedErrorCode { get; private set; }
+
+    public string? ExtendedErrorText { get; private set; }
+
     /// <summary>True while fetching DS/DNSKEY so nested validation does not re-enter fetch loops.</summary>
     public bool SuppressKeyFetch { get; set; }
 
@@ -125,10 +129,24 @@ public sealed class DnssecScope
         Status = Combine(Status, outcome);
     }
 
+    public void NoteExtendedError(ushort code, string text)
+    {
+        if (_ignoreStatusDepth > 0 || ExtendedErrorCode is not null)
+            return;
+
+        ExtendedErrorCode = code;
+        ExtendedErrorText = text;
+    }
+
     /// <summary>
     /// Clear validation outcome between SERVFAIL retries. Keys/delegations stay.
     /// </summary>
-    public void ResetStatus() => Status = DnssecValidationStatus.Unchecked;
+    public void ResetStatus()
+    {
+        Status = DnssecValidationStatus.Unchecked;
+        ExtendedErrorCode = null;
+        ExtendedErrorText = null;
+    }
 
     public static DnssecValidationStatus Combine(DnssecValidationStatus current, DnssecValidationStatus next)
     {

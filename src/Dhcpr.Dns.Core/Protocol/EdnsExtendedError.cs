@@ -14,6 +14,10 @@ public static class EdnsExtendedError
 {
     public const ushort OptionCode = 15;
     public const ushort Other = 0;
+    public const ushort DnssecBogus = 6;
+    public const ushort SignatureExpired = 7;
+    public const ushort SignatureNotYetValid = 8;
+    public const ushort DnskeyMissing = 9;
     public const string LoopDetectedText = "Loop Detected";
 
     public static DomainResourceRecord Create(ushort infoCode, string extraText)

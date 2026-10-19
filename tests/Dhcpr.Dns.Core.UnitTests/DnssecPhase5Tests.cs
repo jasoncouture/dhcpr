@@ -1,6 +1,8 @@
+using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -330,6 +332,8 @@ public class DnssecPhase5Tests
         Assert.Equal(DnssecValidationStatus.Bogus, scope.Status);
         Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
         Assert.False(result.Flags.Authentic);
+        Assert.Equal(EdnsExtendedError.DnssecBogus, ExtendedErrorCode(result));
+        Assert.Contains("DNSSEC Bogus", ExtendedErrorText(result), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -693,6 +697,29 @@ public class DnssecPhase5Tests
     {
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Options(new DnsConfiguration()));
         return crypto.CalculateKeyTag((DomainNameSystemKeyData)dnsKeyRecord.Data, dnsKeyRecord);
+    }
+
+    private static ushort ExtendedErrorCode(DomainMessage message)
+        => BinaryPrimitives.ReadUInt16BigEndian(ExtendedError(message).AsSpan());
+
+    private static string ExtendedErrorText(DomainMessage message)
+        => Encoding.UTF8.GetString(ExtendedError(message).AsSpan()[2..]);
+
+    private static ImmutableArray<byte> ExtendedError(DomainMessage message)
+    {
+        foreach (var record in message.Records.Additional)
+        {
+            if (record.Data is not OptionData data)
+                continue;
+
+            foreach (var option in data.Options)
+            {
+                if (option.Code == EdnsExtendedError.OptionCode)
+                    return option.Data;
+            }
+        }
+
+        throw new InvalidOperationException("missing extended DNS error");
     }
 
     private static string ComputeDsDigestHex(DomainResourceRecord dnsKeyRecord)

@@ -15,6 +15,8 @@ dig @$SERVER -p $PORT +dnssec NS cloudflare.com
 dig @$SERVER -p $PORT ichnaea-web.netflix.com
 dig @$SERVER -p $PORT +dnssec fedoraproject.org
 dig @$SERVER -p $PORT +dnssec deb.debian.org
+dig @$SERVER -p $PORT +dnssec icann.org
+dig @$SERVER -p $PORT +dnssec dnssec-failed.org
 dig @$SERVER -p $PORT SVCB _dns.resolver.arpa
 dig @$SERVER -p $PORT netdimensional.top
 dig @$SERVER -p $PORT NS netdimensional.top

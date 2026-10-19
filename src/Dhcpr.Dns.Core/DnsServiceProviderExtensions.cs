@@ -65,7 +65,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsQueryPipeline, DnsQueryPipeline>();
         services.AddScoped<DomainMessageContextMessageProcessor>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → Loop → RateLimit → Shuffle → DNSSEC → …
+        // Outermost last: Logging → Metrics → Loop → RateLimit → Shuffle → RA → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
         // NsCut → Forward → Recursive → ServerFailure.
         services.Decorate<IDomainMessageMiddleware, RecursiveRootResolver>();
@@ -91,9 +91,10 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ResolverArpaMiddleware>();
         services.Decorate<IDomainMessageMiddleware, CacheResolverDecorator>();
         services.Decorate<IDomainMessageMiddleware, CanonicalNameResolverDecorator>();
-        // Outside CNAME so chased assemblies still get RA (previously stamped before chase).
-        services.Decorate<IDomainMessageMiddleware, RecursionAvailableMiddleware>();
+        // Outside DNSSEC so a synthesized Bogus SERVFAIL still gets RA.
+        // Outside CNAME so the chased assembly gets RA too.
         services.Decorate<IDomainMessageMiddleware, DnssecValidationMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, RecursionAvailableMiddleware>();
         // Outside cache so HIT responses still rotate A/AAAA order per client query.
         services.Decorate<IDomainMessageMiddleware, AnswerShuffleMiddleware>();
         // Outside the cache. Inside the loop check so a tagged self-query is

@@ -102,9 +102,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             if (outcome is DnssecValidationStatus.Bogus)
             {
                 LogObservingBogus(_logger, question.Name, question.Type, scope.Status);
-                scope.NoteExtendedError(
-                    EdnsExtendedError.DnssecBogus,
-                    $"DNSSEC Bogus for {question.Name}/{question.Type}");
+                scope.NoteExtendedError(EdnsExtendedError.DnssecBogus);
             }
 
             scope.Observe(outcome);
@@ -112,41 +110,32 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogValidationFailedUnexpectedly(_logger, ex, question.Name, question.Type);
-            scope.NoteExtendedError(
-                EdnsExtendedError.DnssecBogus,
-                $"DNSSEC Bogus for {question.Name}/{question.Type}");
+            scope.NoteExtendedError(EdnsExtendedError.DnssecBogus);
             scope.Observe(DnssecValidationStatus.Bogus);
         }
     }
 
-    private static DnssecValidationStatus MissingDnsKey(DnssecScope scope, string signer)
+    private static DnssecValidationStatus MissingDnsKey(DnssecScope scope)
     {
-        scope.NoteExtendedError(EdnsExtendedError.DnskeyMissing, $"DNSKEY Missing for {signer}");
+        scope.NoteExtendedError(EdnsExtendedError.DnskeyMissing);
         return DnssecValidationStatus.Bogus;
     }
 
-    private static DnssecValidationStatus BogusRrset(
-        DnssecScope scope,
-        string name,
-        DomainRecordType type,
-        bool expired,
-        bool notYetValid)
+    private static DnssecValidationStatus BogusRrset(DnssecScope scope, bool expired, bool notYetValid)
     {
         if (expired)
         {
-            scope.NoteExtendedError(EdnsExtendedError.SignatureExpired, $"Signature Expired for {name}/{type}");
+            scope.NoteExtendedError(EdnsExtendedError.SignatureExpired);
             return DnssecValidationStatus.Bogus;
         }
 
         if (notYetValid)
         {
-            scope.NoteExtendedError(
-                EdnsExtendedError.SignatureNotYetValid,
-                $"Signature Not Yet Valid for {name}/{type}");
+            scope.NoteExtendedError(EdnsExtendedError.SignatureNotYetValid);
             return DnssecValidationStatus.Bogus;
         }
 
-        scope.NoteExtendedError(EdnsExtendedError.DnssecBogus, $"DNSSEC Bogus for {name}/{type}");
+        scope.NoteExtendedError(EdnsExtendedError.DnssecBogus);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -230,20 +219,20 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 }
 
                 LogNoAuthenticatedKeysForSigner(_logger, signer);
-                return MissingDnsKey(scope, signer);
+                return MissingDnsKey(scope);
             }
 
             if (!scope.TryGetKeys(signer, out var keys))
             {
                 LogKeysMissingAfterEnsure(_logger, signer);
-                return MissingDnsKey(scope, signer);
+                return MissingDnsKey(scope);
             }
 
             if (!DnssecRrsetVerifier.TryVerifyRrset(
                     _crypto, rrset, rrsigs, keys.Keys, now, out var expired, out var notYetValid))
             {
                 LogRrsetVerificationFailed(_logger, group.Key.Name, group.Key.Type);
-                return BogusRrset(scope, group.Key.Name, group.Key.Type, expired, notYetValid);
+                return BogusRrset(scope, expired, notYetValid);
             }
 
             LogVerifiedRrset(_logger, group.Key.Name, group.Key.Type);
@@ -373,7 +362,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                     _crypto, [nsecRecord], rrsigs, keys.Keys, now, out var expired, out var notYetValid))
             {
                 LogNsecRrsigFailed(_logger, nsecRecord.Name);
-                return BogusRrset(scope, nsecRecord.Name.ToString(), DomainRecordType.NSEC, expired, notYetValid);
+                return BogusRrset(scope, expired, notYetValid);
             }
 
             // Exact owner: NODATA when QTYPE (and CNAME) bits are clear.
@@ -444,7 +433,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                     _crypto, records, rrsigs, keys.Keys, now, out var expired, out var notYetValid))
             {
                 LogNsec3RrsigFailed(_logger, owner);
-                return BogusRrset(scope, owner.ToString(), DomainRecordType.NSEC3, expired, notYetValid);
+                return BogusRrset(scope, expired, notYetValid);
             }
         }
 

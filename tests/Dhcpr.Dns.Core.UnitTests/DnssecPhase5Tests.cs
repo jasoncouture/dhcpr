@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
@@ -333,7 +332,7 @@ public class DnssecPhase5Tests
         Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
         Assert.False(result.Flags.Authentic);
         Assert.Equal(EdnsExtendedError.DnssecBogus, ExtendedErrorCode(result));
-        Assert.Contains("DNSSEC Bogus", ExtendedErrorText(result), StringComparison.Ordinal);
+        Assert.Equal(2, ExtendedError(result).Length);
     }
 
     [Fact]
@@ -701,9 +700,6 @@ public class DnssecPhase5Tests
 
     private static ushort ExtendedErrorCode(DomainMessage message)
         => BinaryPrimitives.ReadUInt16BigEndian(ExtendedError(message).AsSpan());
-
-    private static string ExtendedErrorText(DomainMessage message)
-        => Encoding.UTF8.GetString(ExtendedError(message).AsSpan()[2..]);
 
     private static ImmutableArray<byte> ExtendedError(DomainMessage message)
     {

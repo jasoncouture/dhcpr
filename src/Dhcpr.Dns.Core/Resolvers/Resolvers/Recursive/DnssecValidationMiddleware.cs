@@ -113,11 +113,10 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
             {
                 LogServFailBogus(_logger, name, question?.Type);
                 var code = context.DnssecScope.ExtendedErrorCode ?? EdnsExtendedError.DnssecBogus;
-                var text = context.DnssecScope.ExtendedErrorText ?? $"DNSSEC Bogus for {name}/{question?.Type}";
-                context.ServFailReason = text;
+                context.ServFailReason = ServFailReasonFor(code);
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
-                    additional: [EdnsExtendedError.Create(code, text)],
+                    additional: [EdnsExtendedError.Create(code)],
                     responseCode: DomainResponseCode.ServerFailure);
             }
 
@@ -137,6 +136,15 @@ public sealed partial class DnssecValidationMiddleware : IDomainMessageMiddlewar
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC skip hop validation during key/DS fetch for {Name}/{Type}")]
     private static partial void LogSkipHopValidation(ILogger logger, DomainLabels? name, DomainRecordType? type);
+
+    private static string ServFailReasonFor(ushort code)
+        => code switch
+        {
+            EdnsExtendedError.SignatureExpired => "Signature Expired",
+            EdnsExtendedError.SignatureNotYetValid => "Signature Not Yet Valid",
+            EdnsExtendedError.DnskeyMissing => "DNSKEY Missing",
+            _ => "DNSSEC Bogus",
+        };
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DNSSEC hop {Name}/{Type} rcode={Rcode} status {Before} -> {After} (depth={Depth}, cache={Cache})")]
     private static partial void LogHopStatus(

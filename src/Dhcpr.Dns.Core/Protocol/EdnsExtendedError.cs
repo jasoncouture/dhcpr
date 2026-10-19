@@ -20,6 +20,9 @@ public static class EdnsExtendedError
     public const ushort DnskeyMissing = 9;
     public const string LoopDetectedText = "Loop Detected";
 
+    public static DomainResourceRecord Create(ushort infoCode)
+        => Create(infoCode, string.Empty);
+
     public static DomainResourceRecord Create(ushort infoCode, string extraText)
     {
         var text = Encoding.UTF8.GetBytes(extraText);

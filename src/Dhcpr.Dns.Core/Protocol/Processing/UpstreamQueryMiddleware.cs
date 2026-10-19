@@ -99,9 +99,6 @@ public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
         // Every nameserver endpoint failed.
         context.ServFailReason = "all upstream nameservers failed";
         context.AnsweredBy ??= Name;
-        return DomainMessage.CreateResponse(
-            context.DomainMessage,
-            DomainResourceRecords.Empty,
-            DomainResponseCode.ServerFailure);
+        return EdnsExtendedError.ServFail(context.DomainMessage, EdnsExtendedError.NetworkError);
     }
 }

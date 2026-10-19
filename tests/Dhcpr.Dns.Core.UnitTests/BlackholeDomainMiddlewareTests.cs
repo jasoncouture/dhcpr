@@ -33,6 +33,7 @@ public class BlackholeDomainMiddlewareTests
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.Blocked));
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

@@ -81,12 +81,16 @@ public sealed class CanonicalNameResolverDecorator : IDomainMessageMiddleware
                 .ConvertExceptionsToNull();
 
             if (nextResponse is null)
-                return ServFail(context.DomainMessage);
+                return EdnsExtendedError.ServFail(
+                    context.DomainMessage,
+                    EdnsExtendedError.NoReachableAuthority);
 
             lastChase = nextResponse;
 
-            if (nextResponse.Flags.ResponseCode is DomainResponseCode.ServerFailure
-                or DomainResponseCode.Refused)
+            if (nextResponse.Flags.ResponseCode is DomainResponseCode.ServerFailure)
+                return EdnsExtendedError.CopyOntoServFail(context.DomainMessage, nextResponse);
+
+            if (nextResponse.Flags.ResponseCode is DomainResponseCode.Refused)
                 return ServFail(context.DomainMessage);
 
             var chasedCnames = KeepTypesWithCoveringRrsigs(

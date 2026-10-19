@@ -45,10 +45,7 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
         {
             context.ServFailReason = "no reachable authority";
             context.AnsweredBy ??= Name;
-            return DomainMessage.CreateResponse(
-                context.DomainMessage,
-                DomainResourceRecords.Empty,
-                DomainResponseCode.ServerFailure);
+            return EdnsExtendedError.ServFail(context.DomainMessage, EdnsExtendedError.NoReachableAuthority);
         }
 
         using var startPoints = ListPool<IPEndPoint>.Default.Get();
@@ -85,8 +82,19 @@ public sealed partial class RecursiveRootResolver : IDomainMessageMiddleware
                 LogUnhandledException(_logger, ex);
             }
 
-            context.ServFailReason = "recursive resolver exception";
+            var timedOut = ex is OperationCanceledException && !cancellationToken.IsCancellationRequested;
+            var network = NameserverSelection.IsTransportFailure(ex);
+            context.ServFailReason = network
+                ? "network error"
+                : timedOut
+                    ? "no reachable authority"
+                    : "recursive resolver exception";
             context.AnsweredBy ??= Name;
+            if (network)
+                return EdnsExtendedError.ServFail(context.DomainMessage, EdnsExtendedError.NetworkError);
+            if (timedOut)
+                return EdnsExtendedError.ServFail(context.DomainMessage, EdnsExtendedError.NoReachableAuthority);
+
             return DomainMessage.CreateResponse(context.DomainMessage, DomainResourceRecords.Empty,
                 DomainResponseCode.ServerFailure);
         }

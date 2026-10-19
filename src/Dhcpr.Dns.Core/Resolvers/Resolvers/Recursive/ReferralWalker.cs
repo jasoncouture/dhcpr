@@ -81,7 +81,10 @@ public sealed class ReferralWalker : IReferralWalker
                 return promoted;
 
             if (last.Flags.ResponseCode is not DomainResponseCode.NoError)
+            {
+                NoteExtendedFailure(context, last);
                 return last;
+            }
 
             using var nsNames = CollectNameserverNames(last.Records, request, options).ToPooledList();
             if (nsNames.Count == 0)
@@ -122,14 +125,14 @@ public sealed class ReferralWalker : IReferralWalker
                 or DomainRecordType.DNSKEY)
         {
             context.ServFailReason ??= "referral walk exhausted";
-            return RecursiveResponseNormalizer.ServFail(request);
+            return RecursiveResponseNormalizer.ServFail(request, EdnsExtendedError.NoReachableAuthority);
         }
 
         if (!IsUnresolvedReferral(last!, options))
             return last!;
 
         context.ServFailReason ??= "unresolved referral";
-        return RecursiveResponseNormalizer.ServFail(request);
+        return RecursiveResponseNormalizer.ServFail(request, EdnsExtendedError.NoReachableAuthority);
     }
 
     public async ValueTask<bool> TrySeedEndpointsAsync(
@@ -278,7 +281,7 @@ public sealed class ReferralWalker : IReferralWalker
     {
         RememberUnreachable(referral);
         context.ServFailReason ??= "no reachable authority";
-        return RecursiveResponseNormalizer.ServFail(request);
+        return RecursiveResponseNormalizer.ServFail(request, EdnsExtendedError.NoReachableAuthority);
     }
 
     private void RememberUnreachable(DomainMessage referral)
@@ -296,6 +299,14 @@ public sealed class ReferralWalker : IReferralWalker
         }
 
         return null;
+    }
+
+    private static void NoteExtendedFailure(DomainMessageContext context, DomainMessage message)
+    {
+        if (EdnsExtendedError.Contains(message, EdnsExtendedError.NoReachableAuthority))
+            context.ServFailReason ??= "no reachable authority";
+        else if (EdnsExtendedError.Contains(message, EdnsExtendedError.NetworkError))
+            context.ServFailReason ??= "network error";
     }
 
     private async ValueTask<DomainMessage> QueryUpstreamAsync(

@@ -40,8 +40,8 @@ public sealed class BlackholeDomainMiddleware : IDomainMessageMiddleware
                 context.AnsweredBy = "Blackhole";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.NameError);
+                    additional: [EdnsExtendedError.Create(EdnsExtendedError.Blocked)],
+                    responseCode: DomainResponseCode.NameError);
             }
         }
 

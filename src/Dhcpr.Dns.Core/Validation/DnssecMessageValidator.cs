@@ -328,6 +328,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             return ValidateNsec3Proof(scope, question, response, allRecords, now);
 
         LogNoNegativeProofRecords(_logger, question.Name);
+        scope.NoteExtendedError(EdnsExtendedError.NsecMissing);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -393,6 +394,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         }
 
         LogNoCoveringNsec(_logger, question.Name);
+        scope.NoteExtendedError(EdnsExtendedError.NsecMissing);
         return DnssecValidationStatus.Bogus;
     }
 
@@ -419,6 +421,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             if (rrsigs.Count == 0)
             {
                 LogNsec3HasNoRrsig(_logger, owner);
+                scope.NoteExtendedError(EdnsExtendedError.RrsigsMissing);
                 return DnssecValidationStatus.Bogus;
             }
 
@@ -464,6 +467,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 out var closest, out _))
         {
             LogNsec3ClosestEncloserNotFound(_logger, question.Name);
+            scope.NoteExtendedError(EdnsExtendedError.NsecMissing);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -491,6 +495,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         if (nextCloserCover is null)
         {
             LogNsec3NoNextCloserCover(_logger, nextCloser, question.Name);
+            scope.NoteExtendedError(EdnsExtendedError.NsecMissing);
             return DnssecValidationStatus.Bogus;
         }
 
@@ -510,6 +515,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
                 DnssecNsec3Proof.FindCover(_crypto, nsec3s, wildcardHash) is null)
             {
                 LogNsec3NoWildcardProof(_logger, closest, question.Name);
+                scope.NoteExtendedError(EdnsExtendedError.NsecMissing);
                 return DnssecValidationStatus.Bogus;
             }
         }

@@ -135,6 +135,7 @@ public class UpstreamQueryMiddlewareTests
 
         Assert.NotNull(result);
         Assert.Equal(DomainResponseCode.ServerFailure, result!.Flags.ResponseCode);
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.NetworkError));
     }
 
     [Fact]

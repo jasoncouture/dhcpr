@@ -51,6 +51,25 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
+    public async Task CachedServerFailureCarriesCachedError()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("broken.example", DomainRecordType.A);
+        cache.Set(request, EdnsExtendedError.ServFail(request, EdnsExtendedError.NoReachableAuthority));
+
+        var inner = Substitute.For<IDomainMessageMiddleware>();
+        var middleware = new CacheResolverDecorator(inner, cache, Substitute.For<IServiceScopeFactory>());
+        var result = await middleware.ProcessAsync(
+            new DomainMessageContext(null, null, request),
+            CancellationToken.None);
+
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.CachedError));
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.NoReachableAuthority));
+        await inner.DidNotReceiveWithAnyArgs()
+            .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void PolicyResponseTtlIsOneHour()
         => Assert.Equal(TimeSpan.FromHours(1), DnsResponseCache.PolicyResponseTtl);
 

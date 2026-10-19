@@ -37,6 +37,7 @@ public class DomainMessageRateLimitTests
         Assert.Equal("UdpRateLimit", context.AnsweredBy);
         Assert.NotNull(response);
         Assert.Equal(DomainResponseCode.Refused, response!.Flags.ResponseCode);
+        Assert.True(EdnsExtendedError.Contains(response, EdnsExtendedError.Prohibited));
     }
 
     [Theory]

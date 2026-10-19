@@ -25,6 +25,7 @@ public sealed class DomainClientParallelWrapper : IDomainClient
         DomainMessage? truncatedFallback = null;
         DomainMessage? nameErrorFallback = null;
         DomainMessage? refusedFallback = null;
+        DomainMessage? serverFailureFallback = null;
 
         while (tasks.Count > 0)
         {
@@ -51,6 +52,8 @@ public sealed class DomainClientParallelWrapper : IDomainClient
                     nameErrorFallback ??= result;
                 else if (result.Flags.ResponseCode is DomainResponseCode.Refused)
                     refusedFallback ??= result;
+                else if (result.Flags.ResponseCode is DomainResponseCode.ServerFailure)
+                    serverFailureFallback ??= result;
             }
             catch (AggregateException ex)
             {
@@ -62,6 +65,9 @@ public sealed class DomainClientParallelWrapper : IDomainClient
                 exceptions.Add(ex);
             }
         }
+
+        if (cancellationToken.IsCancellationRequested)
+            cancellationToken.ThrowIfCancellationRequested();
 
         if (truncatedFallback is not null)
             return truncatedFallback;
@@ -77,6 +83,13 @@ public sealed class DomainClientParallelWrapper : IDomainClient
 
         if (refusedFallback is not null && exceptions.Count == 0)
             return refusedFallback;
+
+        // An authority answered SERVFAIL. That is not "no reachable authority".
+        if (serverFailureFallback is not null)
+            return serverFailureFallback;
+
+        if (exceptions.Count > 0 && exceptions.All(static ex => ex is OperationCanceledException))
+            return EdnsExtendedError.ServFail(message, EdnsExtendedError.NoReachableAuthority);
 
         // Prefer a SERVFAIL response over throwing — callers can try more nameservers.
         return DomainMessage.CreateResponse(

@@ -85,6 +85,8 @@ public sealed partial class CacheResolverDecorator : IDomainMessageMiddleware
         context.AnsweredBy = "Cache";
         if (shouldRefresh)
             RefreshAsync(context);
+        if (hit.Flags.ResponseCode is DomainResponseCode.ServerFailure)
+            hit = EdnsExtendedError.Attach(hit, EdnsExtendedError.CachedError);
         cached = hit;
         return true;
     }

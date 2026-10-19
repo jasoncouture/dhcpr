@@ -29,8 +29,8 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
                 context.AnsweredBy = "query-class";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    DomainResponseCode.NotImplemented);
+                    additional: [EdnsExtendedError.Create(EdnsExtendedError.NotSupported)],
+                    responseCode: DomainResponseCode.NotImplemented);
             }
 
             // CH ANY / HINFO / AXFR are BindChaos local bait, not IN policy.
@@ -42,8 +42,8 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
                 context.AnsweredBy = "UnsupportedQueryType";
                 return DomainMessage.CreateResponse(
                     context.DomainMessage,
-                    DomainResourceRecords.Empty,
-                    rcode);
+                    additional: [EdnsExtendedError.Create(EdnsExtendedError.NotSupported)],
+                    responseCode: rcode);
             }
         }
 

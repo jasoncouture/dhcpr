@@ -62,10 +62,15 @@ public sealed partial class UdpRateLimitMiddleware : IDomainMessageMiddleware
                 question?.Name ?? DomainLabels.Empty);
         }
 
-        return DomainMessage.CreateResponse(
-            context.DomainMessage,
-            DomainResourceRecords.Empty,
-            DomainResponseCode.Refused);
+        return action is UdpRateLimitAction.Drop
+            ? DomainMessage.CreateResponse(
+                context.DomainMessage,
+                DomainResourceRecords.Empty,
+                DomainResponseCode.Refused)
+            : DomainMessage.CreateResponse(
+                context.DomainMessage,
+                additional: [EdnsExtendedError.Create(EdnsExtendedError.Prohibited)],
+                responseCode: DomainResponseCode.Refused);
     }
 
     private static bool ShouldRateLimit(DomainMessageContext context)

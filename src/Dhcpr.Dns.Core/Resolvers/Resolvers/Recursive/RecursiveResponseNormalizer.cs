@@ -12,7 +12,7 @@ public static class RecursiveResponseNormalizer
         if (TryPromoteAuthoritativeAnswer(request, response) is { } promoted)
             response = promoted;
         if (IsUnresolvedReferral(response))
-            return ServFail(request);
+            return ServFail(request, EdnsExtendedError.NoReachableAuthority);
         return StripParentDelegationProof(request, response);
     }
 
@@ -50,8 +50,10 @@ public static class RecursiveResponseNormalizer
         };
     }
 
-    public static DomainMessage ServFail(DomainMessage request)
-        => DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
+    public static DomainMessage ServFail(DomainMessage request, ushort? extendedError = null)
+        => extendedError is ushort code
+            ? EdnsExtendedError.ServFail(request, code)
+            : DomainMessage.CreateResponse(request, DomainResourceRecords.Empty, DomainResponseCode.ServerFailure);
 
     public static bool IsUnresolvedReferral(DomainMessage message)
     {

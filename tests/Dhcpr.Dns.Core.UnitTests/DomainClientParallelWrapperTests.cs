@@ -22,6 +22,37 @@ public class DomainClientParallelWrapperTests
     }
 
     [Fact]
+    public async Task AllTimeoutsReturnNoReachableAuthority()
+    {
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            ThrowingClient(new OperationCanceledException()),
+            ThrowingClient(new OperationCanceledException())
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.NoReachableAuthority));
+    }
+
+    [Fact]
+    public async Task AuthorityServFailIsNotNoReachableAuthority()
+    {
+        var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);
+        using var wrapper = new DomainClientParallelWrapper(new IDomainClient[]
+        {
+            GatedClient(failure, Task.CompletedTask),
+            ThrowingClient(new OperationCanceledException())
+        });
+
+        var result = await wrapper.SendAsync(DomainMessage.CreateRequest("example.com"), CancellationToken.None);
+
+        Assert.Equal(DomainResponseCode.ServerFailure, result.Flags.ResponseCode);
+        Assert.False(EdnsExtendedError.Contains(result, EdnsExtendedError.NoReachableAuthority));
+    }
+
+    [Fact]
     public async Task PrefersNoErrorOverServerFailure()
     {
         var failure = CreateResponse(DomainResponseCode.ServerFailure, truncated: false);

@@ -35,6 +35,7 @@ public class UnsupportedQueryTypeMiddlewareTests
 
         Assert.NotNull(result);
         Assert.Equal(rcode, result!.Flags.ResponseCode);
+        Assert.True(EdnsExtendedError.Contains(result, EdnsExtendedError.NotSupported));
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

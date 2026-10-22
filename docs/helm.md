@@ -86,9 +86,8 @@ authentication:
 
 ## `secureDns` (DoT + DoH)
 
-Process-terminated TLS. **No Gateway listener** for 853/443 — the Service
-gains those ports and you front them with whatever LoadBalancer you own
-(often a separate Flux object, not this chart).
+Process-terminated TLS. The Service gains ports 853 and 443. This chart
+does not create a load balancer for them.
 
 ```yaml
 secureDns:
@@ -159,10 +158,3 @@ Pods are labeled `orleans/serviceId=dhcpr` and `orleans/clusterId=dhcpr`.
 Silo and gateway ports are on the pod spec only. In-cluster the process uses
 kube membership. Outside the cluster, set `Orleans:UseConsul` — see
 [configuration](configuration.md#orleans). Dashboard: `/orleans` (admin role).
-
-## Public VIP
-
-This chart’s Service is ClusterIP. The published instance
-[dns.alertr.info](public-resolver.md) is a separate LoadBalancer
-(`23.162.92.54` / `2602:81e:9004::4`) in front of `https`, `dns-tls`, and
-classic 53. That object is not in this repository.

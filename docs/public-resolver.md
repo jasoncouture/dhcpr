@@ -17,8 +17,7 @@ depend on another resolver to look up the hostname.
 | 443 | HTTPS — DNS-over-HTTPS at `/dns-query` (RFC 8484) |
 
 These names are DoH-only on HTTPS: paths other than `/dns-query` return
-**404**. The operator UI is not on them. `/health` and `/metrics` stay
-on cluster-internal HTTP 8080.
+**404**. The operator UI is not on them.
 
 ## Classic DNS
 

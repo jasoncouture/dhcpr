@@ -130,6 +130,4 @@ publishes DoT on 853 and DoH on 443 with certificate `CN=dns.alertr.info`.
 
 ## Helm
 
-See [Helm](helm.md) `secureDns`. Public MetalLB / extra LoadBalancer objects
-are **not** in this repo; this chart only exposes ClusterIP ports `dns-tls`
-and `https` when `secureDns` is on.
+See [Helm](helm.md) `secureDns`.

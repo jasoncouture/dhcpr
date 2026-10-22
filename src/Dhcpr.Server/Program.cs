@@ -23,11 +23,6 @@ using Microsoft.Extensions.Options;
 
 using Orleans.Dashboard;
 
-ThreadPool.GetMaxThreads(out var workerMaxThreads, out _);
-ThreadPool.GetMinThreads(out var workerMinThreads, out _);
-ThreadPool.SetMaxThreads(workerMaxThreads, 16384);
-ThreadPool.SetMinThreads(workerMinThreads, 256);
-
 var builder = WebApplication.CreateBuilder();
 
 builder.Services.Configure<HostOptions>(options =>

@@ -192,7 +192,18 @@ public sealed class DnsResponseCache : IDnsResponseCache
             return false;
 
         if (!servFail && originalLifetime > _maxCacheTtl)
-            originalLifetime = _maxCacheTtl;
+        {
+            // Loop REFUSED carries a one-day SOA. Other answers stay at the hour cap.
+            if (response.Flags.ResponseCode is DomainResponseCode.Refused)
+            {
+                if (originalLifetime > TimeSpan.FromDays(1))
+                    originalLifetime = TimeSpan.FromDays(1);
+            }
+            else
+            {
+                originalLifetime = _maxCacheTtl;
+            }
+        }
 
         var age = DateTimeOffset.UtcNow - cachedAt;
         if (age < TimeSpan.Zero)

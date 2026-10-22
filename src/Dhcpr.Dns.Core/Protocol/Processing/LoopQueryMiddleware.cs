@@ -1,6 +1,7 @@
 using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,9 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 /// </summary>
 public sealed partial class LoopQueryMiddleware : IDomainMessageMiddleware
 {
+    private static readonly TimeSpan _refusedTtl = TimeSpan.FromDays(1);
+    private static readonly DomainLabels _masterName = new("localhost");
+    private static readonly DomainLabels _responsibleName = new("nobody.invalid");
     private readonly IDomainMessageMiddleware _inner;
     private readonly IEdnsLoopTag _loopTag;
     private readonly ILogger<LoopQueryMiddleware> _logger;
@@ -43,9 +47,25 @@ public sealed partial class LoopQueryMiddleware : IDomainMessageMiddleware
 
         return DomainMessage.CreateResponse(
             context.DomainMessage,
+            authorities: question is null ? null : [RefusalSoa(question)],
             additional: [EdnsExtendedError.Create(EdnsExtendedError.Other, EdnsExtendedError.LoopDetectedText)],
             responseCode: DomainResponseCode.Refused);
     }
+
+    private static DomainResourceRecord RefusalSoa(DomainQuestion question)
+        => new(
+            question.Name,
+            DomainRecordType.SOA,
+            question.Class,
+            _refusedTtl,
+            new StartOfAuthorityData(
+                _masterName,
+                _responsibleName,
+                1,
+                TimeSpan.FromHours(1),
+                TimeSpan.FromMinutes(20),
+                TimeSpan.FromDays(7),
+                _refusedTtl));
 
     [LoggerMessage(
         Level = LogLevel.Debug,

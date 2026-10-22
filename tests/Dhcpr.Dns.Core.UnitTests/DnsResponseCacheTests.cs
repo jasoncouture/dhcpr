@@ -91,6 +91,40 @@ public class DnsResponseCacheTests
     }
 
     [Fact]
+    public void RefusedWithSoaKeepsAOneDayTtl()
+    {
+        var cache = CreateCache();
+        var request = DomainMessage.CreateRequest("loop.example", DomainRecordType.A);
+        var soa = new DomainResourceRecord(
+            new DomainLabels("loop.example"),
+            DomainRecordType.SOA,
+            DomainRecordClass.IN,
+            TimeSpan.FromDays(1),
+            new StartOfAuthorityData(
+                new DomainLabels("localhost"),
+                new DomainLabels("nobody.invalid"),
+                1,
+                TimeSpan.FromHours(1),
+                TimeSpan.FromMinutes(20),
+                TimeSpan.FromDays(7),
+                TimeSpan.FromDays(1)));
+        var response = DomainMessage.CreateResponse(
+            request,
+            authorities: [soa],
+            responseCode: DomainResponseCode.Refused);
+
+        cache.Set(request, response);
+
+        Assert.True(cache.TryGet(request, out var cached));
+        Assert.NotNull(cached);
+        var cachedSoa = Assert.Single(cached!.Records.Authorities);
+        Assert.InRange(
+            cachedSoa.TimeToLive,
+            TimeSpan.FromDays(1) - TimeSpan.FromSeconds(5),
+            TimeSpan.FromDays(1));
+    }
+
+    [Fact]
     public void CachesServerFailureForAShortTime()
     {
         var cache = CreateCache();

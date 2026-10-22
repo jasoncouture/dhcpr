@@ -144,6 +144,10 @@ public class EdnsLoopTagTests
         Assert.True(response.Flags.Response);
         Assert.Equal(wire.Id, response.Id);
         Assert.Equal("Loop", inbound.AnsweredBy);
+        var soa = Assert.Single(response.Records.Authorities);
+        Assert.Equal(DomainRecordType.SOA, soa.Type);
+        Assert.Equal(TimeSpan.FromDays(1), soa.TimeToLive);
+        Assert.Equal(TimeSpan.FromDays(1), ((StartOfAuthorityData)soa.Data).MinimumTimeToLive);
         EdnsOption? ede = null;
         foreach (var record in response.Records.Additional)
         {

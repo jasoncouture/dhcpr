@@ -56,7 +56,7 @@ gateway:
 # sticky uses a TraefikService (traefik.io) for Blazor circuit affinity.
 httpRoute:
   enabled: false
-  host: dns.example.com
+  host: dns.instigaterevolution.com
   annotations: {}
   parentRefs:
     - name: dhcpr

@@ -73,12 +73,12 @@ Turn on process-terminated DoT/DoH with `secureDns.enabled` (requires
 ## Benchmark (2026-10-22)
 
 `dnsperf` 2.15.0, eighty repeated A/AAAA names, all cache hits, over TCP.
-The client held 2,000 queries in flight.
+The client held 2,000 queries in flight. Per-CPU rate is completed qps divided by the CPUs that run was using (1032% is 10.32 CPUs, 5944m is 5.944).
 
-| Where | CPU | Completed qps | Latency |
-|---|---|---|---|
-| Local process | AMD Ryzen 9 7950X, 16 cores / 32 threads. Process at 1032% CPU | 180,711 | 10.7 ms |
-| Kubernetes pod | AMD Ryzen 5 PRO 5650GE, 6 cores / 12 threads. Pod limit 6000m (6 hardware threads), using 5944m | 54,689 | 37 ms |
+| Where | CPU | Completed qps | Per CPU | Latency |
+|---|---|---|---|---|
+| Local process | AMD Ryzen 9 7950X, 16 cores / 32 threads. Process at 1032% CPU | 180,711 | 17,511 | 10.7 ms |
+| Kubernetes pod | AMD Ryzen 5 PRO 5650GE, 6 cores / 12 threads. Pod limit 6000m (6 hardware threads), using 5944m | 54,689 | 9,201 | 37 ms |
 
 ## License
 

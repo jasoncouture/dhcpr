@@ -63,10 +63,3 @@ Stub examples (`dns.alertr.info`; swap hostname and IPs for
 
 DDR: query `_dns.resolver.arpa` `SVCB` at the resolver for the advertised DoT
 (`alpn=dot`) and DoH (`alpn=h2`, `dohpath=/dns-query{?dns}`) records.
-
-## How it is published
-
-The Helm chart in this repo only creates a ClusterIP. The public VIPs
-(`23.162.92.54` / `2602:81e:9004::4` and `23.162.92.1` / `2602:81e:9002::1`)
-are separate LoadBalancers in front of the `https` and `dns-tls` Service ports
-(and classic 53). Those objects are not in this repository.

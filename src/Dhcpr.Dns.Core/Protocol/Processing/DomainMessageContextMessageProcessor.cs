@@ -74,12 +74,12 @@ public sealed partial class DomainMessageContextMessageProcessor
                     _cookies,
                     context.ClientEndPoint?.Address);
 
-            await DnsQueryEventFactory.PublishAnswersAsync(
+            DnsQueryEventFactory.PublishAnswersAsync(
                 _liveQueryPublisher,
                 context,
                 response,
                 context.AnsweredBy ?? "unknown",
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
             return response;
         }

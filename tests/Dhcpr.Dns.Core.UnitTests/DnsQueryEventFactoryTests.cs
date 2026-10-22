@@ -11,7 +11,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class DnsQueryEventFactoryTests
 {
     [Fact]
-    public async Task PublishesForExternalAnswer()
+    public void PublishesForExternalAnswer()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(
@@ -38,7 +38,7 @@ public class DnsQueryEventFactoryTests
             Source = DnsQuerySource.Udp
         };
 
-        await DnsQueryEventFactory.PublishAnswersAsync(
+        DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, response, "TestResolver", CancellationToken.None);
 
         Assert.Single(published);
@@ -55,7 +55,7 @@ public class DnsQueryEventFactoryTests
     }
 
     [Fact]
-    public async Task SkipsInternalRequests()
+    public void SkipsInternalRequests()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
@@ -69,7 +69,7 @@ public class DnsQueryEventFactoryTests
             IsInternal = true
         };
 
-        await DnsQueryEventFactory.PublishAnswersAsync(
+        DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, response, "TestResolver", CancellationToken.None);
 
         Assert.Empty(published);
@@ -113,7 +113,7 @@ public class DnsQueryEventFactoryTests
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
         Assert.Equal("Blackhole", context.AnsweredBy);
 
-        await DnsQueryEventFactory.PublishAnswersAsync(
+        DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
 
         Assert.Single(published);

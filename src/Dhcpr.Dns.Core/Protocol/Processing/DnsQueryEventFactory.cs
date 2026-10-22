@@ -6,7 +6,7 @@ public static class DnsQueryEventFactory
 {
     /// <summary>
     /// Publishes one live-query event per question for an external answered query.
-    /// Fire-and-forget: the reply is not held for the publisher.
+    /// Fire-and-forget: yields before the event is built, so the reply is not held for it.
     /// Internal pipeline re-entries are skipped so glue/DNSSEC hops do not flood the UI.
     /// </summary>
     public static async void PublishAnswersAsync(
@@ -20,6 +20,8 @@ public static class DnsQueryEventFactory
         {
             if (context.IsInternal)
                 return;
+
+            await Task.Yield();
 
             var timestamp = DateTimeOffset.UtcNow;
             var queryId = Guid.CreateVersion7();

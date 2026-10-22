@@ -11,7 +11,7 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class DnsQueryEventFactoryTests
 {
     [Fact]
-    public void PublishesForExternalAnswer()
+    public async Task PublishesForExternalAnswer()
     {
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(
@@ -28,7 +28,7 @@ public class DnsQueryEventFactoryTests
             responseCode: DomainResponseCode.NoError);
 
         var published = new List<DnsQueryEvent>();
-        var publisher = RecordingPublisher(published);
+        var (publisher, publishedTask) = RecordingPublisher(published);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -40,6 +40,7 @@ public class DnsQueryEventFactoryTests
 
         DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, response, "TestResolver", CancellationToken.None);
+        await publishedTask;
 
         Assert.Single(published);
         var evt = published[0];
@@ -60,7 +61,7 @@ public class DnsQueryEventFactoryTests
         var request = DomainMessage.CreateRequest("example.com", DomainRecordType.A);
         var response = DomainMessage.CreateResponse(request, responseCode: DomainResponseCode.NoError);
         var published = new List<DnsQueryEvent>();
-        var publisher = RecordingPublisher(published);
+        var (publisher, _) = RecordingPublisher(published);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
             new IPEndPoint(IPAddress.Loopback, 53),
@@ -100,7 +101,7 @@ public class DnsQueryEventFactoryTests
         monitor.CurrentValue.Returns(new DnsConfiguration { BlackholeDomains = ["dhitc.com"] });
         var blackhole = new BlackholeDomainMiddleware(leaf, monitor);
         var published = new List<DnsQueryEvent>();
-        var publisher = RecordingPublisher(published);
+        var (publisher, publishedTask) = RecordingPublisher(published);
         var request = DomainMessage.CreateRequest("www.dhitc.com", DomainRecordType.A);
         var context = new DomainMessageContext(
             new IPEndPoint(IPAddress.Loopback, 53000),
@@ -115,6 +116,7 @@ public class DnsQueryEventFactoryTests
 
         DnsQueryEventFactory.PublishAnswersAsync(
             publisher, context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
+        await publishedTask;
 
         Assert.Single(published);
         Assert.Equal("www.dhitc.com", published[0].Name);
@@ -124,15 +126,17 @@ public class DnsQueryEventFactoryTests
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }
 
-    private static ILiveQueryEventPublisher RecordingPublisher(List<DnsQueryEvent> published)
+    private static (ILiveQueryEventPublisher Publisher, Task Published) RecordingPublisher(List<DnsQueryEvent> published)
     {
+        var publishedTask = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var publisher = Substitute.For<ILiveQueryEventPublisher>();
         publisher.PublishAsync(Arg.Any<DnsQueryEvent>(), Arg.Any<CancellationToken>())
             .Returns(ci =>
             {
                 published.Add(ci.Arg<DnsQueryEvent>());
+                publishedTask.TrySetResult();
                 return ValueTask.CompletedTask;
             });
-        return publisher;
+        return (publisher, publishedTask.Task);
     }
 }

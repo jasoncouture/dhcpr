@@ -8,12 +8,12 @@
         <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.Extensions.Configuration.Binder.SourceGeneration</InterceptorsNamespaces>
         <!-- Force Blazor JS static assets even when restore runs before .razor files exist (Docker layer cache). -->
         <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
-        <!-- <ThreadPoolMinThreads>64</ThreadPoolMinThreads> -->
-        <!-- <ThreadPoolMaxThreads>16384</ThreadPoolMaxThreads> -->
-        <!-- <TieredPGO>true</TieredPGO> -->
-        <!-- <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops> -->
-        <!-- <PublishReadyToRun>true</PublishReadyToRun> -->
-        <!-- <PublishReadyToRunComposite>true</PublishReadyToRunComposite> -->
+        <ThreadPoolMinThreads>64</ThreadPoolMinThreads>
+        <ThreadPoolMaxThreads>16384</ThreadPoolMaxThreads>
+        <TieredPGO>true</TieredPGO>
+        <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+        <PublishReadyToRun>true</PublishReadyToRun>
+        <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
         <NoWarn>$(NoWarn);SYSLIB1100;SYSLIB1101</NoWarn>
     </PropertyGroup>
 

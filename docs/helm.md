@@ -23,7 +23,7 @@ Override `image.tag` if you are not using the chart `appVersion`.
 | Certificate | cert-manager, only if `secureDns` + cert-manager and no `existingSecret` |
 | Gateway / HTTPRoute / TCPRoute / UDPRoute | Off by default |
 
-Rollout default: `RollingUpdate`, `maxUnavailable: 0`, `maxSurge: 3`.
+Rollout default: `RollingUpdate`, `maxUnavailable: 0`, `maxSurge: 1`.
 
 ## Required DNS bind env
 
@@ -66,12 +66,12 @@ Off by default. The operator UI is then reachable without login. When
 `enabled` is true, `authority` and `clientId` are required; the chart sets
 `Authentication__Enabled` and `Authentication__Keycloak__*`.
 
-To restore the current Keycloak client (`dhcpr` on `auth.alertr.info`):
+Example:
 
 ```yaml
 authentication:
   enabled: true
-  authority: https://auth.alertr.info/realms/master
+  authority: https://auth.example.com/realms/master
   clientId: dhcpr
   responseType: code
   usePkce: true

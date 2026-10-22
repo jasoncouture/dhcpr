@@ -78,7 +78,6 @@ The client held 2,000 queries in flight.
 | Where | CPU | Completed qps | Latency |
 |---|---|---|---|
 | Local process | AMD Ryzen 9 7950X, 16 cores / 32 threads. Process at 1032% CPU | 180,711 | 10.7 ms |
-| Kubernetes pod | AMD Ryzen 5 PRO 5650GE, 6 cores / 12 threads. Pod limit 6000m (6 hardware threads), using 5944m | 54,689 | 37 ms |
 
 ## License
 

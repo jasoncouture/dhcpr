@@ -337,7 +337,7 @@ DHCP__ENABLED=false
 
 # OIDC (off unless Enabled=true)
 Authentication__Enabled=true
-Authentication__Keycloak__Authority=https://auth.alertr.info/realms/master
+Authentication__Keycloak__Authority=https://auth.example.com/realms/master
 Authentication__Keycloak__ClientId=dhcpr
 
 # Consul (outside Kubernetes)

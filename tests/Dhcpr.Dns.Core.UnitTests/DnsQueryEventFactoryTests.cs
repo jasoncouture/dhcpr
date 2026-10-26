@@ -38,8 +38,8 @@ public class DnsQueryEventFactoryTests
             Source = DnsQuerySource.Udp
         };
 
-        DnsQueryEventFactory.PublishAnswersAsync(
-            publisher, context, response, "TestResolver", CancellationToken.None);
+        new DnsQueryEventFactory(publisher).PublishAnswersAsync(
+            context, response, "TestResolver", CancellationToken.None);
         await publishedTask;
 
         Assert.Single(published);
@@ -70,8 +70,8 @@ public class DnsQueryEventFactoryTests
             IsInternal = true
         };
 
-        DnsQueryEventFactory.PublishAnswersAsync(
-            publisher, context, response, "TestResolver", CancellationToken.None);
+        new DnsQueryEventFactory(publisher).PublishAnswersAsync(
+            context, response, "TestResolver", CancellationToken.None);
 
         Assert.Empty(published);
     }
@@ -114,8 +114,8 @@ public class DnsQueryEventFactoryTests
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
         Assert.Equal("Blackhole", context.AnsweredBy);
 
-        DnsQueryEventFactory.PublishAnswersAsync(
-            publisher, context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
+        new DnsQueryEventFactory(publisher).PublishAnswersAsync(
+            context, result, context.AnsweredBy ?? leaf.Name, CancellationToken.None);
         await publishedTask;
 
         Assert.Single(published);

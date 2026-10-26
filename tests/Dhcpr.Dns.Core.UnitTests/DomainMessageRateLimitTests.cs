@@ -231,7 +231,7 @@ public class DomainMessageRateLimitTests
             pipeline = new CookieMiddleware(pipeline, cookies);
         return new DomainMessageContextMessageProcessor(
             pipeline,
-            Substitute.For<ILiveQueryEventPublisher>(),
+            Substitute.For<IDnsQueryEventFactory>(),
             Substitute.For<IDnsMetrics>());
     }
 

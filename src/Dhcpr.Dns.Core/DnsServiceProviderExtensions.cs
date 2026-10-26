@@ -114,6 +114,8 @@ public static class DnsServiceProviderExtensions
 
         // Process-bound: MessagePipe live-query dispatch (Orleans replaces this).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();
+        // One per process. The semaphore is the live-query cap.
+        services.AddSingleton<IDnsQueryEventFactory, DnsQueryEventFactory>();
         services.AddSingleton<IUdpQueryRateLimiter, SlidingWindowUdpQueryRateLimiter>();
         services.TryAddSingleton<IDnsServerCookieSecretSource, ProcessLocalDnsServerCookieSecretSource>();
         services.AddSingleton<IDnsServerCookieFactory, DnsServerCookieFactory>();

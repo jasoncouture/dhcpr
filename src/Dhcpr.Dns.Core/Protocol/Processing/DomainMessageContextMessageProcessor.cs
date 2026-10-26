@@ -21,16 +21,16 @@ public sealed partial class DomainMessageContextMessageProcessor
     public const int UdpResponseSizeLimit = 1232;
 
     private readonly IDomainMessageMiddleware _middleware;
-    private readonly ILiveQueryEventPublisher _liveQueryPublisher;
+    private readonly IDnsQueryEventFactory _dnsQueryEventFactory;
     private readonly IDnsMetrics _metrics;
 
     public DomainMessageContextMessageProcessor(
         IDomainMessageMiddleware middleware,
-        ILiveQueryEventPublisher liveQueryPublisher,
+        IDnsQueryEventFactory dnsQueryEventFactory,
         IDnsMetrics metrics)
     {
         _middleware = middleware;
-        _liveQueryPublisher = liveQueryPublisher;
+        _dnsQueryEventFactory = dnsQueryEventFactory;
         _metrics = metrics;
     }
 
@@ -63,8 +63,7 @@ public sealed partial class DomainMessageContextMessageProcessor
             if (response.Id != context.DomainMessage.Id)
                 response = response with { Id = context.DomainMessage.Id };
 
-            DnsQueryEventFactory.PublishAnswersAsync(
-                _liveQueryPublisher,
+            _dnsQueryEventFactory.PublishAnswersAsync(
                 context,
                 response,
                 context.AnsweredBy ?? "unknown",

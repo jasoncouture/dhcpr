@@ -2,17 +2,20 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
-public static class DnsQueryEventFactory
+/// <summary>
+/// Fire-and-forget. A full gate returns before the yield, so the response is not queued.
+/// </summary>
+public sealed class DnsQueryEventFactory : IDnsQueryEventFactory
 {
-    private static readonly SemaphoreSlim _gate = new(16, 16);
+    private readonly ILiveQueryEventPublisher _publisher;
+    private readonly SemaphoreSlim _gate = new(16, 16);
 
-    /// <summary>
-    /// Publishes one live-query event per question for an external answered query.
-    /// Fire-and-forget. A full gate returns before the yield, so the response is not queued.
-    /// Internal pipeline re-entries are skipped so glue/DNSSEC hops do not flood the UI.
-    /// </summary>
-    public static async void PublishAnswersAsync(
-        ILiveQueryEventPublisher publisher,
+    public DnsQueryEventFactory(ILiveQueryEventPublisher publisher)
+    {
+        _publisher = publisher;
+    }
+
+    public async void PublishAnswersAsync(
         DomainMessageContext context,
         DomainMessage response,
         string middlewareName,
@@ -45,7 +48,7 @@ public static class DnsQueryEventFactory
                     middlewareName,
                     context.Source);
 
-                await publisher.PublishAsync(evt, cancellationToken);
+                await _publisher.PublishAsync(evt, cancellationToken);
             }
         }
         catch (OperationCanceledException)

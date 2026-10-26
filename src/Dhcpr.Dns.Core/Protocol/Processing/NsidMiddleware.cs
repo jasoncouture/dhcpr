@@ -30,8 +30,10 @@ public sealed class NsidMiddleware : IDomainMessageMiddleware
         if (context.IsInternal || !Requested(context.DomainMessage))
             return result;
 
-        var name = Encoding.UTF8.GetBytes(Environment.MachineName.ToLower()).ToImmutableArray();
-        return Attach(result, name);
+        var machine = Environment.MachineName.ToLower();
+        Span<byte> name = stackalloc byte[Encoding.UTF8.GetMaxByteCount(machine.Length)];
+        var written = Encoding.UTF8.GetBytes(machine, name);
+        return Attach(result, name[..written]);
     }
 
     private static bool Requested(DomainMessage message)
@@ -51,7 +53,7 @@ public sealed class NsidMiddleware : IDomainMessageMiddleware
         return false;
     }
 
-    private static DomainMessage Attach(DomainMessage response, ImmutableArray<byte> payload)
+    private static DomainMessage Attach(DomainMessage response, ReadOnlySpan<byte> payload)
     {
         var additional = response.Records.Additional;
         var optIndex = -1;
@@ -64,7 +66,7 @@ public sealed class NsidMiddleware : IDomainMessageMiddleware
             }
         }
 
-        var nsid = new EdnsOption(OptionCode, payload);
+        var nsid = new EdnsOption(OptionCode, ImmutableArray.Create(payload));
         if (optIndex < 0)
         {
             var opt = new DomainResourceRecord(

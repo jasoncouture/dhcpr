@@ -23,25 +23,21 @@ public sealed partial class DomainMessageContextMessageProcessor
     private readonly IDomainMessageMiddleware _middleware;
     private readonly ILiveQueryEventPublisher _liveQueryPublisher;
     private readonly IDnsMetrics _metrics;
-    private readonly IDnsServerCookieFactory? _cookies;
 
     public DomainMessageContextMessageProcessor(
         IDomainMessageMiddleware middleware,
         ILiveQueryEventPublisher liveQueryPublisher,
-        IDnsMetrics metrics,
-        IDnsServerCookieFactory? cookies = null)
+        IDnsMetrics metrics)
     {
         _middleware = middleware;
         _liveQueryPublisher = liveQueryPublisher;
         _metrics = metrics;
-        _cookies = cookies;
     }
 
     public async ValueTask<DomainMessage?> ExecuteAsync(
         DomainMessageContext context,
         CancellationToken cancellationToken)
     {
-        EdnsCookie.Capture(context, _cookies);
         using var activity = DnsInstrumentation.StartQuery(context);
         var started = Stopwatch.GetTimestamp();
         DomainMessage? response = null;
@@ -66,13 +62,6 @@ public sealed partial class DomainMessageContextMessageProcessor
 
             if (response.Id != context.DomainMessage.Id)
                 response = response with { Id = context.DomainMessage.Id };
-
-            if (!context.IsInternal)
-                response = EdnsCookie.Apply(
-                    context.ClientCookie,
-                    response,
-                    _cookies,
-                    context.ClientEndPoint?.Address);
 
             DnsQueryEventFactory.PublishAnswersAsync(
                 _liveQueryPublisher,

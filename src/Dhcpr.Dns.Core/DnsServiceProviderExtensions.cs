@@ -65,7 +65,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsQueryPipeline, DnsQueryPipeline>();
         services.AddScoped<DomainMessageContextMessageProcessor>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: NSID → Logging → Metrics → Loop → RateLimit → RA → DNSSEC → …
+        // Outermost last: Logging → Metrics → Cookie → NSID → Loop → RateLimit → RA → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
         // NsCut → Forward → Recursive → ServerFailure.
         services.Decorate<IDomainMessageMiddleware, RecursiveRootResolver>();
@@ -101,12 +101,16 @@ public static class DnsServiceProviderExtensions
         // Outside the cache and DNSSEC: REFUSED before the looped packet can
         // join the in-flight lookup or be rewritten as Bogus.
         services.Decorate<IDomainMessageMiddleware, LoopQueryMiddleware>();
-        // Outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
-        services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
-        // Outermost logging so Unsupported/Blackhole answers are still recorded.
-        services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
-        // Outside the cache and every short-circuit. The name is for this answer only.
+        // Inside logging and metrics. Outside the cache, so the name is for this answer only.
         services.Decorate<IDomainMessageMiddleware, NsidMiddleware>();
+        // Inside logging and metrics. Outside the limiter, so a confirmed cookie
+        // is set before the query is counted. The echo is not cached.
+        services.Decorate<IDomainMessageMiddleware, CookieMiddleware>();
+        // Outermost. Nothing wraps these, including EDNS.
+        // Metrics stays outside Blackhole/Unsupported so sinkhole + NOTIMP still increment dns.queries.
+        // Logging stays outside so those answers are still recorded.
+        services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
+        services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
 
         // Process-bound: MessagePipe live-query dispatch (Orleans replaces this).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();

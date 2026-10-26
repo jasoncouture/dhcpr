@@ -227,11 +227,12 @@ public class DomainMessageRateLimitTests
             middleware,
             limiter,
             NullLogger<UdpRateLimitMiddleware>.Instance);
+        if (cookies is not null)
+            pipeline = new CookieMiddleware(pipeline, cookies);
         return new DomainMessageContextMessageProcessor(
             pipeline,
             Substitute.For<ILiveQueryEventPublisher>(),
-            Substitute.For<IDnsMetrics>(),
-            cookies);
+            Substitute.For<IDnsMetrics>());
     }
 
     private static DomainMessage WithOptCookie(DomainMessage message, ImmutableArray<byte> cookie)

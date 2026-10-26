@@ -30,7 +30,7 @@ public sealed class NsidMiddleware : IDomainMessageMiddleware
         if (context.IsInternal || !Requested(context.DomainMessage))
             return result;
 
-        var machine = Environment.MachineName.ToLower();
+        var machine = Environment.MachineName;
         Span<byte> name = stackalloc byte[Encoding.UTF8.GetMaxByteCount(machine.Length)];
         var written = Encoding.UTF8.GetBytes(machine, name);
         return Attach(result, name[..written]);

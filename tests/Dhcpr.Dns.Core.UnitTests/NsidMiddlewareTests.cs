@@ -85,7 +85,7 @@ public class NsidMiddlewareTests
         => new(null, null, request);
 
     private static byte[] MachineNameBytes()
-        => Encoding.UTF8.GetBytes(Environment.MachineName.ToLower());
+        => Encoding.UTF8.GetBytes(Environment.MachineName);
 
     private static DomainMessage WithNsid(DomainMessage message, ImmutableArray<byte> payload)
     {

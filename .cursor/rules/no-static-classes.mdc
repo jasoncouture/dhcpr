@@ -1,0 +1,21 @@
+---
+description: Static classes need extremely strong justification
+alwaysApply: true
+---
+
+# Static classes
+
+Do not add a static class unless the file states, on the type, an extremely strong reason. "No state" and "it's convenient" are not reasons.
+
+The reason has to be that the language forces `static`:
+
+- An extension-method container.
+- A source-generated partial the generator requires to be `static`.
+
+Anything else is an instance type. A gate, a cache, or a helper does not qualify.
+
+Forbidden:
+
+- New `static class` with no justification comment on the type
+- Moving instance logic into a static helper to avoid a constructor
+- Growing an existing static class with new behavior

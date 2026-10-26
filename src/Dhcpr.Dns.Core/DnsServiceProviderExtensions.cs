@@ -65,7 +65,7 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IDnsQueryPipeline, DnsQueryPipeline>();
         services.AddScoped<DomainMessageContextMessageProcessor>();
         services.AddScoped<IDomainMessageMiddleware, ServerFailureDomainMiddleware>();
-        // Outermost last: Logging → Metrics → Loop → RateLimit → RA → DNSSEC → …
+        // Outermost last: NSID → Logging → Metrics → Loop → RateLimit → RA → DNSSEC → …
         // Leaf order: Configured → RootZone → Upstream → Dynamic DNS → Auth →
         // NsCut → Forward → Recursive → ServerFailure.
         services.Decorate<IDomainMessageMiddleware, RecursiveRootResolver>();
@@ -105,6 +105,8 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, MetricsDomainMessageMiddleware>();
         // Outermost logging so Unsupported/Blackhole answers are still recorded.
         services.Decorate<IDomainMessageMiddleware, QueryLoggingDomainMessageMiddleware>();
+        // Outside the cache and every short-circuit. The name is for this answer only.
+        services.Decorate<IDomainMessageMiddleware, NsidMiddleware>();
 
         // Process-bound: MessagePipe live-query dispatch (Orleans replaces this).
         services.TryAddSingleton<ILiveQueryEventPublisher, NoOpLiveQueryEventPublisher>();

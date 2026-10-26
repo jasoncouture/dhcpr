@@ -1,0 +1,18 @@
+---
+description: Never inject or register a concrete type
+alwaysApply: true
+---
+
+# Concrete types
+
+Do not inject a concrete type. Do not register a concrete type in DI. Ever.
+
+A constructor dependency is an interface. A DI registration is an interface to an implementation: `AddSingleton<IFoo, Foo>()`.
+
+A concrete type appears at `new`, and only there. Tests substitute the interface.
+
+Forbidden:
+
+- `AddSingleton<Foo>()` or `AddScoped<Foo>()` with no interface
+- A constructor parameter whose type is a class
+- A test that passes `new Foo(...)` into a constructor that should take an interface

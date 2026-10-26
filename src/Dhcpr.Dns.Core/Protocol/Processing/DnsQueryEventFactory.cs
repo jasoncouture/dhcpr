@@ -4,9 +4,11 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 public static class DnsQueryEventFactory
 {
+    private static readonly SemaphoreSlim _gate = new(16, 16);
+
     /// <summary>
     /// Publishes one live-query event per question for an external answered query.
-    /// Fire-and-forget: yields before the event is built, so the reply is not held for it.
+    /// Fire-and-forget. A full gate returns before the yield, so the response is not queued.
     /// Internal pipeline re-entries are skipped so glue/DNSSEC hops do not flood the UI.
     /// </summary>
     public static async void PublishAnswersAsync(
@@ -16,11 +18,14 @@ public static class DnsQueryEventFactory
         string middlewareName,
         CancellationToken cancellationToken)
     {
+        if (context.IsInternal)
+            return;
+
+        if (!await _gate.WaitAsync(0))
+            return;
+
         try
         {
-            if (context.IsInternal)
-                return;
-
             await Task.Yield();
 
             var timestamp = DateTimeOffset.UtcNow;
@@ -49,6 +54,10 @@ public static class DnsQueryEventFactory
         catch (Exception)
         {
             // The datagram is already on its way.
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 

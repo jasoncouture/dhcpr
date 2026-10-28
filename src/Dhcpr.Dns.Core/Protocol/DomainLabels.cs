@@ -20,7 +20,19 @@ public sealed record DomainLabels(ImmutableArray<DomainLabel> Labels)
         }
     }
 
-    public DomainLabels(string str) : this(str.TrimEnd('.').Split('.')) { }
+    // "." and "" are the root. TrimEnd then Split yields one empty string, and an
+    // empty string is not a label, so rebuilding the apex from ToString() threw
+    // and DNSSEC reported that as Bogus.
+    public DomainLabels(string str) : this(LabelsFromPresentation(str)) { }
+
+    private static string[] LabelsFromPresentation(string name)
+    {
+        var trimmed = name.TrimEnd('.');
+        if (trimmed.Length == 0)
+            return [];
+
+        return trimmed.Split('.');
+    }
 
     public DomainLabels(IEnumerable<string> strings) : this(ValidateAndCreateLabelsFromStrings(strings)
         .ToImmutableArray())

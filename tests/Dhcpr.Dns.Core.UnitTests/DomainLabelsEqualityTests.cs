@@ -5,6 +5,14 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class DomainLabelsEqualityTests
 {
     [Fact]
+    public void RootPresentation_IsEmptyLabels()
+    {
+        Assert.Equal(DomainLabels.Empty, new DomainLabels(""));
+        Assert.Equal(DomainLabels.Empty, new DomainLabels("."));
+        Assert.Equal(DomainLabels.Empty, new DomainLabels(DomainLabels.Empty.ToString()));
+    }
+
+    [Fact]
     public void EqualNamesFromSeparateInstances_AreEqual()
     {
         var a = new DomainLabels("Example.COM");

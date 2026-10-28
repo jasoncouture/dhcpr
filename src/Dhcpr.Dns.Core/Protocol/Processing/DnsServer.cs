@@ -264,7 +264,10 @@ public sealed partial class DnsServer : BackgroundService
         catch (Exception exception)
         {
             LogTcpClientFailed(_logger, exception, TryRemoteEndPoint(client));
-            client.Dispose();
+        }
+        finally
+        {
+            DisposeClient(client);
         }
     }
 
@@ -279,6 +282,7 @@ public sealed partial class DnsServer : BackgroundService
         var remoteEndPoint = TryRemoteEndPoint(client);
         await Task.Yield();
         SslStream? sslStream = null;
+        var receivedQuery = false;
         var abort = new HandshakeAbort(client);
         using var abortHandshake = new Timer(
             static state => ((HandshakeAbort)state!).TryClose(),
@@ -290,7 +294,7 @@ public sealed partial class DnsServer : BackgroundService
             sslStream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
             await sslStream.AuthenticateAsServerAsync(CreateTlsServerOptions(), cancellationToken);
             abort.Finish();
-            await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
+            receivedQuery = await HandleStreamClientAsync(client, sslStream, DnsQuerySource.Dot, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -299,15 +303,24 @@ public sealed partial class DnsServer : BackgroundService
         {
             LogDotHandshakeTimedOut(_logger, remoteEndPoint);
         }
+        catch (Exception exception) when (exception is IOException or SocketException or AuthenticationException or ObjectDisposedException)
+        {
+            LogDotClientClosed(_logger, remoteEndPoint);
+        }
         catch (Exception exception)
         {
             LogDotClientFailed(_logger, exception, remoteEndPoint);
         }
         finally
         {
-            if (sslStream is not null)
-                await sslStream.DisposeAsync();
-            client.Dispose();
+            // A peer that never sent a query also never sends close_notify.
+            // SslStream shutdown waits for that notify on a thread-pool thread.
+            // Reset the socket first so dispose cannot pin threads until other
+            // queries SERVFAIL and the process dies.
+            if (!receivedQuery)
+                AbortClient(client);
+            await ReleaseTlsStreamAsync(client, sslStream);
+            DisposeClient(client);
         }
     }
 
@@ -347,7 +360,7 @@ public sealed partial class DnsServer : BackgroundService
             ServerCertificateContext = _certificates.GetServerCertificateContext()
         };
 
-    internal async Task HandleStreamClientAsync(
+    internal async Task<bool> HandleStreamClientAsync(
         TcpClient client,
         Stream stream,
         DnsQuerySource source,
@@ -355,6 +368,7 @@ public sealed partial class DnsServer : BackgroundService
     {
         var buffer = ArrayPool<byte>.Shared.Rent(16384);
         var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var receivedQuery = false;
         try
         {
             while (client.Connected && !cancellationToken.IsCancellationRequested)
@@ -364,12 +378,14 @@ public sealed partial class DnsServer : BackgroundService
                 cancellationTokenSource.CancelAfter(TcpReadTimeout);
                 var idleCancellationToken = cancellationTokenSource.Token;
 
-                await ReadExactAsync(stream, buffer.AsMemory(0, 2), idleCancellationToken);
+                if (!await ReadExactAsync(stream, buffer.AsMemory(0, 2), idleCancellationToken))
+                    return receivedQuery;
                 var length = BitConverter.ToUInt16(buffer.AsSpan(0, 2)).ToHostByteOrder();
                 if (length == 0 || length > buffer.Length)
-                    return;
+                    return receivedQuery;
 
-                await ReadExactAsync(stream, buffer.AsMemory(0, length), idleCancellationToken);
+                if (!await ReadExactAsync(stream, buffer.AsMemory(0, length), idleCancellationToken))
+                    return receivedQuery;
                 if (!cancellationTokenSource.TryReset())
                 {
                     cancellationTokenSource.Dispose();
@@ -382,39 +398,97 @@ public sealed partial class DnsServer : BackgroundService
                     buffer.AsSpan(0, length).ToArray(),
                     source,
                     cancellationToken);
+                receivedQuery = true;
                 if (reply is not null)
                     await reply.ConfigureAwait(false);
             }
+
+            return receivedQuery;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Host is shutting down.
+            return receivedQuery;
         }
         catch (OperationCanceledException exception)
         {
             LogStreamClientDropped(_logger, exception, source, TryRemoteEndPoint(client));
+            return receivedQuery;
         }
         catch (Exception exception)
         {
             LogStreamClientFailed(_logger, exception, source, TryRemoteEndPoint(client));
+            return receivedQuery;
         }
         finally
         {
             cancellationTokenSource.Dispose();
             ArrayPool<byte>.Shared.Return(buffer);
-            client.Dispose();
         }
     }
 
-    private static async Task ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
+    private static async Task<bool> ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         var offset = 0;
         while (offset < buffer.Length)
         {
             var received = await stream.ReadAsync(buffer[offset..], cancellationToken);
             if (received == 0)
-                throw new IOException("DNS TCP client closed the connection.");
+                return false;
             offset += received;
+        }
+
+        return true;
+    }
+
+    private static async Task ReleaseTlsStreamAsync(TcpClient client, SslStream? sslStream)
+    {
+        if (sslStream is null)
+            return;
+
+        try
+        {
+            var dispose = sslStream.DisposeAsync();
+            if (dispose.IsCompletedSuccessfully)
+                return;
+
+            var disposeTask = dispose.AsTask();
+            var finished = await Task.WhenAny(disposeTask, Task.Delay(TcpReadTimeout));
+            if (!ReferenceEquals(finished, disposeTask))
+                AbortClient(client);
+            try
+            {
+                await disposeTask;
+            }
+            catch (Exception)
+            {
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static void AbortClient(TcpClient client)
+    {
+        try
+        {
+            client.LingerState = new LingerOption(true, 0);
+            client.Client?.Close();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static void DisposeClient(TcpClient client)
+    {
+        try
+        {
+            client.Dispose();
+        }
+        catch (Exception)
+        {
         }
     }
 
@@ -643,6 +717,9 @@ public sealed partial class DnsServer : BackgroundService
 
     [LoggerMessage(Level = LogLevel.Error, Message = "DoT client {RemoteEndPoint} failed")]
     private static partial void LogDotClientFailed(ILogger logger, Exception exception, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "DoT client {RemoteEndPoint} closed")]
+    private static partial void LogDotClientClosed(ILogger logger, EndPoint? remoteEndPoint);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "DoT client {RemoteEndPoint} handshake timed out")]
     private static partial void LogDotHandshakeTimedOut(ILogger logger, EndPoint? remoteEndPoint);

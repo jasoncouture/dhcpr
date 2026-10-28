@@ -95,6 +95,68 @@ public class TlsListenDisposeTests
     }
 
     [Fact]
+    public async Task CloseWithoutQueryDisposesClient()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
+            var tls = ValidTls(certificatePath, keyPath);
+            var pipeline = Substitute.For<IDnsQueryPipeline>();
+            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
+            certificates.Refresh();
+            var server = new DnsServer(
+                pipeline,
+                Monitor(new DnsConfiguration()),
+                Monitor(tls),
+                certificates,
+                NullLogger<DnsServer>.Instance);
+
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                using var queryClient = new TcpClient();
+                var connect = queryClient.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+                using var accepted = await listener.AcceptTcpClientAsync();
+                await connect;
+
+                server.HandleTlsClientAsync(accepted, CancellationToken.None);
+                var ssl = new SslStream(queryClient.GetStream(), false, static (_, _, _, _) => true);
+                await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                {
+                    TargetHost = "localhost",
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                    ApplicationProtocols = [new SslApplicationProtocol("dot")]
+                }).WaitAsync(TimeSpan.FromSeconds(5));
+
+                queryClient.Client.LingerState = new LingerOption(true, 0);
+                queryClient.Close();
+
+                await WaitUntilDisposed(accepted, TimeSpan.FromSeconds(5));
+                Assert.True(IsDisposed(accepted));
+                await pipeline.DidNotReceive()
+                    .ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
+                try
+                {
+                    await ssl.DisposeAsync();
+                }
+                catch (Exception)
+                {
+                }
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TlsHandshakeTimeoutDisposesClient()
     {
         var directory = Directory.CreateTempSubdirectory();

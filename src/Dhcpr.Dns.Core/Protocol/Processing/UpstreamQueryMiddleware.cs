@@ -11,7 +11,7 @@ namespace Dhcpr.Dns.Core.Protocol.Processing;
 public sealed class UpstreamQueryMiddleware : IDomainMessageMiddleware
 {
     // Race the glue we already resolved (2 NS names × A+AAAA). Two-wide
-    // serialized a 250ms UDP timeout when the opening pair was dead.
+    // serialized one UDP timeout when the opening pair was dead.
     // Remaining peers are the next batch.
     public const int MaxParallelNameservers = 4;
 

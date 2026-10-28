@@ -68,7 +68,7 @@ has `Clients` and the querier is outside those CIDRs, the route is skipped
 ```
 
 Empty `Clients` means any client. Upstream is `host:port` (port defaults to 53).
-The default UDP timeout to an upstream is **250 ms**.
+The default UDP timeout to an upstream is **3 s**.
 
 ## Overlay records
 

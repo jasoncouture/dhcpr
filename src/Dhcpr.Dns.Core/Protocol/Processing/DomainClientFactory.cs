@@ -75,7 +75,7 @@ public sealed class DomainClientFactory : IDomainClientFactory
             throw new ArgumentException("No DNS client types requested", nameof(options));
 
         // Internal resolution walks the full middleware/resolver chain; do not apply the
-        // short UDP network timeout (default 250ms) or CNAME/NS-glue chases will fail.
+        // UDP network timeout (default 3s) or CNAME/NS-glue chases will fail.
         var applyTimeout = options.TimeOut > TimeSpan.Zero &&
                            !options.Type.HasFlag(DomainClientType.Internal);
         if (applyTimeout)

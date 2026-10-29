@@ -14,7 +14,7 @@ public static class OidcAuthenticationExtensions
     public const string DnsViewerPolicy = "DnsViewer";
     public const string DnsAdminPolicy = "DnsAdmin";
     public const string UiPrefix = "/admin";
-    public const string HomePath = "/admin/";
+    public const string HomePath = UiPrefix;
     public const string LoginPath = "/admin/account/login";
     public const string LogoutPath = "/admin/account/logout";
     public const string AccessDeniedPath = "/admin/Account/AccessDenied";

@@ -1,6 +1,6 @@
 # Operator UI
 
-Blazor Server app at `/admin/`. `/` is a public landing page and does not
+Blazor Server app at `/admin`. `/` is a public landing page and does not
 require login. DNS, DoH, DynDNS, `/health`, and `/metrics` stay at the root
 and never require login. The DoH hostname does **not** serve this UI when
 `DNS:DOH:IsolateHost` is true (default) — those requests 404 except
@@ -29,7 +29,7 @@ are disabled (some proxies 502 PAR).
 
 | Role | Can do |
 |------|--------|
-| `dns-user` | Live queries (`/admin/`) |
+| `dns-user` | Live queries (`/admin`) |
 | `dns-admin` | Everything `dns-user` can, plus settings and `/admin/orleans` |
 
 A user with only `dns-user` does not see the settings nav.
@@ -44,7 +44,7 @@ cookie encrypt/decrypt reads that copy. A new grain activation on a silo
 that already saw the ring bootstraps from it. A cluster-wide empty restart
 mints a new ring and existing cookies die.
 
-## Live queries (`/admin/`)
+## Live queries (`/admin`)
 
 Last **250** queries, newest first, pushed over the Blazor circuit. A
 process-wide ring plus Orleans pub/sub so replicas see each other's traffic.

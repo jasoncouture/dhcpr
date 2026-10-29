@@ -4,7 +4,7 @@ namespace Dhcpr.Server.LiveQueries;
 
 public static class LiveQueryWebSocketExtensions
 {
-    public const string Path = "/ws/queries";
+    public const string Path = "/admin/ws/queries";
 
     public static WebApplication MapLiveQueryWebSocket(this WebApplication app)
     {

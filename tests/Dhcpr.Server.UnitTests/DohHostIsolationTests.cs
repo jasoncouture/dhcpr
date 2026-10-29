@@ -15,7 +15,7 @@ public class DohHostIsolationTests
 
     [Theory]
     [InlineData("/")]
-    [InlineData("/orleans")]
+    [InlineData("/admin/orleans")]
     [InlineData("/dns-query/extra")]
     [InlineData("/nic/update")]
     public void OtherPathsAreNotDnsQuery(string path)
@@ -85,7 +85,7 @@ public class DohHostIsolationTests
         Assert.False(DohHostIsolation.ShouldReturnNotFound(
             "/", new HostString("dns.example.com"), dns, tls, certificate: null));
         Assert.False(DohHostIsolation.ShouldReturnNotFound(
-            "/orleans", new HostString("dns.example.com"), dns, tls, certificate: null));
+            "/admin/orleans", new HostString("dns.example.com"), dns, tls, certificate: null));
     }
 
     private static DnsConfiguration DohDns(string target)

@@ -89,19 +89,23 @@ app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 app.UseWebSockets();
 
-// UI middleware
-app.UseStaticFiles();
+// Operator UI lives under /admin so / can be a public page.
+// DNS, DynDNS, /health, and /metrics stay at the root.
+app.UseStaticFiles(new StaticFileOptions { RequestPath = OidcAuthenticationExtensions.UiPrefix });
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
-app.MapStaticAssets();
+app.MapGet(OidcAuthenticationExtensions.UiPrefix, () => Results.Redirect(OidcAuthenticationExtensions.HomePath));
 app.MapDhcprAccountEndpoints();
 app.MapLiveQueryWebSocket();
-app.MapRazorComponents<App>()
+
+var admin = app.MapGroup(OidcAuthenticationExtensions.UiPrefix);
+admin.MapStaticAssets();
+admin.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization();
 
-app.MapOrleansDashboard(routePrefix: "/orleans")
+app.MapOrleansDashboard(routePrefix: OidcAuthenticationExtensions.OrleansDashboardPath)
     .RequireAuthorization(OidcAuthenticationExtensions.DnsAdminPolicy);
 
 app.Run();

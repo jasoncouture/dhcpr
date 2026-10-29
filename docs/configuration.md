@@ -269,7 +269,7 @@ See [Dynamic DNS](dyndns.md).
 ## `Authentication`
 
 OpenID Connect for the operator UI. **Off by default** — the UI is open and
-every visitor can use live queries, settings, and `/orleans`. Login routes
+every visitor can use live queries, settings, and `/admin/orleans`. Login routes
 are not mapped.
 
 | Key | Default | Meaning |

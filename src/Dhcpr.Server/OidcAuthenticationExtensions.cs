@@ -13,9 +13,12 @@ public static class OidcAuthenticationExtensions
 {
     public const string DnsViewerPolicy = "DnsViewer";
     public const string DnsAdminPolicy = "DnsAdmin";
-    public const string LoginPath = "/account/login";
-    public const string LogoutPath = "/account/logout";
-    public const string AccessDeniedPath = "/Account/AccessDenied";
+    public const string UiPrefix = "/admin";
+    public const string HomePath = "/admin/";
+    public const string LoginPath = "/admin/account/login";
+    public const string LogoutPath = "/admin/account/logout";
+    public const string AccessDeniedPath = "/admin/Account/AccessDenied";
+    public const string OrleansDashboardPath = "/admin/orleans";
 
     public static WebApplicationBuilder AddDhcprAuthentication(this WebApplicationBuilder builder)
     {
@@ -101,7 +104,7 @@ public static class OidcAuthenticationExtensions
 
         app.MapGet(LoginPath, (string? returnUrl) =>
                 Results.Challenge(
-                    new AuthenticationProperties { RedirectUri = returnUrl ?? "/" },
+                    new AuthenticationProperties { RedirectUri = returnUrl ?? HomePath },
                     [OpenIdConnectDefaults.AuthenticationScheme]))
             .AllowAnonymous();
         app.MapGet(LogoutPath, async Task<IResult> (HttpContext context) =>
@@ -115,11 +118,11 @@ public static class OidcAuthenticationExtensions
                 if (string.IsNullOrEmpty(idToken))
                 {
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    return Results.Redirect("/");
+                    return Results.Redirect(HomePath);
                 }
 
                 return Results.SignOut(
-                    new AuthenticationProperties { RedirectUri = "/" },
+                    new AuthenticationProperties { RedirectUri = HomePath },
                     [
                         OpenIdConnectDefaults.AuthenticationScheme,
                         CookieAuthenticationDefaults.AuthenticationScheme

@@ -31,7 +31,7 @@ dotnet test
 dotnet run --project src/Dhcpr.Server
 ```
 
-Development listens on `http://localhost:5187` (UI) and DNS `127.0.0.1:65353` /
+Development listens on `http://localhost:5187/admin/` (UI) and DNS `127.0.0.1:65353` /
 `[::1]:65353`. Production images listen on `8080` (HTTP probes/UI), `53`, `443`,
 and `853`.
 

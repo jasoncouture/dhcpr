@@ -1,7 +1,7 @@
 # Operator UI
 
-Blazor Server app. DNS, DoH, DynDNS, `/health`, and `/metrics` never require
-login. The DoH hostname does **not** serve this UI when
+Blazor Server app at `/admin/`. DNS, DoH, DynDNS, `/health`, and `/metrics` stay
+at the root and never require login. The DoH hostname does **not** serve this UI when
 `DNS:DOH:IsolateHost` is true (default) — those requests 404 except
 `/dns-query`. Use a different `Host` (or HTTP 8080), or set
 `DNS__DOH__IsolateHost=false`.
@@ -18,9 +18,9 @@ user.
 
 | Path | Action |
 |------|--------|
-| `/account/login` | Challenge (OIDC) |
-| `/account/logout` | Sign out cookie + IdP |
-| `/Account/AccessDenied` | Authenticated but missing role |
+| `/admin/account/login` | Challenge (OIDC) |
+| `/admin/account/logout` | Sign out cookie + IdP |
+| `/admin/Account/AccessDenied` | Authenticated but missing role |
 
 Roles come from the token **`groups`** claim
 (`TokenValidationParameters:RoleClaimType`). Pushed Authorization Requests
@@ -28,8 +28,8 @@ are disabled (some proxies 502 PAR).
 
 | Role | Can do |
 |------|--------|
-| `dns-user` | Live queries (`/`) |
-| `dns-admin` | Everything `dns-user` can, plus settings and `/orleans` |
+| `dns-user` | Live queries (`/admin/`) |
+| `dns-admin` | Everything `dns-user` can, plus settings and `/admin/orleans` |
 
 A user with only `dns-user` does not see the settings nav.
 
@@ -43,7 +43,7 @@ cookie encrypt/decrypt reads that copy. A new grain activation on a silo
 that already saw the ring bootstraps from it. A cluster-wide empty restart
 mints a new ring and existing cookies die.
 
-## Live queries (`/`)
+## Live queries (`/admin/`)
 
 Last **250** queries, newest first, pushed over the Blazor circuit. A
 process-wide ring plus Orleans pub/sub so replicas see each other's traffic.
@@ -72,7 +72,7 @@ on a local UI.
 
 Non-`NoError` rows are highlighted.
 
-## Settings (`/settings/…`)
+## Settings (`/admin/settings/…`)
 
 Admin only. Save writes `{DataPath}/settings.json` (atomic replace) and
 hot-reloads. The file is watched; an edit on disk is picked up without a
@@ -84,12 +84,12 @@ change appsettings — edit the file or the UI, not both casually.
 
 | Page | Keys |
 |------|------|
-| `/settings/routes` | `DNS:Routes` (suffix `.` is the catch-all forwarder) |
-| `/settings/records` | `DNS:Records` |
-| `/settings/blackhole` | `DNS:BlackholeDomains` |
-| `/settings/dnssec` | `DNS:Dnssec` |
-| `/settings/health` | `DNS:HealthCheck` |
-| `/settings/dynamic-dns` | `DynamicDns` |
+| `/admin/settings/routes` | `DNS:Routes` (suffix `.` is the catch-all forwarder) |
+| `/admin/settings/records` | `DNS:Records` |
+| `/admin/settings/blackhole` | `DNS:BlackholeDomains` |
+| `/admin/settings/dnssec` | `DNS:Dnssec` |
+| `/admin/settings/health` | `DNS:HealthCheck` |
+| `/admin/settings/dynamic-dns` | `DynamicDns` |
 
 Not in the UI (restart + env/appsettings only):
 
@@ -105,7 +105,7 @@ Not in the UI (restart + env/appsettings only):
 Invalid saves are rejected with a form error; the previous file is left in
 place.
 
-## Orleans dashboard (`/orleans`)
+## Orleans dashboard (`/admin/orleans`)
 
 Admin only. Cluster membership, grains, and counters. Orleans silo ports
 **11111** and **30000** are on the pod (not on the public Service). Live-query

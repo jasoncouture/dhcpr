@@ -9,7 +9,7 @@ loaded zone file.
 
 ## Configuration
 
-Root key `DynamicDns` (also editable at `/settings/dynamic-dns`).
+Root key `DynamicDns` (also editable at `/admin/settings/dynamic-dns`).
 
 | Key | Default | Rule |
 |-----|---------|------|

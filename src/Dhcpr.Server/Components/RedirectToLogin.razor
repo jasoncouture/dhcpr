@@ -3,11 +3,10 @@
 @code {
     protected override void OnInitialized()
     {
-        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (string.IsNullOrEmpty(path))
-            path = "/";
-        else if (!path.StartsWith('/'))
-            path = "/" + path;
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var path = string.IsNullOrEmpty(relative)
+            ? OidcAuthenticationExtensions.HomePath
+            : OidcAuthenticationExtensions.UiPrefix + "/" + relative.TrimStart('/');
         Navigation.NavigateTo(
             $"{OidcAuthenticationExtensions.LoginPath}?returnUrl={Uri.EscapeDataString(path)}",
             forceLoad: true);

@@ -705,6 +705,10 @@ main {
 }
 
 .landing-footer .landing-coffee {
+    display: inline-block;
+}
+
+.landing-footer .landing-coffee img {
     display: block;
 }
 

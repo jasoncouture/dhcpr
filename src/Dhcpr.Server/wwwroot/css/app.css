@@ -703,3 +703,8 @@ main {
     font-size: 0.8rem;
     text-align: center;
 }
+
+.landing-footer a {
+    display: block;
+    margin-top: 0.85rem;
+}

@@ -704,7 +704,7 @@ main {
     text-align: center;
 }
 
-.landing-footer a {
+.landing-footer .landing-coffee {
     display: block;
     margin-top: 0.85rem;
 }

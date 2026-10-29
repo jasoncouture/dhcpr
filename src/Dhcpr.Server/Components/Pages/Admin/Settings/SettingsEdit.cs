@@ -1,4 +1,4 @@
-namespace Dhcpr.Server.Components.Pages.Settings;
+namespace Dhcpr.Server.Components.Pages.Admin.Settings;
 
 internal static class SettingsEdit
 {

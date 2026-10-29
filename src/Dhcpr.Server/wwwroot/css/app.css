@@ -710,9 +710,18 @@ main {
 }
 
 .landing-legal {
-    margin: 0.85rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
 }
 
-.landing-legal + .landing-legal {
-    margin-top: 0.2rem;
+.landing-legal > * {
+    padding: 0 0.7rem;
+    line-height: 1.4;
+}
+
+.landing-legal > * + * {
+    border-left: 1px solid var(--border);
 }

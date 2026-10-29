@@ -1,0 +1,35 @@
+@page "/"
+@layout LandingLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>dhcpr — no-log DNS</PageTitle>
+
+<h1>A no-log DNS server, focused on privacy.</h1>
+<p class="lead">
+    DHCPR answers a DNS query and does not keep a history of it.
+    The log records errors only. A lookup that succeeds is not written down.
+</p>
+
+<h2>Public resolvers</h2>
+<p class="lead">
+    The same software is the public DNS service at these two names.
+    Each one speaks classic DNS, DNS-over-TLS, and DNS-over-HTTPS.
+</p>
+<div class="landing-resolvers">
+    <article class="landing-resolver">
+        <h3>dns.alertr.info</h3>
+        <dl>
+            <div><dt>IPv4</dt><dd>23.162.92.54</dd></div>
+            <div><dt>IPv6</dt><dd>2602:81e:9004::4</dd></div>
+        </dl>
+        <p class="landing-protocols">Port 53 DNS · port 853 DNS-over-TLS · HTTPS /dns-query</p>
+    </article>
+    <article class="landing-resolver">
+        <h3>dns.instigaterevolution.com</h3>
+        <dl>
+            <div><dt>IPv4</dt><dd>23.162.92.1</dd></div>
+            <div><dt>IPv6</dt><dd>2602:81e:9002::1</dd></div>
+        </dl>
+        <p class="landing-protocols">Port 53 DNS · port 853 DNS-over-TLS · HTTPS /dns-query</p>
+    </article>
+</div>

@@ -89,19 +89,15 @@ app.MapPrometheusScrapingEndpoint();
 app.MapDhcprHealthChecks();
 app.UseWebSockets();
 
-// Operator UI lives under /admin so / can be a public page.
-// DNS, DynDNS, /health, and /metrics stay at the root.
-app.UseStaticFiles(new StaticFileOptions { RequestPath = OidcAuthenticationExtensions.UiPrefix });
+// DNS, DynDNS, /health, and /metrics stay beside the Blazor app.
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
-app.MapGet(OidcAuthenticationExtensions.UiPrefix, () => Results.Redirect(OidcAuthenticationExtensions.HomePath));
 app.MapDhcprAccountEndpoints();
 app.MapLiveQueryWebSocket();
-
-var admin = app.MapGroup(OidcAuthenticationExtensions.UiPrefix);
-admin.MapStaticAssets();
-admin.MapRazorComponents<App>()
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization();
 

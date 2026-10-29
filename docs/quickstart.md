@@ -32,7 +32,7 @@ That profile (`src/Dhcpr.Server/Properties/launchSettings.json`) binds:
 
 | What | Where |
 |------|--------|
-| Operator UI | [http://localhost:5187/admin/](http://localhost:5187/admin/) |
+| HTTP | [http://localhost:5187](http://localhost:5187) |
 | DNS UDP/TCP | `127.0.0.1:65353` and `[::1]:65353` |
 
 The UI is **open by default** (`Authentication:Enabled` is false). Turn on

@@ -1,7 +1,8 @@
 # Operator UI
 
-Blazor Server app at `/admin/`. DNS, DoH, DynDNS, `/health`, and `/metrics` stay
-at the root and never require login. The DoH hostname does **not** serve this UI when
+Blazor Server app at `/admin/`. `/` is a public landing page and does not
+require login. DNS, DoH, DynDNS, `/health`, and `/metrics` stay at the root
+and never require login. The DoH hostname does **not** serve this UI when
 `DNS:DOH:IsolateHost` is true (default) — those requests 404 except
 `/dns-query`. Use a different `Host` (or HTTP 8080), or set
 `DNS__DOH__IsolateHost=false`.
@@ -13,8 +14,8 @@ queries, settings, Orleans). Sign-in routes are not registered.
 
 When `Authentication:Enabled` is true, OpenID Connect against
 `Authentication:Keycloak` (standard ASP.NET Core `OpenIdConnectOptions`:
-Authority, ClientId, scopes, …). Every Razor page then requires a signed-in
-user.
+Authority, ClientId, scopes, …). Every operator page then requires a signed-in
+user. The public page at `/` stays anonymous.
 
 | Path | Action |
 |------|--------|

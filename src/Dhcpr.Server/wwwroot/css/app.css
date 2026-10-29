@@ -708,3 +708,11 @@ main {
     display: block;
     margin-top: 0.85rem;
 }
+
+.landing-legal {
+    margin: 0.85rem 0 0;
+}
+
+.landing-legal + .landing-legal {
+    margin-top: 0.2rem;
+}

@@ -636,6 +636,17 @@ main {
     font-size: 1.05rem;
 }
 
+.landing-counter {
+    margin: 1.75rem 0 0;
+    color: var(--muted);
+    font-size: 1.05rem;
+}
+
+.landing-count {
+    color: var(--text);
+    font-weight: 700;
+}
+
 .landing h2 {
     margin: 2.75rem 0 0.75rem;
     font-size: 0.85rem;

@@ -1,0 +1,47 @@
+@inject ILiveQueryStore Store
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<p class="landing-counter">Queries since this page was loaded: <span class="landing-count">@_sinceLoad</span></p>
+
+@code {
+    private long _baseline;
+    private long _sinceLoad;
+    private PeriodicTimer? _timer;
+    private Task? _watch;
+
+    protected override void OnInitialized()
+    {
+        _baseline = Store.QueryCount;
+        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+        _timer = timer;
+        _watch = WatchAsync(timer);
+    }
+
+    private async Task WatchAsync(PeriodicTimer timer)
+    {
+        while (await timer.WaitForNextTickAsync())
+        {
+            var since = Store.QueryCount - _baseline;
+            if (since == _sinceLoad)
+                continue;
+
+            _sinceLoad = since;
+            try
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        if (_watch is not null)
+            await _watch;
+    }
+}

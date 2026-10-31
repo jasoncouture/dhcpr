@@ -97,9 +97,10 @@ app.UseAntiforgery();
 app.MapDhcprAccountEndpoints();
 app.MapLiveQueryWebSocket();
 app.MapStaticAssets();
+// Operator pages carry their own [Authorize]. A blanket requirement also
+// locks the circuit, so a signed-out visitor would never see the public counter move.
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
-    .RequireAuthorization();
+    .AddInteractiveServerRenderMode();
 
 app.MapOrleansDashboard(routePrefix: OidcAuthenticationExtensions.OrleansDashboardPath)
     .RequireAuthorization(OidcAuthenticationExtensions.DnsAdminPolicy);

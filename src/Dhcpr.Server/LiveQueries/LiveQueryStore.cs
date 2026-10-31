@@ -23,6 +23,9 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
     private readonly ConcurrentDictionary<Guid, ChannelWriter<DnsQueryEvent>> _subscribers = new();
 
     private IDisposable? _subscription;
+    private long _queryCount;
+
+    public long QueryCount => Volatile.Read(ref _queryCount);
 
     public LiveQueryStore(IAsyncSubscriber<DnsQueryEvent> subscriber)
     {
@@ -74,6 +77,8 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
         await Task.Yield();
         if (LiveQueryFilters.IsHealthCheckProbe(message))
             return;
+
+        Interlocked.Increment(ref _queryCount);
 
         lock (_ringLock)
         {

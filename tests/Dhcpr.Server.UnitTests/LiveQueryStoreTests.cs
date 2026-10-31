@@ -46,6 +46,25 @@ public class LiveQueryStoreTests
     }
 
     [Fact]
+    public async Task QueryCountSkipsHealthCheckProbes()
+    {
+        var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
+        await using var store = new LiveQueryStore(subscriber);
+
+        var probe = CreateEvent(1) with
+        {
+            Client = new IPEndPoint(IPAddress.Loopback, 0)
+        };
+
+        await store.HandleAsync(probe, CancellationToken.None);
+        Assert.Equal(0, store.QueryCount);
+
+        await store.HandleAsync(CreateEvent(2), CancellationToken.None);
+        await store.HandleAsync(CreateEvent(3), CancellationToken.None);
+        Assert.Equal(2, store.QueryCount);
+    }
+
+    [Fact]
     public async Task HealthCheckProbesAreNotRetainedOrFannedOut()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();

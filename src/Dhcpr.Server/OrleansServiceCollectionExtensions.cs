@@ -62,12 +62,8 @@ public static class OrleansServiceCollectionExtensions
             }
             else
             {
-#if DEBUG
-                silo.UseLocalhostClustering();
-#else
                 throw new InvalidOperationException(
                     "No clustering configuration is set. Set Orleans:Standalone for one process, or Orleans:UseConsul.");
-#endif
             }
 
             silo.AddDashboard();

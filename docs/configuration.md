@@ -292,13 +292,13 @@ See [UI](ui.md).
 ## `Orleans`
 
 Membership. In a Kubernetes pod the process uses kube clustering and ignores
-this section. Anywhere else, set `Standalone` for one process or `UseConsul`
-to join other silos. A Debug build with neither set falls back to localhost.
+this section. Anywhere else, `Standalone` runs one process and `UseConsul`
+joins other silos. With neither set, startup throws.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `UseConsul` | `false` | Join Consul when not in-cluster |
-| `Standalone` | `false` | One process, localhost membership. No other silo can join |
+| `Standalone` | `true` | One process, localhost membership. No other silo can join |
 | `Consul:Address` | | Required when `UseConsul` is true. `http` or `https` URI |
 | `Consul:Token` | | Optional ACL token |
 | `Consul:KvRootFolder` | | Optional KV prefix; empty uses the provider default |
@@ -341,10 +341,8 @@ Authentication__Enabled=true
 Authentication__Keycloak__Authority=https://auth.example.com/realms/master
 Authentication__Keycloak__ClientId=dhcpr
 
-# One process, no Consul and not in Kubernetes
-Orleans__Standalone=true
-
-# Consul (outside Kubernetes)
+# Consul (outside Kubernetes). Standalone is the appsettings default.
+Orleans__Standalone=false
 Orleans__UseConsul=true
 Orleans__Consul__Address=http://consul:8500
 Orleans__AdvertisedIP=10.0.0.8

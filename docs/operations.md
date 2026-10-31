@@ -192,9 +192,9 @@ URIs, empty `ListenAddresses`, `TLS:Enabled` without PEM paths, or
 `Orleans:UseConsul` without a Consul URI, or `Standalone` together with
 `UseConsul`, exit immediately.
 
-Release builds outside Kubernetes need `Orleans:Standalone` (one process) or
-`Orleans:UseConsul`. Debug builds with neither set fall back to localhost
-clustering.
+Outside Kubernetes the process needs `Orleans:Standalone` or
+`Orleans:UseConsul`. The shipped `appsettings.json` turns Standalone on.
+With neither set, startup throws.
 
 ## Multi-replica
 

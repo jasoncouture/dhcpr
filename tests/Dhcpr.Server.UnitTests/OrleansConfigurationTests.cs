@@ -21,12 +21,12 @@ public class OrleansConfigurationTests
     }
 
     [Fact]
-    public void StandaloneWithConsulFails()
+    public void StandaloneWithConsulSucceeds()
     {
         var config = Consul("http://consul:8500");
         config.Standalone = true;
-        Assert.False(config.TryValidate(out var error));
-        Assert.Contains("Standalone", error);
+        Assert.True(config.TryValidate(out var error));
+        Assert.Null(error);
     }
 
     [Fact]

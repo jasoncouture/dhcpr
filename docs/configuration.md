@@ -293,7 +293,8 @@ See [UI](ui.md).
 
 Membership. In a Kubernetes pod the process uses kube clustering and ignores
 this section. Anywhere else, `Standalone` runs one process and `UseConsul`
-joins other silos. With neither set, startup throws.
+joins other silos. `UseConsul` wins when both are set. With neither set,
+startup throws.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -341,8 +342,7 @@ Authentication__Enabled=true
 Authentication__Keycloak__Authority=https://auth.example.com/realms/master
 Authentication__Keycloak__ClientId=dhcpr
 
-# Consul (outside Kubernetes). Standalone is the appsettings default.
-Orleans__Standalone=false
+# Consul (outside Kubernetes). Wins even when Standalone stays at its default.
 Orleans__UseConsul=true
 Orleans__Consul__Address=http://consul:8500
 Orleans__AdvertisedIP=10.0.0.8

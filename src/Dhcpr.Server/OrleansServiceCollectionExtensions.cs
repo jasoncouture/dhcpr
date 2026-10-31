@@ -34,6 +34,7 @@ public static class OrleansServiceCollectionExtensions
                 silo.UseKubernetesHosting();
                 silo.UseKubeMembership();
             }
+            // UseConsul wins when Standalone is also set.
             else if (builder.Configuration.GetValue<bool>("Orleans:UseConsul"))
             {
                 var orleans = builder.Configuration.GetSection("Orleans").Get<OrleansConfiguration>()

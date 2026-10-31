@@ -34,12 +34,6 @@ public sealed class OrleansConfiguration : IValidateSelf
         Consul.KvRootFolder ??= "";
         AdvertisedIP ??= "";
 
-        if (UseConsul && Standalone)
-        {
-            error = "Orleans:Standalone and Orleans:UseConsul cannot both be true";
-            return false;
-        }
-
         if (!UseConsul)
         {
             error = null;

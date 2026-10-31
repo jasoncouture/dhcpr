@@ -189,8 +189,8 @@ restarts the pod.
 
 `DNS`, `TLS`, `DataPath`, and `Orleans` use `ValidateOnStart` — bad listen
 URIs, empty `ListenAddresses`, `TLS:Enabled` without PEM paths, or
-`Orleans:UseConsul` without a Consul URI, or `Standalone` together with
-`UseConsul`, exit immediately.
+`Orleans:UseConsul` without a Consul URI exits immediately. When both
+`Standalone` and `UseConsul` are set, Consul is used.
 
 Outside Kubernetes the process needs `Orleans:Standalone` or
 `Orleans:UseConsul`. The shipped `appsettings.json` turns Standalone on.

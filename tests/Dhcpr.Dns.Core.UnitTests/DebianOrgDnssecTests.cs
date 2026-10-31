@@ -180,6 +180,7 @@ public class DebianOrgDnssecTests
             internalClient,
             options,
             NullLogger<DnssecMessageValidator>.Instance,
+            Substitute.For<IDnssecTypeBitMaps>(),
             new FrozenTimeProvider(FrozenNow));
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())

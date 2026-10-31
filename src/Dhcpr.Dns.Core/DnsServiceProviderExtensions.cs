@@ -132,6 +132,8 @@ public static class DnsServiceProviderExtensions
         services.AddScoped<IEdnsProtocolService, EdnsProtocolService>();
         services.AddScoped<IDnssecValidator, DnssecValidator>();
         services.TryAddSingleton(TimeProvider.System);
+        // One per process. NSEC and NSEC3 proofs share the type bit maps.
+        services.AddSingleton<IDnssecTypeBitMaps, DnssecTypeBitMaps>();
         services.AddScoped<IDnssecMessageValidator, DnssecMessageValidator>();
         services.AddScoped<ISocketFactory, SocketFactory>();
         // Process-bound: shared StringBuilder pool.

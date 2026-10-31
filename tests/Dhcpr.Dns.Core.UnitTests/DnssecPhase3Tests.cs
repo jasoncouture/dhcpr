@@ -251,7 +251,7 @@ public class DnssecPhase3Tests
             crypto,
             NoopInternalClient(),
             options,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
 
         return new DnssecValidationMiddleware(
             FixedInner(response),

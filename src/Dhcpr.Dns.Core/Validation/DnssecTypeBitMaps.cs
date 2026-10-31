@@ -4,12 +4,10 @@ using Dhcpr.Dns.Core.Protocol;
 
 namespace Dhcpr.Dns.Core.Validation;
 
-/// <summary>
-/// RFC 4034 §4.1.2 / RFC 5155 type bit map helpers for NSEC / NSEC3.
-/// </summary>
-public static class DnssecTypeBitMaps
+/// <inheritdoc cref="IDnssecTypeBitMaps"/>
+public sealed class DnssecTypeBitMaps : IDnssecTypeBitMaps
 {
-    public static bool Contains(ImmutableArray<byte> typeBitMaps, DomainRecordType type)
+    public bool Contains(ImmutableArray<byte> typeBitMaps, DomainRecordType type)
     {
         var typeValue = (ushort)type;
         var window = typeValue >> 8;
@@ -39,7 +37,7 @@ public static class DnssecTypeBitMaps
         return false;
     }
 
-    public static ImmutableArray<byte> FromTypes(params DomainRecordType[] types)
+    public ImmutableArray<byte> FromTypes(params DomainRecordType[] types)
     {
         if (types.Length == 0)
             return ImmutableArray<byte>.Empty;

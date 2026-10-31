@@ -93,7 +93,7 @@ public class DnssecNsecNodataTests
             new DnssecValidator(NullLogger<DnssecValidator>.Instance, monitor),
             NoopInternalClient(),
             monitor,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
     }
 
     private static (DomainResourceRecord DnsKey, ECDsa PrivateKey) CreateEcdsaDnsKey(string zone)

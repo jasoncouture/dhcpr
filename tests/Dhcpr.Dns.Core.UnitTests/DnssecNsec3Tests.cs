@@ -18,6 +18,8 @@ public class DnssecNsec3Tests
 {
     private static readonly byte[] _salt = Convert.FromHexString("AABBCCDD");
 
+    private readonly IDnssecTypeBitMaps _bitMaps = new DnssecTypeBitMaps();
+
     [Fact]
     public void Base32Hex_RoundTrips()
     {
@@ -31,10 +33,10 @@ public class DnssecNsec3Tests
     [Fact]
     public void TypeBitMaps_ContainsTypes()
     {
-        var maps = DnssecTypeBitMaps.FromTypes(DomainRecordType.NS, DomainRecordType.SOA);
-        Assert.True(DnssecTypeBitMaps.Contains(maps, DomainRecordType.NS));
-        Assert.True(DnssecTypeBitMaps.Contains(maps, DomainRecordType.SOA));
-        Assert.False(DnssecTypeBitMaps.Contains(maps, DomainRecordType.A));
+        var maps = _bitMaps.FromTypes(DomainRecordType.NS, DomainRecordType.SOA);
+        Assert.True(_bitMaps.Contains(maps, DomainRecordType.NS));
+        Assert.True(_bitMaps.Contains(maps, DomainRecordType.SOA));
+        Assert.False(_bitMaps.Contains(maps, DomainRecordType.A));
     }
 
     [Fact]
@@ -73,7 +75,7 @@ public class DnssecNsec3Tests
             parameters with
             {
                 NextHashedOwnerName = Enumerable.Repeat((byte)0xFF, 20).ToImmutableArray(),
-                TypeBitMaps = DnssecTypeBitMaps.FromTypes(DomainRecordType.AAAA) // A absent
+                TypeBitMaps = _bitMaps.FromTypes(DomainRecordType.AAAA) // A absent
             });
         var rrsig = SignRrset(privateKey, dnsKey, [nsec3], DomainRecordType.NSEC3);
 
@@ -112,7 +114,7 @@ public class DnssecNsec3Tests
             parameters with
             {
                 NextHashedOwnerName = IncrementHash(closestHash).ToImmutableArray(),
-                TypeBitMaps = DnssecTypeBitMaps.FromTypes(
+                TypeBitMaps = _bitMaps.FromTypes(
                     DomainRecordType.NS, DomainRecordType.SOA, DomainRecordType.DNSKEY, DomainRecordType.NSEC3PARAM)
             });
 
@@ -126,7 +128,7 @@ public class DnssecNsec3Tests
             parameters with
             {
                 NextHashedOwnerName = Enumerable.Repeat((byte)0xFF, 20).ToImmutableArray(),
-                TypeBitMaps = DnssecTypeBitMaps.FromTypes(DomainRecordType.NS)
+                TypeBitMaps = _bitMaps.FromTypes(DomainRecordType.NS)
             });
 
         // Ensure cover does not accidentally exact-match closest (closestHash != 0).
@@ -179,7 +181,7 @@ public class DnssecNsec3Tests
             {
                 Flags = 0,
                 NextHashedOwnerName = IncrementHash(closestHash).ToImmutableArray(),
-                TypeBitMaps = DnssecTypeBitMaps.FromTypes(DomainRecordType.NS, DomainRecordType.SOA)
+                TypeBitMaps = _bitMaps.FromTypes(DomainRecordType.NS, DomainRecordType.SOA)
             });
 
         var coverOwnerHash = new byte[20];
@@ -192,7 +194,7 @@ public class DnssecNsec3Tests
             {
                 Flags = DnssecNsec3Proof.OptOutFlag,
                 NextHashedOwnerName = Enumerable.Repeat((byte)0xFF, 20).ToImmutableArray(),
-                TypeBitMaps = DnssecTypeBitMaps.FromTypes(DomainRecordType.NS)
+                TypeBitMaps = _bitMaps.FromTypes(DomainRecordType.NS)
             });
 
         var authorities = ImmutableArray.Create(
@@ -307,7 +309,7 @@ public class DnssecNsec3Tests
             crypto,
             NoopInternalClient(),
             options,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
     }
 
     private static (DomainResourceRecord KeyRecord, ECDsa PrivateKey) CreateEcdsaDnsKey(string zone)

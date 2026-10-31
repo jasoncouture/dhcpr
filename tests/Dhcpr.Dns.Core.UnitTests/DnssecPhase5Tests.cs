@@ -529,7 +529,7 @@ public class DnssecPhase5Tests
             crypto, ScriptedInternalClient(_ =>
                 DomainMessage.CreateResponse(
                     DomainMessage.CreateRequest("."), DomainResourceRecords.Empty, DomainResponseCode.ServerFailure)),
-            options, NullLogger<DnssecMessageValidator>.Instance);
+            options, NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -593,7 +593,7 @@ public class DnssecPhase5Tests
                 DomainMessage.CreateResponse(
                     DomainMessage.CreateRequest("."), DomainResourceRecords.Empty, DomainResponseCode.ServerFailure)),
             options,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
 
         return new DnssecValidationMiddleware(
             FixedInner(response),

@@ -54,7 +54,7 @@ public class DnssecInsecureCnameAdTests
             new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration())),
             NoopInternalClient(),
             Monitor(new DnsConfiguration()),
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
 
         await validator.ValidateResponseAsync(
             new DomainMessageContext(null, null, request) { DnssecScope = scope },

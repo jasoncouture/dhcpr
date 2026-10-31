@@ -201,7 +201,7 @@ public class DnssecPhase4Tests
             TrustAnchors = [new TrustAnchorConfiguration()]
         });
         var validator = new DnssecMessageValidator(
-            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -404,7 +404,7 @@ public class DnssecPhase4Tests
             new DnssecValidator(NullLogger<DnssecValidator>.Instance, options),
             NoopInternalClient(),
             options,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -446,7 +446,7 @@ public class DnssecPhase4Tests
             new DnssecValidator(NullLogger<DnssecValidator>.Instance, options),
             NoopInternalClient(),
             options,
-            NullLogger<DnssecMessageValidator>.Instance);
+            NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             inner, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -580,7 +580,7 @@ public class DnssecPhase4Tests
             ]
         });
         var validator = new DnssecMessageValidator(
-            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 
@@ -656,7 +656,7 @@ public class DnssecPhase4Tests
             ]
         });
         var validator = new DnssecMessageValidator(
-            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance);
+            crypto, NoopInternalClient(), options, NullLogger<DnssecMessageValidator>.Instance, Substitute.For<IDnssecTypeBitMaps>());
         var dnssec = new DnssecValidationMiddleware(
             cnameDecorator, validator, cache, options, NullLogger<DnssecValidationMiddleware>.Instance);
 

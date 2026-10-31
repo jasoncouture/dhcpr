@@ -18,6 +18,7 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
     private readonly IDnssecValidator _crypto;
     private readonly IInternalDomainClient _internalClient;
     private readonly IOptionsMonitor<DnsConfiguration> _options;
+    private readonly IDnssecTypeBitMaps _typeBitMaps;
     private readonly ITrustAnchorStore? _trustAnchors;
     private readonly ILogger<DnssecMessageValidator> _logger;
     private readonly TimeProvider _time;
@@ -27,12 +28,14 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         IInternalDomainClient internalClient,
         IOptionsMonitor<DnsConfiguration> options,
         ILogger<DnssecMessageValidator> logger,
+        IDnssecTypeBitMaps typeBitMaps,
         TimeProvider? timeProvider = null,
         ITrustAnchorStore? trustAnchors = null)
     {
         _crypto = crypto;
         _internalClient = internalClient;
         _options = options;
+        _typeBitMaps = typeBitMaps;
         _logger = logger;
         _time = timeProvider ?? TimeProvider.System;
         _trustAnchors = trustAnchors;
@@ -369,8 +372,8 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
             // Exact owner: NODATA when QTYPE (and CNAME) bits are clear.
             if (question.Name.Equals(nsecRecord.Name))
             {
-                if (DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, question.Type) ||
-                    DnssecTypeBitMaps.Contains(nsec.TypeBitMaps, DomainRecordType.CNAME))
+                if (_typeBitMaps.Contains(nsec.TypeBitMaps, question.Type) ||
+                    _typeBitMaps.Contains(nsec.TypeBitMaps, DomainRecordType.CNAME))
                 {
                     LogNsecNodataTypePresent(_logger, nsecRecord.Name);
                     return DnssecValidationStatus.Bogus;
@@ -450,8 +453,8 @@ public sealed partial class DnssecMessageValidator : IDnssecMessageValidator
         if (exact is { } exactMatch &&
             response.Flags.ResponseCode is DomainResponseCode.NoError)
         {
-            if (DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, question.Type) ||
-                DnssecTypeBitMaps.Contains(exactMatch.Data.TypeBitMaps, DomainRecordType.CNAME))
+            if (_typeBitMaps.Contains(exactMatch.Data.TypeBitMaps, question.Type) ||
+                _typeBitMaps.Contains(exactMatch.Data.TypeBitMaps, DomainRecordType.CNAME))
             {
                 LogNsec3NodataTypePresent(_logger, question.Name);
                 return DnssecValidationStatus.Bogus;

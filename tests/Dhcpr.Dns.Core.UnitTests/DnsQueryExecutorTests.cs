@@ -8,6 +8,8 @@ using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 using Microsoft.Extensions.Options;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnsQueryExecutorTests
@@ -15,7 +17,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_EmptyRequest_ReturnsEmptyStatus()
     {
-        var executor = CreateExecutor(new CountingPipeline());
+        var executor = CreateExecutor(Substitute.For<IDnsQueryPipeline>());
 
         var result = await executor.ExecuteAsync(
             ReadOnlyMemory<byte>.Empty,
@@ -30,7 +32,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_TooLarge_ReturnsRequestTooLarge()
     {
-        var executor = CreateExecutor(new CountingPipeline(), maxRequestBytes: 12);
+        var executor = CreateExecutor(Substitute.For<IDnsQueryPipeline>(), maxRequestBytes: 12);
         var wire = new byte[13];
 
         var result = await executor.ExecuteAsync(
@@ -45,7 +47,7 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_InvalidWire_ReturnsInvalidWireFormat()
     {
-        var executor = CreateExecutor(new CountingPipeline());
+        var executor = CreateExecutor(Substitute.For<IDnsQueryPipeline>());
 
         var result = await executor.ExecuteAsync(
             new byte[] { 1, 2, 3 },
@@ -59,7 +61,9 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task ExecuteAsync_RunsPipelineWithExternalContextAndReturnsEncodedResponse()
     {
-        var pipeline = new CountingPipeline();
+        var contexts = new List<DomainMessageContext>();
+        var completions = new List<TaskCompletionSource<DomainMessage?>>();
+        var pipeline = HeldPipeline(contexts, completions);
         var executor = CreateExecutor(pipeline);
         var request = DomainMessage.CreateRequest("example.com");
         var requestWire = Encode(request);
@@ -70,19 +74,18 @@ public class DnsQueryExecutorTests
             new IPEndPoint(IPAddress.Loopback, 8080),
             CancellationToken.None).AsTask();
 
-        Assert.Equal(1, pipeline.ExecuteCount);
-        Assert.NotNull(pipeline.LastContext);
-        Assert.False(pipeline.LastContext!.IsInternal);
-        Assert.Equal(DnsQuerySource.Doh, pipeline.LastContext.Source);
-        Assert.NotNull(pipeline.LastContext.WorkBudget);
-        Assert.NotNull(pipeline.LastContext.DnssecScope);
-        Assert.Equal(IPAddress.Parse("203.0.113.10"), pipeline.LastContext.ClientEndPoint!.Address);
+        var context = Assert.Single(contexts);
+        Assert.False(context.IsInternal);
+        Assert.Equal(DnsQuerySource.Doh, context.Source);
+        Assert.NotNull(context.WorkBudget);
+        Assert.NotNull(context.DnssecScope);
+        Assert.Equal(IPAddress.Parse("203.0.113.10"), context.ClientEndPoint!.Address);
 
         var response = DomainMessage.CreateResponse(
-            pipeline.LastContext.DomainMessage,
+            context.DomainMessage,
             DomainResourceRecords.Empty,
             DomainResponseCode.NameError);
-        pipeline.CompleteLast(response);
+        completions[0].TrySetResult(response);
 
         var result = await executeTask;
         Assert.Equal(DnsQueryExecutionStatus.Success, result.Status);
@@ -95,23 +98,24 @@ public class DnsQueryExecutorTests
     [Fact]
     public async Task QueryAsync_RunsPipelineAndReturnsResponse()
     {
-        var pipeline = new CountingPipeline();
+        var contexts = new List<DomainMessageContext>();
+        var completions = new List<TaskCompletionSource<DomainMessage?>>();
+        var pipeline = HeldPipeline(contexts, completions);
         var executor = CreateExecutor(pipeline);
         var request = DomainMessage.CreateRequest("health.example");
 
         var queryTask = executor.QueryAsync(request, CancellationToken.None).AsTask();
 
-        Assert.Equal(1, pipeline.ExecuteCount);
-        Assert.NotNull(pipeline.LastContext);
-        Assert.Equal("health.example", pipeline.LastContext!.DomainMessage.Questions[0].Name.ToString());
-        Assert.True(pipeline.LastContext.BypassCache);
-        Assert.True(pipeline.LastContext.DoNotCacheResponse);
+        var context = Assert.Single(contexts);
+        Assert.Equal("health.example", context.DomainMessage.Questions[0].Name.ToString());
+        Assert.True(context.BypassCache);
+        Assert.True(context.DoNotCacheResponse);
 
         var response = DomainMessage.CreateResponse(
-            pipeline.LastContext.DomainMessage,
+            context.DomainMessage,
             DomainResourceRecords.Empty,
             DomainResponseCode.NoError);
-        pipeline.CompleteLast(response);
+        completions[0].TrySetResult(response);
 
         var result = await queryTask;
         Assert.NotNull(result);
@@ -140,24 +144,20 @@ public class DnsQueryExecutorTests
         return buffer.AsSpan(0, length).ToArray();
     }
 
-    private sealed class CountingPipeline : IDnsQueryPipeline
+    private static IDnsQueryPipeline HeldPipeline(
+        List<DomainMessageContext> contexts,
+        List<TaskCompletionSource<DomainMessage?>> completions)
     {
-        public int ExecuteCount { get; private set; }
-        public DomainMessageContext? LastContext { get; private set; }
-        private TaskCompletionSource<DomainMessage?>? _completion;
-
-        public ValueTask<DomainMessage?> ExecuteAsync(
-            DomainMessageContext context,
-            CancellationToken cancellationToken)
-        {
-            ExecuteCount++;
-            LastContext = context;
-            _completion = new TaskCompletionSource<DomainMessage?>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            return new ValueTask<DomainMessage?>(_completion.Task);
-        }
-
-        public void CompleteLast(DomainMessage response)
-            => _completion!.TrySetResult(response);
+        var pipeline = Substitute.For<IDnsQueryPipeline>();
+        pipeline.ExecuteAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                contexts.Add(call.Arg<DomainMessageContext>());
+                var completion = new TaskCompletionSource<DomainMessage?>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                completions.Add(completion);
+                return new ValueTask<DomainMessage?>(completion.Task);
+            });
+        return pipeline;
     }
 }

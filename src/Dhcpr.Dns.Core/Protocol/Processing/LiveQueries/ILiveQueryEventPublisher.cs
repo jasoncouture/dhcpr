@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 public interface ILiveQueryEventPublisher
 {

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 /// <summary>Authenticated DNSKEY set for a zone apex.</summary>
 public sealed class AuthenticatedDnsKeySet

@@ -2,6 +2,7 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 using NSubstitute;

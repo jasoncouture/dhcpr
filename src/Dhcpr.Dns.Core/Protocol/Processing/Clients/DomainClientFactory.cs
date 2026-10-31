@@ -2,8 +2,9 @@
 using System.Net.Sockets;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public sealed class DomainClientFactory : IDomainClientFactory
 {

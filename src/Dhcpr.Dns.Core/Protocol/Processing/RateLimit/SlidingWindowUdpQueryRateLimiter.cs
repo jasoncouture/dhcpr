@@ -6,7 +6,7 @@ using Dhcpr.Core;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.RateLimit;
 
 /// <summary>
 /// Two sliding windows for classic DNS (UDP/TCP): client+QNAME+QTYPE (soft REFUSED

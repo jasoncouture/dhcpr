@@ -1,8 +1,9 @@
 using System.Diagnostics;
 
 using Dhcpr.Core.Metrics;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
 public sealed class DnsMetricsPublisher : IDnsMetrics
 {

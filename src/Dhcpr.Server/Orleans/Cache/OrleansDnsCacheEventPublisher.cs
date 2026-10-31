@@ -2,6 +2,7 @@ using System.Threading.Channels;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 
 namespace Dhcpr.Server.Orleans.Cache;

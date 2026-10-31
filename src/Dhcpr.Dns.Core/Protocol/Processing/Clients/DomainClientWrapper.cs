@@ -1,6 +1,6 @@
 ﻿using Dhcpr.Core.Linq;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public sealed class DomainClientWrapper : IDomainClient
 {

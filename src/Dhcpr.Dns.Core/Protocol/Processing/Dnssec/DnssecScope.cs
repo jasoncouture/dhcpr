@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 public sealed class DnssecScope
 {

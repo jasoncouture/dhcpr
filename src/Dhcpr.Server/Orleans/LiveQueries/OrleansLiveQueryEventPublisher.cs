@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 namespace Dhcpr.Server.Orleans.LiveQueries;
 

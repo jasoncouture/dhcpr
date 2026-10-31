@@ -1,6 +1,7 @@
 using System.Diagnostics;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
 public static class DnsInstrumentation
 {

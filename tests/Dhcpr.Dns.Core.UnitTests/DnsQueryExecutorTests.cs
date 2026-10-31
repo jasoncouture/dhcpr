@@ -3,6 +3,8 @@ using System.Net;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 using Microsoft.Extensions.Options;
 

@@ -2,6 +2,8 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Clients;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Resolvers.Caching;

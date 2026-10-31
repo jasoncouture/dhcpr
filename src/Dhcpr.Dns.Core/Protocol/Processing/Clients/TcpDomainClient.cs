@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol.Parser;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public sealed class TcpDomainClient : IDomainClient
 {

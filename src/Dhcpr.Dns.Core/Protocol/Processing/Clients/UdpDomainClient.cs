@@ -5,7 +5,7 @@ using System.Net.Sockets;
 
 using Dhcpr.Dns.Core.Protocol.Parser;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 [SuppressMessage("ReSharper", "SuggestBaseTypeForParameter",
     Justification = "Explicit types are desired, as only IP is supported.")]

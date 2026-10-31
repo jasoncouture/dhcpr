@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Net;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public sealed class TracingDomainClient : IDomainClient
 {

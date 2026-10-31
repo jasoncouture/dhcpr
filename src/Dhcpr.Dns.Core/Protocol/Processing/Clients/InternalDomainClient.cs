@@ -2,8 +2,11 @@
 using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public class InternalDomainClient : IInternalDomainClient
 {

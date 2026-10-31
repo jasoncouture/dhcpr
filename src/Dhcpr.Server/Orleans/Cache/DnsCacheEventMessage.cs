@@ -3,6 +3,7 @@ using System.Buffers;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Parser;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 namespace Dhcpr.Server.Orleans.Cache;
 

@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 /// <summary>
 /// Default publisher used when the host does not register a live-query sink.

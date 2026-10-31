@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 

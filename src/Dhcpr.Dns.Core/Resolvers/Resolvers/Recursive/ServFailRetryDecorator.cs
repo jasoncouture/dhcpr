@@ -1,5 +1,6 @@
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 namespace Dhcpr.Dns.Core.Resolvers.Resolvers.Recursive;

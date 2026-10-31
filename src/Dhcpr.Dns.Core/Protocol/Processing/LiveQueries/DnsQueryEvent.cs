@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 public sealed record DnsQueryEvent(
     Guid Id,

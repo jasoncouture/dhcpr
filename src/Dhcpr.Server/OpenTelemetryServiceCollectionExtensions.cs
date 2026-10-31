@@ -2,6 +2,7 @@ using System.Diagnostics.Metrics;
 
 using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
 using OpenTelemetry;
 using OpenTelemetry.Logs;

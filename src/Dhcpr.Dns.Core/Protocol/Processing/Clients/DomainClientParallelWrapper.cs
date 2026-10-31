@@ -1,7 +1,8 @@
 ﻿using Dhcpr.Core;
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public sealed class DomainClientParallelWrapper : IDomainClient
 {

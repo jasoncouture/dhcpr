@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 using NSubstitute;
 

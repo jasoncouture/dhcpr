@@ -1,6 +1,6 @@
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 /// <summary>
 /// Fire-and-forget. A full gate returns before the yield, so the response is not queued.

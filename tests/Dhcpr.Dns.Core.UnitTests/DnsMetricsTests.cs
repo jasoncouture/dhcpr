@@ -1,4 +1,5 @@
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
 
 namespace Dhcpr.Dns.Core.UnitTests;
 

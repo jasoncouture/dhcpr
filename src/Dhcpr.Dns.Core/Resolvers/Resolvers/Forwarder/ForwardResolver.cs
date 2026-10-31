@@ -4,6 +4,7 @@ using System.Net;
 using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Clients;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 using Microsoft.Extensions.Options;

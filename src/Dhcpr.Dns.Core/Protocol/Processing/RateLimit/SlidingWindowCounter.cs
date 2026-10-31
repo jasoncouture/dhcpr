@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.RateLimit;
 
 /// <summary>
 /// Segmented sliding window: counts live in a ring keyed by absolute segment

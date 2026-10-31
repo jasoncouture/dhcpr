@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
 /// <summary>
 /// Query-scoped zone-cut endpoints shared with CNAME/glue re-entries.

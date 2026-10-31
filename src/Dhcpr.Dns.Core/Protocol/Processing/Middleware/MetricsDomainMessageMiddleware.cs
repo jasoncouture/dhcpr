@@ -1,3 +1,5 @@
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
+
 namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 public sealed class MetricsDomainMessageMiddleware : IDomainMessageMiddleware

@@ -10,6 +10,10 @@ using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol.Parser;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
+using Dhcpr.Dns.Core.Protocol.Processing.Metrics;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

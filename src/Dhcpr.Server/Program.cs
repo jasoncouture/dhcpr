@@ -3,6 +3,7 @@ using Dhcpr.Dhcp.Core;
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 using Dhcpr.Server;
 using Dhcpr.Server.Components;
 using Dhcpr.Server.Components.Pages.Admin.Settings;

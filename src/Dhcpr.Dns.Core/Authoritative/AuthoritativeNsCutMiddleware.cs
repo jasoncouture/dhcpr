@@ -3,6 +3,7 @@ using System.Net;
 using Dhcpr.Core.Linq;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 namespace Dhcpr.Dns.Core.Authoritative;

@@ -3,6 +3,7 @@ using System.Net;
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.RateLimit;
 
 using Microsoft.Extensions.Options;
 

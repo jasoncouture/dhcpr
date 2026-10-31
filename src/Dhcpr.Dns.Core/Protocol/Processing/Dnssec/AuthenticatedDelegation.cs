@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 /// <summary>Authenticated DS set (or trust-anchor equivalent) for a child zone.</summary>
 public sealed class AuthenticatedDelegation

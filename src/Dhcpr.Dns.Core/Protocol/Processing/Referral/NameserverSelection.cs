@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
 public static class NameserverSelection
 {

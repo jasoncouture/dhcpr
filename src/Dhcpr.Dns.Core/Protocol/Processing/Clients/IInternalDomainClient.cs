@@ -1,8 +1,9 @@
 ﻿using System.Collections.Immutable;
 using System.Net;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 public interface IInternalDomainClient : IDomainClient
 {

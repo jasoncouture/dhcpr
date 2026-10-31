@@ -1,5 +1,6 @@
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Dnssec;
 
 namespace Dhcpr.Dns.Core.Resolvers.Caching;
 

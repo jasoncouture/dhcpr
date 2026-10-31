@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.LiveQueries;
 
 /// <summary>
 /// External ingress that produced a client query. Internal hops keep the

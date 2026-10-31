@@ -1,6 +1,8 @@
 using System.Net;
 
 using Dhcpr.Core.Linq;
+using Dhcpr.Dns.Core.Protocol.Processing.Clients;
+using Dhcpr.Dns.Core.Protocol.Processing.Referral;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 

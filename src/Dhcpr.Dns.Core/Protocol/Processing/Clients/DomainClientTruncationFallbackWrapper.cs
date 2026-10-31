@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Clients;
 
 /// <summary>
 /// Sends via UDP first; if the response is truncated, retries the same query over TCP.

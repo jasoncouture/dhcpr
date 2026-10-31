@@ -55,6 +55,29 @@ public class OrleansDataProtectionKeyRepositoryTests
         }
     }
 
+    [Fact]
+    public void ReplaceSkipsKeyFileThatAlreadyExists()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var files = CreateFiles(directory.FullName);
+            var xml = """<key id="abc"><descriptor/></key>""";
+            files.Store(XElement.Parse(xml), "key");
+            DataProtectionKeySnapshot.Clear();
+
+            files.Replace([xml]);
+
+            var keyDirectory = Path.Combine(directory.FullName, ApplicationConfiguration.DataProtectionKeysDirectoryName);
+            Assert.Single(Directory.GetFiles(keyDirectory, "*.xml"));
+            Assert.Contains(DataProtectionKeySnapshot.Copy(), static item => item.Contains("abc"));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     private static DataProtectionKeyFiles CreateFiles(string? path = null)
     {
         path ??= Directory.CreateTempSubdirectory().FullName;

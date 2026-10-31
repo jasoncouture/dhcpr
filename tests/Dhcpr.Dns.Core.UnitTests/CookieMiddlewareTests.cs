@@ -169,11 +169,20 @@ public class CookieMiddlewareTests
     }
 
     private static DnsServerCookieFactory Factory(byte[]? secret = null)
-        => new(
-            secret is null
-                ? new EmptyDnsServerCookieSecretSource()
-                : new StaticDnsServerCookieSecretSource(secret),
-            TimeProvider.System);
+    {
+        var source = Substitute.For<IDnsServerCookieSecretSource>();
+        if (secret is not null)
+        {
+            source.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>())
+                .Returns(call =>
+                {
+                    call[0] = new ReadOnlyMemory<byte>(secret);
+                    return true;
+                });
+        }
+
+        return new DnsServerCookieFactory(source, TimeProvider.System);
+    }
 
     private static DomainMessage WithOptCookie(DomainMessage message, ImmutableArray<byte> cookie)
         => message with

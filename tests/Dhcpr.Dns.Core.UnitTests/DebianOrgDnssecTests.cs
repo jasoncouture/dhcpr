@@ -184,7 +184,7 @@ public class DebianOrgDnssecTests
             options,
             NullLogger<DnssecMessageValidator>.Instance,
             Substitute.For<IDnssecTypeBitMaps>(),
-            new FrozenTimeProvider(FrozenNow));
+            Clock(FrozenNow));
         var inner = Substitute.For<IDomainMessageMiddleware>();
         inner.ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>())
             .Returns(response);
@@ -247,12 +247,10 @@ public class DebianOrgDnssecTests
     /// Fixture RRSIGs are snapshots; <c>org.DS</c> and <c>root.DNSKEY</c>
     /// expire on the order of days. Validation must use <see cref="FrozenNow"/>.
     /// </summary>
-    private sealed class FrozenTimeProvider : TimeProvider
+    private static TimeProvider Clock(DateTimeOffset utc)
     {
-        private readonly DateTimeOffset _utc;
-
-        public FrozenTimeProvider(DateTimeOffset utc) => _utc = utc.ToUniversalTime();
-
-        public override DateTimeOffset GetUtcNow() => _utc;
+        var clock = Substitute.For<TimeProvider>();
+        clock.GetUtcNow().Returns(utc.ToUniversalTime());
+        return clock;
     }
 }

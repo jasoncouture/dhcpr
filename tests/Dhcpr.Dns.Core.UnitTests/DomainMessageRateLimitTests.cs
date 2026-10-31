@@ -137,9 +137,7 @@ public class DomainMessageRateLimitTests
         limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
             .Returns(UdpRateLimitAction.Drop);
         var middleware = PassthroughMiddleware();
-        var factory = new DnsServerCookieFactory(
-            new StaticDnsServerCookieSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
-            TimeProvider.System);
+        var factory = new DnsServerCookieFactory(CookieSecret(), TimeProvider.System);
         var processor = Create(limiter, middleware, factory);
         var clientCookie = ImmutableArray.Create<byte>(1, 2, 3, 4, 5, 6, 7, 8);
         var serverCookie = factory.Create(clientCookie.AsSpan(), Client.Address);
@@ -164,9 +162,7 @@ public class DomainMessageRateLimitTests
         limiter.Record(Arg.Any<IPAddress?>(), Arg.Any<DomainLabels>(), Arg.Any<DomainRecordType>())
             .Returns(UdpRateLimitAction.Refuse);
         var middleware = PassthroughMiddleware();
-        var factory = new DnsServerCookieFactory(
-            new StaticDnsServerCookieSecretSource(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
-            TimeProvider.System);
+        var factory = new DnsServerCookieFactory(CookieSecret(), TimeProvider.System);
         var processor = Create(limiter, middleware, factory);
         var request = WithOptCookie(
             DomainMessage.CreateRequest("cisco.com", DomainRecordType.TXT),
@@ -269,6 +265,19 @@ public class DomainMessageRateLimitTests
                         DomainResponseCode.NoError));
             });
         return middleware;
+    }
+
+    private static IDnsServerCookieSecretSource CookieSecret()
+    {
+        var secret = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        var source = Substitute.For<IDnsServerCookieSecretSource>();
+        source.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>())
+            .Returns(call =>
+            {
+                call[0] = new ReadOnlyMemory<byte>(secret);
+                return true;
+            });
+        return source;
     }
 
     private static DomainMessageContext CreateContext(DnsQuerySource source)

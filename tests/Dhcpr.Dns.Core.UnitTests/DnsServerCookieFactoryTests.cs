@@ -2,6 +2,8 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol;
 
+using NSubstitute;
+
 namespace Dhcpr.Dns.Core.UnitTests;
 
 public class DnsServerCookieFactoryTests
@@ -54,8 +56,8 @@ public class DnsServerCookieFactoryTests
     [Fact]
     public void IsValid_RejectsExpiredCookie()
     {
-        var mintedAt = new FrozenTimeProvider(FrozenNow);
-        var later = new FrozenTimeProvider(FrozenNow + DnsServerCookieFactory.Lifetime + TimeSpan.FromSeconds(1));
+        var mintedAt = Clock(FrozenNow);
+        var later = Clock(FrozenNow + DnsServerCookieFactory.Lifetime + TimeSpan.FromSeconds(1));
         var minted = Factory(mintedAt);
         var server = minted.Create(ClientCookie, Client);
         var validator = Factory(later);
@@ -66,8 +68,8 @@ public class DnsServerCookieFactoryTests
     [Fact]
     public void IsValid_AcceptsCookieInsideLifetime()
     {
-        var mintedAt = new FrozenTimeProvider(FrozenNow);
-        var later = new FrozenTimeProvider(FrozenNow + DnsServerCookieFactory.Lifetime - TimeSpan.FromMinutes(1));
+        var mintedAt = Clock(FrozenNow);
+        var later = Clock(FrozenNow + DnsServerCookieFactory.Lifetime - TimeSpan.FromMinutes(1));
         var minted = Factory(mintedAt);
         var server = minted.Create(ClientCookie, Client);
         var validator = Factory(later);
@@ -83,14 +85,24 @@ public class DnsServerCookieFactoryTests
     }
 
     private static DnsServerCookieFactory Factory(TimeProvider? time = null)
-        => new(new StaticDnsServerCookieSecretSource(Secret), time ?? new FrozenTimeProvider(FrozenNow));
+        => new(CookieSecret(), time ?? Clock(FrozenNow));
 
-    private sealed class FrozenTimeProvider : TimeProvider
+    private static IDnsServerCookieSecretSource CookieSecret()
     {
-        private readonly DateTimeOffset _utc;
+        var source = Substitute.For<IDnsServerCookieSecretSource>();
+        source.TryGetSecret(out Arg.Any<ReadOnlyMemory<byte>>())
+            .Returns(call =>
+            {
+                call[0] = new ReadOnlyMemory<byte>(Secret);
+                return true;
+            });
+        return source;
+    }
 
-        public FrozenTimeProvider(DateTimeOffset utc) => _utc = utc.ToUniversalTime();
-
-        public override DateTimeOffset GetUtcNow() => _utc;
+    private static TimeProvider Clock(DateTimeOffset utc)
+    {
+        var clock = Substitute.For<TimeProvider>();
+        clock.GetUtcNow().Returns(utc.ToUniversalTime());
+        return clock;
     }
 }

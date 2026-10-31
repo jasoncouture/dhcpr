@@ -4,7 +4,7 @@
 GitHub is a read-only mirror. Issues, PRs, and CI belong on git.alertr.info.
 
 Recursive DNS resolver (and optional DHCP server) with a small operator UI.
-.NET 10, in-process DoT/DoH, validating DNSSEC, and a Helm chart for Kubernetes.
+.NET 11, in-process DoT/DoH, validating DNSSEC, and a Helm chart for Kubernetes.
 
 **How to use it:** [docs/](docs/README.md) — start with the
 [quickstart](docs/quickstart.md). Public resolvers:
@@ -24,7 +24,7 @@ see [docs/public-resolver.md](docs/public-resolver.md).
 
 ## Build and run
 
-Requires the .NET 10 SDK. Details: [quickstart](docs/quickstart.md).
+Requires the .NET 11 SDK. Details: [quickstart](docs/quickstart.md).
 
 ```bash
 dotnet test

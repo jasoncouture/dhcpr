@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.100-rc.3.26522.148
 
       - uses: dotnet/nbgv@v0.4.2
         id: nbgv
@@ -51,7 +51,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.100-rc.3.26522.148
 
       - name: Test
         run: dotnet test --configuration Release

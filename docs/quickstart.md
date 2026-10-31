@@ -4,7 +4,7 @@ A public instance is at **`dns.alertr.info`** —
 `23.162.92.54` and `2602:81e:9004::4`. Ports 53, 853 (DoT), and 443 (DoH).
 Usage: [public resolver](public-resolver.md).
 
-Requires the [.NET 10 SDK](https://dot.net/) to run your own copy. Port 53
+Requires the [.NET 11 SDK](https://dot.net/) to run your own copy. Port 53
 needs extra privileges; development uses **65353** so you can run unprivileged.
 
 ## Clone the official repo

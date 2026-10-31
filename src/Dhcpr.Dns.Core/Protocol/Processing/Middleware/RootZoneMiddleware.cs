@@ -6,7 +6,7 @@ using Dhcpr.Dns.Core.RootZone;
 
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// Answers from the primed root.zone snapshot (TLD NS/DS, covering RRSIGs, and

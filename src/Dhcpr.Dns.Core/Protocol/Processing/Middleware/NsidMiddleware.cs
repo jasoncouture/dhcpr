@@ -3,7 +3,7 @@ using System.Text;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// RFC 5001. When the query carries NSID, the reply includes this host's name.

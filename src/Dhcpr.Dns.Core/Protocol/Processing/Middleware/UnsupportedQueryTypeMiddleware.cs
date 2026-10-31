@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// Rejects query class other than IN/CH with NOTIMP, QTYPE ANY and unknown

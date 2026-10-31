@@ -5,7 +5,7 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// RFC 9462 Discovery of Designated Resolvers: serve <c>resolver.arpa</c> locally

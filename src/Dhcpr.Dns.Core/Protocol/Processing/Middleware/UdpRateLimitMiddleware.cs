@@ -2,7 +2,7 @@ using System.Net;
 
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// REFUSED or drop for classic DNS (UDP and TCP) over the shared sliding

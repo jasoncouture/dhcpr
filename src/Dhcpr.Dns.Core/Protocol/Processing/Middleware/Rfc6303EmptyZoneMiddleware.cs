@@ -3,7 +3,7 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// Serves RFC 6303 empty reverse zones locally so private PTR lookups are

@@ -1,4 +1,4 @@
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 // Terminal fallback: unhandled query → SERVFAIL, never NXDOMAIN.
 public sealed class ServerFailureDomainMiddleware : IDomainMessageMiddleware

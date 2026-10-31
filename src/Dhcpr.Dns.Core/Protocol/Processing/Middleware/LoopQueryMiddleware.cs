@@ -5,7 +5,7 @@ using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// REFUSED when the query carries this resolver's loop tag. Outside the

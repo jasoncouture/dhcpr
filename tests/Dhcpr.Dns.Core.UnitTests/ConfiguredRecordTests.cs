@@ -6,6 +6,7 @@ using Dhcpr.Dns.Core.ConfiguredRecords;
 using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Options;

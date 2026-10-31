@@ -1,5 +1,6 @@
 using Dhcpr.Dns.Core;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 using Microsoft.Extensions.DependencyInjection;
 

@@ -3,7 +3,7 @@ using System.Reflection;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// CH is answered locally (<c>id.server</c> and <c>version.server</c>

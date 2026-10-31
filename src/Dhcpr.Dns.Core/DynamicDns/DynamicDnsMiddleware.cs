@@ -1,6 +1,7 @@
 using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 namespace Dhcpr.Dns.Core.DynamicDns;
 

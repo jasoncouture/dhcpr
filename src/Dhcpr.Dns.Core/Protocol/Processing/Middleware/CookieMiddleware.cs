@@ -3,7 +3,7 @@ using System.Net;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// RFC 7873. A query that carries a client cookie gets it echoed, plus a

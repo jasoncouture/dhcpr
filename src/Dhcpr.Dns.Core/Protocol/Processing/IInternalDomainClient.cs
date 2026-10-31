@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Net;
+using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 

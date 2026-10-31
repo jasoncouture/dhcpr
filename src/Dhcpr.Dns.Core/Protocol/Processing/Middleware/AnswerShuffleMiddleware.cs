@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 public sealed class AnswerShuffleMiddleware : IDomainMessageMiddleware
 {

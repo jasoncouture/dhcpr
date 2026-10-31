@@ -5,6 +5,7 @@ using System.Text;
 
 using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
+using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 using Microsoft.Extensions.Logging.Abstractions;

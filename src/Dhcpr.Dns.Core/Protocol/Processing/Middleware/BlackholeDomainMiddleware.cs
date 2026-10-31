@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// NXDOMAIN for configured blackhole suffixes and regexes before upstream.

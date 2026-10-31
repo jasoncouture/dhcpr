@@ -2,7 +2,7 @@ using System.Net;
 
 using Dhcpr.Core.Linq;
 
-namespace Dhcpr.Dns.Core.Protocol.Processing;
+namespace Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 
 /// <summary>
 /// Directed stub query to nameservers listed on <see cref="DomainMessageContext.UpstreamEndpoints"/>.

@@ -10,6 +10,7 @@ public sealed partial class DnsServerCookieSecretOrleansBridge : IHostedService
 
     private readonly IGrainFactory _grainFactory;
     private readonly IClusterMembershipService _membership;
+    private readonly IDnsServerCookieSecretSnapshot _snapshot;
     private readonly ILogger<DnsServerCookieSecretOrleansBridge> _logger;
 
     private HubObserver? _observerInstance;
@@ -21,17 +22,19 @@ public sealed partial class DnsServerCookieSecretOrleansBridge : IHostedService
     public DnsServerCookieSecretOrleansBridge(
         IGrainFactory grainFactory,
         IClusterMembershipService membership,
+        IDnsServerCookieSecretSnapshot snapshot,
         ILogger<DnsServerCookieSecretOrleansBridge> logger)
     {
         _grainFactory = grainFactory;
         _membership = membership;
+        _snapshot = snapshot;
         _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        _observerInstance = new HubObserver();
+        _observerInstance = new HubObserver(_snapshot);
         _observer = _grainFactory.CreateObjectReference<IDnsServerCookieSecretObserver>(_observerInstance);
         _hub = _grainFactory.GetGrain<IDnsServerCookieSecretGrain>(DnsServerCookieSecretGrain.Key);
 
@@ -118,9 +121,9 @@ public sealed partial class DnsServerCookieSecretOrleansBridge : IHostedService
     {
         try
         {
-            await _hub!.SubscribeAsync(_observer!, DnsServerCookieSecretSnapshot.Get(), cancellationToken);
-            if (DnsServerCookieSecretSnapshot.Get() is not { Length: >= 16 })
-                DnsServerCookieSecretSnapshot.Replace(await _hub.GetOrCreateAsync());
+            await _hub!.SubscribeAsync(_observer!, _snapshot.Get(), cancellationToken);
+            if (_snapshot.Get() is not { Length: >= 16 })
+                _snapshot.Replace(await _hub.GetOrCreateAsync());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -143,10 +146,17 @@ public sealed partial class DnsServerCookieSecretOrleansBridge : IHostedService
 
     private sealed class HubObserver : IDnsServerCookieSecretObserver
     {
+        private readonly IDnsServerCookieSecretSnapshot _snapshot;
+
+        public HubObserver(IDnsServerCookieSecretSnapshot snapshot)
+        {
+            _snapshot = snapshot;
+        }
+
         public async Task OnSecretAsync(byte[] secret, CancellationToken cancellationToken)
         {
             await Task.Yield();
-            DnsServerCookieSecretSnapshot.Replace(secret);
+            _snapshot.Replace(secret);
         }
     }
 }

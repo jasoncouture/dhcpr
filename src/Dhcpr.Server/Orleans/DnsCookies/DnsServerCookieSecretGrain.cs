@@ -17,18 +17,22 @@ public sealed class DnsServerCookieSecretGrain : Grain, IDnsServerCookieSecretGr
 
     private static readonly TimeSpan _observerExpiration = TimeSpan.FromMinutes(5);
 
+    private readonly IDnsServerCookieSecretSnapshot _snapshot;
     private readonly ObserverManager<IDnsServerCookieSecretObserver> _observers;
     private byte[]? _secret;
 
-    public DnsServerCookieSecretGrain(ILogger<DnsServerCookieSecretGrain> logger)
+    public DnsServerCookieSecretGrain(
+        IDnsServerCookieSecretSnapshot snapshot,
+        ILogger<DnsServerCookieSecretGrain> logger)
     {
+        _snapshot = snapshot;
         _observers = new ObserverManager<IDnsServerCookieSecretObserver>(_observerExpiration, logger);
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        var local = DnsServerCookieSecretSnapshot.Get();
+        var local = _snapshot.Get();
         if (local is { Length: >= 16 })
             _secret = local;
     }

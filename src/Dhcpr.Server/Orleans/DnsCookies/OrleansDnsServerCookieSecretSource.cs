@@ -8,9 +8,16 @@ namespace Dhcpr.Server.Orleans.DnsCookies;
 /// </summary>
 public sealed class OrleansDnsServerCookieSecretSource : IDnsServerCookieSecretSource
 {
+    private readonly IDnsServerCookieSecretSnapshot _snapshot;
+
+    public OrleansDnsServerCookieSecretSource(IDnsServerCookieSecretSnapshot snapshot)
+    {
+        _snapshot = snapshot;
+    }
+
     public bool TryGetSecret(out ReadOnlyMemory<byte> secret)
     {
-        var current = DnsServerCookieSecretSnapshot.Get();
+        var current = _snapshot.Get();
         if (current is not { Length: >= 16 })
         {
             secret = default;

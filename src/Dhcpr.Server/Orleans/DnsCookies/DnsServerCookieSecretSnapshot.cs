@@ -1,32 +1,24 @@
 namespace Dhcpr.Server.Orleans.DnsCookies;
 
-/// <summary>
-/// Silo-local copy of the cluster DNS cookie secret.
-/// </summary>
-internal static class DnsServerCookieSecretSnapshot
+/// <inheritdoc cref="IDnsServerCookieSecretSnapshot"/>
+public sealed class DnsServerCookieSecretSnapshot : IDnsServerCookieSecretSnapshot
 {
-    private static readonly object Gate = new();
-    private static byte[]? _secret;
+    private readonly object _gate = new();
+    private byte[]? _secret;
 
-    public static byte[]? Get()
+    public byte[]? Get()
     {
-        lock (Gate)
+        lock (_gate)
             return _secret;
     }
 
-    public static void Replace(byte[] secret)
+    public void Replace(byte[] secret)
     {
         ArgumentNullException.ThrowIfNull(secret);
         if (secret.Length < 16)
             throw new ArgumentOutOfRangeException(nameof(secret));
 
-        lock (Gate)
+        lock (_gate)
             _secret = secret;
-    }
-
-    internal static void Clear()
-    {
-        lock (Gate)
-            _secret = null;
     }
 }

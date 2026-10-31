@@ -63,6 +63,8 @@ builder.Services.AddHostedService(static sp =>
     (OrleansDnsCacheEventPublisher)sp.GetRequiredService<IDnsCacheEventPublisher>());
 builder.Services.AddHostedService<DnsCacheOrleansBridge>();
 builder.Services.AddHostedService<DataProtectionKeyOrleansBridge>();
+// One secret per process. The grain, the bridge, and the source share it.
+builder.Services.AddSingleton<IDnsServerCookieSecretSnapshot, DnsServerCookieSecretSnapshot>();
 builder.Services.Replace(ServiceDescriptor.Singleton<IDnsServerCookieSecretSource, OrleansDnsServerCookieSecretSource>());
 builder.Services.AddHostedService<DnsServerCookieSecretOrleansBridge>();
 builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();

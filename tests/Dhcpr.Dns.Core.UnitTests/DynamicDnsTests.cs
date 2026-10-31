@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 
+using Dhcpr.Core;
 using Dhcpr.Dns.Core.Authoritative;
 using Dhcpr.Dns.Core.DynamicDns;
 using Dhcpr.Dns.Core.Protocol;
@@ -8,6 +9,9 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Dns.Core.Protocol.Processing.Middleware;
 using Dhcpr.Dns.Core.Protocol.RecordData;
 using Dhcpr.Dns.Core.Protocol.Zone;
+
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 using NSubstitute;
 
@@ -137,7 +141,10 @@ public class DynamicDnsTests
         using var harness = CreateHarness();
         Update(harness, "host.foo.bar", "203.0.113.40");
 
-        var reloaded = DynamicDnsTestHelpers.CreateStore(harness.DataPath, harness.Config);
+        var reloaded = new DynamicDnsStore(
+            Monitor(new ApplicationConfiguration { DataPath = harness.DataPath }),
+            Monitor(harness.Config),
+            NullLogger<DynamicDnsStore>.Instance);
         reloaded.LoadFromDisk();
 
         Assert.True(reloaded.TryGet("host.foo.bar", out var entry));
@@ -287,10 +294,21 @@ public class DynamicDnsTests
             Password = "pass",
             TtlSeconds = 60
         };
-        var store = DynamicDnsTestHelpers.CreateStore(dataPath, config);
+        var store = new DynamicDnsStore(
+            Monitor(new ApplicationConfiguration { DataPath = dataPath }),
+            Monitor(config),
+            NullLogger<DynamicDnsStore>.Instance);
         var zones = new AuthoritativeZoneStore();
         zones.Publish([BuildZone(FooBarZone, "foo.bar.bind")]);
         return new Harness(dataPath, store, zones, config);
+    }
+
+    private static IOptionsMonitor<T> Monitor<T>(T value)
+    {
+        var monitor = Substitute.For<IOptionsMonitor<T>>();
+        monitor.CurrentValue.Returns(value);
+        monitor.Get(Arg.Any<string?>()).Returns(value);
+        return monitor;
     }
 
     private static AuthoritativeZone BuildZone(string text, string path)

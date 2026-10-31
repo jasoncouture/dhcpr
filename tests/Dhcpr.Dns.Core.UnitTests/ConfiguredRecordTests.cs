@@ -295,9 +295,8 @@ public class ConfiguredRecordTests
     [Fact]
     public async Task ConfigOwnerShadowsDynDnsIncludingOtherTypes()
     {
-        var dyn = DynamicDnsTestHelpers.CreateStore();
-        dyn.Upsert("www.home.arpa", IPAddress.Parse("203.0.113.50"), IPAddress.Parse("2001:db8::50"));
-        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, new AuthoritativeZoneStore());
+        var dyn = Store("203.0.113.50", "2001:db8::50");
+        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, Substitute.For<IAuthoritativeZoneStore>());
         var configMiddleware = CreateMiddleware(ValidConfig(Rec("www.home.arpa", "A", "10.0.0.5")));
 
         var aContext = new DomainMessageContext(null, null, DomainMessage.CreateRequest("www.home.arpa"));
@@ -323,9 +322,8 @@ public class ConfiguredRecordTests
     [Fact]
     public async Task MissStillReachesDynDns()
     {
-        var dyn = DynamicDnsTestHelpers.CreateStore();
-        dyn.Upsert("dyn.home.arpa", IPAddress.Parse("203.0.113.60"), ipv6: null);
-        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, new AuthoritativeZoneStore());
+        var dyn = Store("203.0.113.60", ipv6: null);
+        var dynMiddleware = new DynamicDnsMiddleware(PassThroughInner(), dyn, Substitute.For<IAuthoritativeZoneStore>());
         var configMiddleware = CreateMiddleware(ValidConfig(Rec("www.home.arpa", "A", "10.0.0.5")));
 
         var request = DomainMessage.CreateRequest("dyn.home.arpa");
@@ -400,6 +398,20 @@ public class ConfiguredRecordTests
         var monitor = Substitute.For<IOptionsMonitor<DnsConfiguration>>();
         monitor.CurrentValue.Returns(configuration);
         return new ConfiguredRecordMiddleware(PassThroughInner(), monitor);
+    }
+
+    private static IDynamicDnsStore Store(string? ipv4, string? ipv6)
+    {
+        var store = Substitute.For<IDynamicDnsStore>();
+        store.Ttl.Returns(TimeSpan.FromSeconds(60));
+        var entry = new DynamicDnsEntry { Ipv4 = ipv4, Ipv6 = ipv6 };
+        store.TryGet(Arg.Any<string>(), out Arg.Any<DynamicDnsEntry>()!)
+            .Returns(call =>
+            {
+                call[1] = entry;
+                return true;
+            });
+        return store;
     }
 
     private static IDomainMessageMiddleware PassThroughInner()

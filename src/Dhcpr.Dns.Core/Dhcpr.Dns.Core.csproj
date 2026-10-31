@@ -14,9 +14,7 @@
     <PackageReference Include="MessagePipe" Version="1.8.2" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="11.0.0-rc.3.26522.148" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics" Version="11.0.0-rc.3.26522.148" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="11.0.0-rc.3.26522.148" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.0-rc.3.26522.148" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-rc.3.26522.148" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="11.0.0-rc.3.26522.148" />
     <PackageReference Include="Scrutor" Version="7.0.0" />
   </ItemGroup>

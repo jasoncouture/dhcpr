@@ -81,7 +81,7 @@ public static class DnsServiceProviderExtensions
         services.Decorate<IDomainMessageMiddleware, ServFailRetryDecorator>();
         // Inside cache: sinkhole NXDOMAIN is stored so regex/suffix match runs once.
         services.Decorate<IDomainMessageMiddleware, BlackholeDomainMiddleware>();
-        // Inside cache: BIND CHAOS bait is stored. ip.info is DoNotCacheResponse.
+        // Inside cache: CHAOS identity TXT is stored. ip.info is DoNotCacheResponse.
         services.Decorate<IDomainMessageMiddleware, BindChaosMiddleware>();
         // Inside cache: NOTIMP / REFUSED policy answers live for an hour.
         services.Decorate<IDomainMessageMiddleware, UnsupportedQueryTypeMiddleware>();

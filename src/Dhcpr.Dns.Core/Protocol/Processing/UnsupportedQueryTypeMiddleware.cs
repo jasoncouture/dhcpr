@@ -33,7 +33,7 @@ public sealed class UnsupportedQueryTypeMiddleware : IDomainMessageMiddleware
                     responseCode: DomainResponseCode.NotImplemented);
             }
 
-            // CH ANY / HINFO / AXFR are BindChaos local bait, not IN policy.
+            // CH is answered locally, not by the IN type policy.
             if (question.Class is DomainRecordClass.CH)
                 continue;
 

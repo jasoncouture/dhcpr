@@ -16,13 +16,10 @@ namespace Dhcpr.Dns.Core.UnitTests;
 public class BindChaosMiddlewareTests
 {
     [Theory]
-    [InlineData("version.bind", BindChaosMiddleware.VersionText)]
-    [InlineData("version.server", BindChaosMiddleware.VersionText)]
-    [InlineData("VERSION.BIND", BindChaosMiddleware.VersionText)]
-    [InlineData("hostname.bind", BindChaosMiddleware.HostnameText)]
-    [InlineData("id.server", BindChaosMiddleware.HostnameText)]
-    [InlineData("authors.bind", BindChaosMiddleware.AuthorsText)]
-    public async Task ChaosTxtLooksLikeBind(string qname, string expected)
+    [InlineData("version.server")]
+    [InlineData("VERSION.SERVER")]
+    [InlineData("id.server")]
+    public async Task ChaosTxtReturnsApplicationIdentity(string qname)
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new BindChaosMiddleware(inner);
@@ -41,8 +38,9 @@ public class BindChaosMiddlewareTests
         Assert.Equal(DomainRecordClass.CH, answer.Class);
         Assert.Equal(BindChaosMiddleware.IdentityTtl, answer.TimeToLive);
         var text = Assert.IsType<TextData>(answer.Data);
-        Assert.Equal(expected, text.Text);
-        Assert.Equal("bind-chaos", context.AnsweredBy);
+        Assert.Equal(BindChaosMiddleware.IdentityText, text.Text);
+        Assert.StartsWith($"{BindChaosMiddleware.ApplicationName} ", text.Text);
+        Assert.Equal("chaos", context.AnsweredBy);
         Assert.False(context.DoNotCacheResponse);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
@@ -114,7 +112,7 @@ public class BindChaosMiddlewareTests
         Assert.NotNull(result);
         var answer = Assert.Single(result!.Records.Answers);
         Assert.Equal(DomainRecordType.TXT, answer.Type);
-        Assert.Equal(BindChaosMiddleware.HostnameText, Assert.IsType<TextData>(answer.Data).Text);
+        Assert.Equal(BindChaosMiddleware.IdentityText, Assert.IsType<TextData>(answer.Data).Text);
     }
 
     [Fact]
@@ -122,7 +120,7 @@ public class BindChaosMiddlewareTests
     {
         var inner = Substitute.For<IDomainMessageMiddleware>();
         var middleware = new BindChaosMiddleware(inner);
-        var request = DomainMessage.CreateRequest("version.bind", DomainRecordType.A, DomainRecordClass.CH);
+        var request = DomainMessage.CreateRequest("version.server", DomainRecordType.A, DomainRecordClass.CH);
 
         var result = await middleware.ProcessAsync(Context(request), CancellationToken.None);
 
@@ -163,16 +161,16 @@ public class BindChaosMiddlewareTests
         var cache = new DnsResponseCache(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }));
         var pipeline = new CacheResolverDecorator(chaos, cache, Substitute.For<IServiceScopeFactory>());
         var firstContext = Context(
-            DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
+            DomainMessage.CreateRequest("version.server", DomainRecordType.TXT, DomainRecordClass.CH));
         var secondContext = Context(
-            DomainMessage.CreateRequest("version.bind", DomainRecordType.TXT, DomainRecordClass.CH));
+            DomainMessage.CreateRequest("version.server", DomainRecordType.TXT, DomainRecordClass.CH));
 
         var first = await pipeline.ProcessAsync(firstContext, CancellationToken.None);
         var second = await pipeline.ProcessAsync(secondContext, CancellationToken.None);
 
-        Assert.Equal(BindChaosMiddleware.VersionText, Assert.IsType<TextData>(Assert.Single(first!.Records.Answers).Data).Text);
-        Assert.Equal("bind-chaos", firstContext.AnsweredBy);
-        Assert.Equal(BindChaosMiddleware.VersionText, Assert.IsType<TextData>(Assert.Single(second!.Records.Answers).Data).Text);
+        Assert.Equal(BindChaosMiddleware.IdentityText, Assert.IsType<TextData>(Assert.Single(first!.Records.Answers).Data).Text);
+        Assert.Equal("chaos", firstContext.AnsweredBy);
+        Assert.Equal(BindChaosMiddleware.IdentityText, Assert.IsType<TextData>(Assert.Single(second!.Records.Answers).Data).Text);
         Assert.True(secondContext.CacheHit);
         Assert.Equal("Cache", secondContext.AnsweredBy);
         await inner.DidNotReceiveWithAnyArgs()
@@ -203,7 +201,7 @@ public class BindChaosMiddlewareTests
         Assert.True(firstContext.DoNotCacheResponse);
         Assert.Equal("198.51.100.20", Assert.IsType<TextData>(Assert.Single(second!.Records.Answers).Data).Text);
         Assert.False(secondContext.CacheHit);
-        Assert.Equal("bind-chaos", secondContext.AnsweredBy);
+        Assert.Equal("chaos", secondContext.AnsweredBy);
     }
 
     [Fact]
@@ -223,6 +221,10 @@ public class BindChaosMiddlewareTests
     }
 
     [Theory]
+    [InlineData("version.bind")]
+    [InlineData("hostname.bind")]
+    [InlineData("authors.bind")]
+    [InlineData("VERSION.BIND")]
     [InlineData("foo.bind")]
     [InlineData("example.com")]
     public async Task OtherChaosNamesAreLocalNxdomain(string qname)
@@ -238,7 +240,7 @@ public class BindChaosMiddlewareTests
         Assert.Equal(DomainResponseCode.NameError, result!.Flags.ResponseCode);
         Assert.Empty(result.Records.Answers);
         Assert.True(result.Flags.Authoritative);
-        Assert.Equal("bind-chaos", context.AnsweredBy);
+        Assert.Equal("chaos", context.AnsweredBy);
         await inner.DidNotReceiveWithAnyArgs()
             .ProcessAsync(Arg.Any<DomainMessageContext>(), Arg.Any<CancellationToken>());
     }

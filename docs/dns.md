@@ -11,8 +11,8 @@ Order (outermost first):
 1. **Log** — every answer is recorded for the live-query UI (`Via` column).
 2. **Metrics** — increments `dns.queries` (see [operations](operations.md)).
 3. **Query class** — only **IN** is forwarded or recursed. Class **CH**:
-   BIND identity names get bait TXT (`9.9.4-P2-RedHat-…` / `ns1` /
-   `Mark Andrews`); `ip.info` is the client address as TXT; every other
+   `id.server` and `version.server` return the application name and
+   version as TXT; `ip.info` is the client address as TXT; every other
    CH name is local **NXDOMAIN**. HS, CS, QCLASS ANY, and unknown
    classes are **NOTIMP**.
 4. **`resolver.arpa`** — served locally, never cached, never forwarded

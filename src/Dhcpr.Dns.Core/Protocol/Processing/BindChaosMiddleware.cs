@@ -1,22 +1,21 @@
 using System.Net;
+using System.Reflection;
 
 using Dhcpr.Dns.Core.Protocol.RecordData;
 
 namespace Dhcpr.Dns.Core.Protocol.Processing;
 
 /// <summary>
-/// CH is answered locally (BIND identity bait, <c>ip.info</c> client
+/// CH is answered locally (<c>id.server</c> and <c>version.server</c>
+/// return the application name and version, <c>ip.info</c> the client
 /// address, or NXDOMAIN). IN and every other class pass through;
 /// <see cref="UnsupportedQueryTypeMiddleware"/> NOTIMPs non-IN/CH.
 /// </summary>
 public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 {
-    /// <summary>CVE-2016-2776 and friends. Scanners love this RPM string.</summary>
-    public const string VersionText = "9.9.4-P2-RedHat-9.9.4-29.el7_2.3";
+    public const string ApplicationName = "dhcpr";
 
-    public const string HostnameText = "ns1";
-
-    public const string AuthorsText = "Mark Andrews";
+    public static readonly string IdentityText = Describe(typeof(BindChaosMiddleware).Assembly);
 
     public const string IpInfoName = "ip.info";
 
@@ -29,9 +28,6 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
 
     private static readonly HashSet<string> IdentityNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "version.bind",
-        "hostname.bind",
-        "authors.bind",
         "id.server",
         "version.server"
     };
@@ -58,9 +54,9 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
             return await _inner.ProcessAsync(context, cancellationToken);
 
         // CHAOS never leaves the process (a "." route would otherwise
-        // send version.bind upstream). Identity answers are cached;
+        // send id.server upstream). Identity answers are cached;
         // ip.info is not — that TXT is the client address.
-        context.AnsweredBy = "bind-chaos";
+        context.AnsweredBy = "chaos";
         if (IsIpInfo(question.Name))
         {
             context.DoNotCacheResponse = true;
@@ -73,7 +69,7 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
         var response = !IsIdentityName(question.Name)
             ? NxDomain(context.DomainMessage)
             : question.Type is DomainRecordType.TXT or DomainRecordType.ANY
-                ? Txt(context.DomainMessage, TextFor(question.Name), IdentityTtl)
+                ? Txt(context.DomainMessage, IdentityText, IdentityTtl)
                 : Nodata(context.DomainMessage);
 
         return Local(response, response.Flags.ResponseCode, authoritative: true);
@@ -97,14 +93,20 @@ public sealed class BindChaosMiddleware : IDomainMessageMiddleware
         return address.ToString();
     }
 
-    internal static string TextFor(DomainLabels name)
-        => name.ToString().ToLowerInvariant() switch
-        {
-            "version.bind" or "version.server" => VersionText,
-            "hostname.bind" or "id.server" => HostnameText,
-            "authors.bind" => AuthorsText,
-            _ => VersionText
-        };
+    internal static string Describe(Assembly assembly)
+    {
+        var informational = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+            return $"{ApplicationName} {informational}";
+
+        var version = assembly.GetName().Version?.ToString();
+        if (!string.IsNullOrWhiteSpace(version))
+            return $"{ApplicationName} {version}";
+
+        return ApplicationName;
+    }
 
     private static DomainMessage Txt(DomainMessage request, string text, TimeSpan ttl)
         => DomainMessage.CreateResponse(

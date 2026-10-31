@@ -156,5 +156,6 @@ serviceMonitor:
 
 Pods are labeled `orleans/serviceId=dhcpr` and `orleans/clusterId=dhcpr`.
 Silo and gateway ports are on the pod spec only. In-cluster the process uses
-kube membership. Outside the cluster, set `Orleans:UseConsul` — see
+kube membership. Outside the cluster, set `Orleans:UseConsul`, or
+`Orleans:Standalone` for one process — see
 [configuration](configuration.md#orleans). Dashboard: `/admin/orleans` (admin role).

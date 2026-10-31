@@ -12,6 +12,8 @@ public sealed class OrleansConfiguration : IValidateSelf
 
     public bool UseConsul { get; set; }
 
+    public bool Standalone { get; set; }
+
     public ConsulClusteringConfiguration Consul { get; set; } = new();
 
     public string AdvertisedIP { get; set; } = "";
@@ -31,6 +33,12 @@ public sealed class OrleansConfiguration : IValidateSelf
         Consul.Token ??= "";
         Consul.KvRootFolder ??= "";
         AdvertisedIP ??= "";
+
+        if (UseConsul && Standalone)
+        {
+            error = "Orleans:Standalone and Orleans:UseConsul cannot both be true";
+            return false;
+        }
 
         if (!UseConsul)
         {

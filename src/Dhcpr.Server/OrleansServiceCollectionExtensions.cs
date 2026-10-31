@@ -56,12 +56,17 @@ public static class OrleansServiceCollectionExtensions
                     gatewayPort: orleans.GatewayPort,
                     listenOnAnyHostAddress: true);
             }
+            else if (builder.Configuration.GetValue<bool>("Orleans:Standalone"))
+            {
+                silo.UseLocalhostClustering();
+            }
             else
             {
 #if DEBUG
                 silo.UseLocalhostClustering();
 #else
-                throw new InvalidOperationException("No clustering configuration is set, unable to start.");
+                throw new InvalidOperationException(
+                    "No clustering configuration is set. Set Orleans:Standalone for one process, or Orleans:UseConsul.");
 #endif
             }
 

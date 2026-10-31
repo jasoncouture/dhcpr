@@ -189,17 +189,20 @@ restarts the pod.
 
 `DNS`, `TLS`, `DataPath`, and `Orleans` use `ValidateOnStart` — bad listen
 URIs, empty `ListenAddresses`, `TLS:Enabled` without PEM paths, or
-`Orleans:UseConsul` without a Consul URI exit immediately.
+`Orleans:UseConsul` without a Consul URI, or `Standalone` together with
+`UseConsul`, exit immediately.
 
-Release builds outside Kubernetes require `Orleans:UseConsul`. Debug builds
-fall back to localhost clustering.
+Release builds outside Kubernetes need `Orleans:Standalone` (one process) or
+`Orleans:UseConsul`. Debug builds with neither set fall back to localhost
+clustering.
 
 ## Multi-replica
 
 - Share `/data` (RWX) or accept split-brain settings/zones/keys
 - HTTPRoute sticky cookie for Blazor
 - Kubernetes: Orleans labels already on the Deployment for kube membership
-- Elsewhere: `Orleans:UseConsul` plus a Consul agent the silos can reach
+- Elsewhere: `Orleans:UseConsul` plus a Consul agent the silos can reach.
+  `Orleans:Standalone` is one process and does not form a cluster
 - Cache is per process (Orleans publishes invalidation events)
 
 ## Local image

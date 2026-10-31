@@ -7,8 +7,26 @@ public class OrleansConfigurationTests
     {
         var config = new OrleansConfiguration();
         Assert.False(config.UseConsul);
+        Assert.False(config.Standalone);
         Assert.True(config.TryValidate(out var error));
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void StandaloneSucceeds()
+    {
+        var config = new OrleansConfiguration { Standalone = true };
+        Assert.True(config.TryValidate(out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void StandaloneWithConsulFails()
+    {
+        var config = Consul("http://consul:8500");
+        config.Standalone = true;
+        Assert.False(config.TryValidate(out var error));
+        Assert.Contains("Standalone", error);
     }
 
     [Fact]

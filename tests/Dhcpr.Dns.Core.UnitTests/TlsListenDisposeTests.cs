@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 using Dhcpr.Core;
 using Dhcpr.Dns.Core.Protocol;
@@ -21,13 +23,8 @@ public class TlsListenDisposeTests
     [Fact]
     public async Task DoesNotDisposeTcpClientUntilProcessAndSendFinishes()
     {
-        var directory = Directory.CreateTempSubdirectory();
-        try
-        {
-            var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
-            var tls = ValidTls(certificatePath, keyPath);
-
-            var started = new TaskCompletionSource<DomainMessageContext>(
+        var tls = ValidTls();
+        var started = new TaskCompletionSource<DomainMessageContext>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource<DomainMessage?>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -38,13 +35,11 @@ public class TlsListenDisposeTests
                     started.TrySetResult(call.Arg<DomainMessageContext>());
                     return new ValueTask<DomainMessage?>(release.Task);
                 });
-            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
-            certificates.Refresh();
             var server = new DnsServer(
                 pipeline,
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
-                certificates,
+                Certificates(),
                 NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -88,29 +83,18 @@ public class TlsListenDisposeTests
             {
                 listener.Stop();
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Fact]
     public async Task CloseWithoutQueryDisposesClient()
     {
-        var directory = Directory.CreateTempSubdirectory();
-        try
-        {
-            var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
-            var tls = ValidTls(certificatePath, keyPath);
-            var pipeline = Substitute.For<IDnsQueryPipeline>();
-            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
-            certificates.Refresh();
-            var server = new DnsServer(
+        var tls = ValidTls();
+        var pipeline = Substitute.For<IDnsQueryPipeline>();
+        var server = new DnsServer(
                 pipeline,
                 Monitor(new DnsConfiguration()),
                 Monitor(tls),
-                certificates,
+                Certificates(),
                 NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -150,29 +134,18 @@ public class TlsListenDisposeTests
             {
                 listener.Stop();
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
     [Fact]
     public async Task TlsHandshakeTimeoutDisposesClient()
     {
-        var directory = Directory.CreateTempSubdirectory();
-        try
-        {
-            var (certificatePath, keyPath) = TlsCertificateFiles.WritePemPair(directory.FullName, "localhost");
-            var tls = ValidTls(certificatePath, keyPath);
-            var certificates = new FileTlsServerCertificateProvider(Monitor(tls));
-            certificates.Refresh();
-            var server = new DnsServer(
-                Substitute.For<IDnsQueryPipeline>(),
-                Monitor(new DnsConfiguration()),
-                Monitor(tls),
-                certificates,
-                NullLogger<DnsServer>.Instance);
+        var tls = ValidTls();
+        var server = new DnsServer(
+            Substitute.For<IDnsQueryPipeline>(),
+            Monitor(new DnsConfiguration()),
+            Monitor(tls),
+            Certificates(),
+            NullLogger<DnsServer>.Instance);
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -191,24 +164,36 @@ public class TlsListenDisposeTests
             {
                 listener.Stop();
             }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
     }
 
-    private static TlsConfiguration ValidTls(string certificatePath, string keyPath)
+    private static TlsConfiguration ValidTls()
     {
         var tls = new TlsConfiguration
         {
             Enabled = true,
             Listeners = ["127.0.0.1:853"],
-            CertificatePath = certificatePath,
-            PrivateKeyPath = keyPath
+            CertificatePath = "tls.crt",
+            PrivateKeyPath = "tls.key"
         };
         Assert.True(tls.TryValidate(out _));
         return tls;
+    }
+
+    private static ITlsServerCertificateProvider Certificates()
+    {
+        using var key = ECDsa.Create();
+        var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256);
+        using var created = request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(30));
+        using var loaded = X509Certificate2.CreateFromPem(created.ExportCertificatePem(), key.ExportPkcs8PrivateKeyPem());
+        var certificate = X509CertificateLoader.LoadPkcs12(loaded.Export(X509ContentType.Pfx), (string?)null);
+        var provider = Substitute.For<ITlsServerCertificateProvider>();
+        provider.GetCertificate().Returns(certificate);
+        provider.GetServerCertificateContext().Returns(
+            SslStreamCertificateContext.Create(certificate, additionalCertificates: null, offline: true));
+        provider.Ready.Returns(Task.CompletedTask);
+        return provider;
     }
 
     private static async Task WaitUntilDisposed(TcpClient client, TimeSpan timeout)

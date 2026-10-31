@@ -39,7 +39,9 @@ builder.Services.AddOptionsWithValidateOnStart<ApplicationConfiguration>()
     .Validate(static o => o.Validate(), "DataPath must be set");
 
 builder.Services.AddDataProtection().SetApplicationName("dhcpr");
-builder.Services.AddSingleton<DataProtectionKeyFiles>();
+// One ring per process. The grain, the key files, and the repository share it.
+builder.Services.AddSingleton<IDataProtectionKeySnapshot, DataProtectionKeySnapshot>();
+builder.Services.AddSingleton<IDataProtectionKeyFiles, DataProtectionKeyFiles>();
 builder.Services.AddSingleton<IXmlRepository, OrleansDataProtectionKeyRepository>();
 builder.Services.AddOptions<KeyManagementOptions>()
     .Configure<IXmlRepository>((options, repository) => options.XmlRepository = repository);

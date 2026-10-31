@@ -10,7 +10,8 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
 
     private readonly IGrainFactory _grainFactory;
     private readonly IClusterMembershipService _membership;
-    private readonly DataProtectionKeyFiles _files;
+    private readonly IDataProtectionKeyFiles _files;
+    private readonly IDataProtectionKeySnapshot _snapshot;
     private readonly ILogger<DataProtectionKeyOrleansBridge> _logger;
 
     private HubObserver? _observerInstance;
@@ -22,12 +23,14 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     public DataProtectionKeyOrleansBridge(
         IGrainFactory grainFactory,
         IClusterMembershipService membership,
-        DataProtectionKeyFiles files,
+        IDataProtectionKeyFiles files,
+        IDataProtectionKeySnapshot snapshot,
         ILogger<DataProtectionKeyOrleansBridge> logger)
     {
         _grainFactory = grainFactory;
         _membership = membership;
         _files = files;
+        _snapshot = snapshot;
         _logger = logger;
     }
 
@@ -121,7 +124,7 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     {
         try
         {
-            await _hub!.SubscribeAsync(_observer!, DataProtectionKeySnapshot.Copy(), cancellationToken);
+            await _hub!.SubscribeAsync(_observer!, _snapshot.Copy(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -142,7 +145,7 @@ public sealed partial class DataProtectionKeyOrleansBridge : IHostedService
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to refresh Data Protection grain subscription")]
     private static partial void LogRefreshSubscriptionFailed(ILogger logger, Exception exception);
 
-    private sealed class HubObserver(DataProtectionKeyFiles files) : IDataProtectionKeyObserver
+    private sealed class HubObserver(IDataProtectionKeyFiles files) : IDataProtectionKeyObserver
     {
         public async Task OnKeysAsync(IEnumerable<string> elementXml, CancellationToken cancellationToken)
         {

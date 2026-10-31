@@ -14,18 +14,20 @@ public sealed class DataProtectionKeyGrain : Grain, IDataProtectionKeyGrain
 
     private static readonly TimeSpan _observerExpiration = TimeSpan.FromMinutes(5);
 
+    private readonly IDataProtectionKeySnapshot _snapshot;
     private readonly ObserverManager<IDataProtectionKeyObserver> _observers;
     private readonly HashSet<string> _elements = [];
 
-    public DataProtectionKeyGrain(ILogger<DataProtectionKeyGrain> logger)
+    public DataProtectionKeyGrain(IDataProtectionKeySnapshot snapshot, ILogger<DataProtectionKeyGrain> logger)
     {
+        _snapshot = snapshot;
         _observers = new ObserverManager<IDataProtectionKeyObserver>(_observerExpiration, logger);
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
-        Merge(DataProtectionKeySnapshot.Copy());
+        Merge(_snapshot.Copy());
     }
 
     public async Task SubscribeAsync(

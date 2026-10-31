@@ -11,15 +11,17 @@ namespace Dhcpr.Server.Orleans.DataProtection;
 /// </summary>
 public sealed class OrleansDataProtectionKeyRepository : IXmlRepository
 {
-    private readonly DataProtectionKeyFiles _files;
+    private readonly IDataProtectionKeyFiles _files;
+    private readonly IDataProtectionKeySnapshot _snapshot;
 
-    public OrleansDataProtectionKeyRepository(DataProtectionKeyFiles files)
+    public OrleansDataProtectionKeyRepository(IDataProtectionKeyFiles files, IDataProtectionKeySnapshot snapshot)
     {
         _files = files;
+        _snapshot = snapshot;
     }
 
     public IReadOnlyCollection<XElement> GetAllElements()
-        => DataProtectionKeySnapshot.Get();
+        => _snapshot.Get();
 
     public void StoreElement(XElement element, string friendlyName)
         => _files.Store(element, friendlyName);

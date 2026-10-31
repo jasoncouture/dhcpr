@@ -12,28 +12,30 @@ namespace Dhcpr.Server.Orleans.DataProtection;
 /// Data Protection keys on disk. The process can load and create keys
 /// while the Orleans grain has no live silo.
 /// </summary>
-public sealed class DataProtectionKeyFiles
+public sealed class DataProtectionKeyFiles : IDataProtectionKeyFiles
 {
+    private readonly IDataProtectionKeySnapshot _snapshot;
     private readonly FileSystemXmlRepository _files;
 
-    public DataProtectionKeyFiles(IOptions<ApplicationConfiguration> configuration)
+    public DataProtectionKeyFiles(IDataProtectionKeySnapshot snapshot, IOptions<ApplicationConfiguration> configuration)
     {
+        _snapshot = snapshot;
         var directory = Directory.CreateDirectory(configuration.Value.GetDataProtectionKeysPath());
         _files = new FileSystemXmlRepository(directory, NullLoggerFactory.Instance);
         foreach (var element in _files.GetAllElements())
-            DataProtectionKeySnapshot.Add(element.ToString(SaveOptions.DisableFormatting));
+            _snapshot.Add(element.ToString(SaveOptions.DisableFormatting));
     }
 
     public void Store(XElement element, string friendlyName)
     {
         _files.StoreElement(element, friendlyName);
-        DataProtectionKeySnapshot.Add(element.ToString(SaveOptions.DisableFormatting));
+        _snapshot.Add(element.ToString(SaveOptions.DisableFormatting));
     }
 
     public void Replace(IEnumerable<string> elementXml)
     {
         var incoming = elementXml as IReadOnlyCollection<string> ?? elementXml.ToArray();
-        var known = DataProtectionKeySnapshot.Copy();
+        var known = _snapshot.Copy();
         foreach (var xml in incoming)
         {
             if (string.IsNullOrWhiteSpace(xml) || known.Contains(xml))
@@ -51,7 +53,7 @@ public sealed class DataProtectionKeyFiles
             }
         }
 
-        DataProtectionKeySnapshot.Replace(incoming);
+        _snapshot.Replace(incoming);
     }
 
     private bool AlreadyStored(XElement element)

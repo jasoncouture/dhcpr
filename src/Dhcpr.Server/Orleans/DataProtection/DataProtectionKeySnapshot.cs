@@ -3,43 +3,40 @@ using System.Xml.Linq;
 
 namespace Dhcpr.Server.Orleans.DataProtection;
 
-/// <summary>
-/// Silo-local key ring. Writes allocate; reads return the current
-/// set and parsed elements without cloning.
-/// </summary>
-internal static class DataProtectionKeySnapshot
+/// <inheritdoc cref="IDataProtectionKeySnapshot"/>
+public sealed class DataProtectionKeySnapshot : IDataProtectionKeySnapshot
 {
-    private static readonly object Gate = new();
-    private static ImmutableHashSet<string> _xml = [];
-    private static XElement[] _elements = [];
+    private readonly object _gate = new();
+    private ImmutableHashSet<string> _xml = [];
+    private XElement[] _elements = [];
 
-    public static ImmutableHashSet<string> Copy() => _xml;
+    public ImmutableHashSet<string> Copy() => _xml;
 
-    public static IReadOnlyCollection<XElement> Get() => _elements;
+    public IReadOnlyCollection<XElement> Get() => _elements;
 
-    public static void Replace(IEnumerable<string> xml)
+    public void Replace(IEnumerable<string> xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
-        lock (Gate)
+        lock (_gate)
         {
             _xml = xml.ToImmutableHashSet();
             _elements = Parse(_xml);
         }
     }
 
-    public static void Add(string elementXml)
+    public void Add(string elementXml)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(elementXml);
-        lock (Gate)
+        lock (_gate)
         {
             _xml = _xml.Add(elementXml);
             _elements = Parse(_xml);
         }
     }
 
-    internal static void Clear()
+    public void Clear()
     {
-        lock (Gate)
+        lock (_gate)
         {
             _xml = [];
             _elements = [];

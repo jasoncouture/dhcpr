@@ -7,10 +7,10 @@ using Dhcpr.Dns.Core.Protocol.Parser;
 
 namespace Dhcpr.Dns.Core.Validation;
 
-/// <summary>DS digest over the canonical owner name and DNSKEY RDATA (RFC 4034 §5.1.4).</summary>
-public static class TrustAnchorDigest
+/// <inheritdoc cref="ITrustAnchorDigest"/>
+public sealed class TrustAnchorDigest : ITrustAnchorDigest
 {
-    public static string Sha256(DomainResourceRecord dnsKeyRecord)
+    public string Sha256(DomainResourceRecord dnsKeyRecord)
     {
         var size = dnsKeyRecord.EstimatedSize;
         var buffer = ArrayPool<byte>.Shared.Rent(size * 2);

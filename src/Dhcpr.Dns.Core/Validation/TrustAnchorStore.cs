@@ -28,6 +28,7 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
 
     private readonly IOptionsMonitor<DnsConfiguration> _dns;
     private readonly IOptionsMonitor<ApplicationConfiguration> _application;
+    private readonly ITrustAnchorDigest _digest;
     private readonly ILogger<TrustAnchorStore> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly TrustAnchorState _state = new();
@@ -40,10 +41,12 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
     public TrustAnchorStore(
         IOptionsMonitor<DnsConfiguration> dns,
         IOptionsMonitor<ApplicationConfiguration> application,
+        ITrustAnchorDigest digest,
         ILogger<TrustAnchorStore> logger)
     {
         _dns = dns;
         _application = application;
+        _digest = digest;
         _logger = logger;
     }
 
@@ -268,7 +271,7 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
         return DnssecRrsetVerifier.TryVerifyRrset(crypto, dnsKeys, rrsigs, verificationKeys, now);
     }
 
-    private static bool MatchesTrusted(
+    private bool MatchesTrusted(
         DomainResourceRecord record,
         DomainNameSystemKeyData data,
         List<TrustAnchorRecord> trusted)
@@ -276,7 +279,7 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
         var publicKey = data.PublicKey.IsDefaultOrEmpty
             ? ""
             : Convert.ToBase64String(data.PublicKey.ToArray());
-        var digest = TrustAnchorDigest.Sha256(record);
+        var digest = _digest.Sha256(record);
         foreach (var entry in trusted)
         {
             if (!string.IsNullOrEmpty(entry.PublicKeyBase64) &&
@@ -291,7 +294,7 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
         return false;
     }
 
-    private static List<TrustAnchorKeyObservation> Describe(
+    private List<TrustAnchorKeyObservation> Describe(
         IReadOnlyList<DomainResourceRecord> dnsKeys,
         IDnssecValidator crypto)
     {
@@ -308,7 +311,7 @@ public sealed partial class TrustAnchorStore : ITrustAnchorStore
                 data.Flags,
                 (byte)data.Algorithm,
                 crypto.CalculateKeyTag(data, record),
-                TrustAnchorDigest.Sha256(record)));
+                _digest.Sha256(record)));
         }
 
         return observations;

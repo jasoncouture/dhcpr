@@ -48,6 +48,8 @@ public static class DnsServiceProviderExtensions
         services.AddSingleton<IRootServerTips, RootServerTips>();
         services.AddSingleton<IRootZoneStore, RootZoneStore>();
         // Process-bound: RFC 5011 state shared by validation and the probe.
+        // One per process. Validation and the RFC 5011 probe share the digest.
+        services.AddSingleton<ITrustAnchorDigest, TrustAnchorDigest>();
         services.AddSingleton<ITrustAnchorStore, TrustAnchorStore>();
         services.AddSingleton<IAuthoritativeZoneStore, AuthoritativeZoneStore>();
         services.AddSingleton<IDynamicDnsStore, DynamicDnsStore>();

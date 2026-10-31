@@ -145,7 +145,7 @@ public class Rfc5011TrustAnchorTests
     public void Sha256Digest_MatchesDelegationSignerCheck()
     {
         var (record, _) = CreateKey();
-        var digest = TrustAnchorDigest.Sha256(record);
+        var digest = new TrustAnchorDigest().Sha256(record);
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var ds = new DelegationSignerData(
             crypto.CalculateKeyTag((DomainNameSystemKeyData)record.Data, record),
@@ -160,7 +160,9 @@ public class Rfc5011TrustAnchorTests
     {
         using var dir = new TempDir();
         var (record, privateKey) = CreateKey();
-        var digest = TrustAnchorDigest.Sha256(record);
+        var digest = "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF";
+        var digests = Substitute.For<ITrustAnchorDigest>();
+        digests.Sha256(Arg.Any<DomainResourceRecord>()).Returns(digest);
         var crypto = new DnssecValidator(NullLogger<DnssecValidator>.Instance, Monitor(new DnsConfiguration()));
         var store = Store(dir, new DnsConfiguration
         {
@@ -174,7 +176,7 @@ public class Rfc5011TrustAnchorTests
                     DigestHex = digest
                 }
             ]
-        });
+        }, digests);
 
         var signature = Sign(privateKey, crypto, record);
         var signed = await store.AcceptDnsKeySetAsync([record], [signature], crypto, DateTimeOffset.UtcNow, CancellationToken.None);
@@ -211,10 +213,11 @@ public class Rfc5011TrustAnchorTests
             ]
         };
 
-    private static TrustAnchorStore Store(TempDir dir, DnsConfiguration dns)
+    private static TrustAnchorStore Store(TempDir dir, DnsConfiguration dns, ITrustAnchorDigest? digest = null)
         => new(
             Monitor(dns),
             Monitor(new ApplicationConfiguration { DataPath = dir.Path }),
+            digest ?? Substitute.For<ITrustAnchorDigest>(),
             NullLogger<TrustAnchorStore>.Instance);
 
     private static (DomainResourceRecord Record, ECDsa Key) CreateKey()

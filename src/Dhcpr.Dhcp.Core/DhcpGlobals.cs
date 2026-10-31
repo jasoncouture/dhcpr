@@ -1,6 +1,7 @@
 ﻿namespace Dhcpr.Dhcp.Core;
 
-public static class DhcpGlobals
+/// <inheritdoc cref="IDhcpGlobals"/>
+public sealed class DhcpGlobals : IDhcpGlobals
 {
-    public static Guid ServerId { get; } = Guid.NewGuid();
+    public Guid ServerId { get; } = Guid.NewGuid();
 }

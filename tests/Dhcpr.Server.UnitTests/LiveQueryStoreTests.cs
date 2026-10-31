@@ -16,7 +16,7 @@ public class LiveQueryStoreTests
     public async Task SnapshotRetainsNewestFirstAndCapsCapacity()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
-        await using var store = new LiveQueryStore(subscriber);
+        await using var store = new LiveQueryStore(Substitute.For<ILiveQueryFilters>(), subscriber);
 
         for (var i = 0; i < LiveQueryStore.SnapshotCapacity + 25; i++)
             await store.HandleAsync(CreateEvent(i), CancellationToken.None);
@@ -31,7 +31,7 @@ public class LiveQueryStoreTests
     public async Task SubscribeReceivesFanOutEvents()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
-        await using var store = new LiveQueryStore(subscriber);
+        await using var store = new LiveQueryStore(Substitute.For<ILiveQueryFilters>(), subscriber);
         var (reader, subscription) = store.Subscribe();
         using (subscription)
         {
@@ -49,7 +49,9 @@ public class LiveQueryStoreTests
     public async Task QueryCountSkipsHealthCheckProbes()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
-        await using var store = new LiveQueryStore(subscriber);
+        var filters = Substitute.For<ILiveQueryFilters>();
+        filters.IsHealthCheckProbe(Arg.Is<DnsQueryEvent>(evt => evt.Client != null && evt.Client.Port == 0)).Returns(true);
+        await using var store = new LiveQueryStore(filters, subscriber);
 
         var probe = CreateEvent(1) with
         {
@@ -68,7 +70,9 @@ public class LiveQueryStoreTests
     public async Task HealthCheckProbesAreNotRetainedOrFannedOut()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
-        await using var store = new LiveQueryStore(subscriber);
+        var filters = Substitute.For<ILiveQueryFilters>();
+        filters.IsHealthCheckProbe(Arg.Is<DnsQueryEvent>(evt => evt.Client != null && evt.Client.Port == 0)).Returns(true);
+        await using var store = new LiveQueryStore(filters, subscriber);
         var (reader, subscription) = store.Subscribe();
         using (subscription)
         {
@@ -107,7 +111,7 @@ public class LiveQueryStoreTests
     public async Task DropOldestWhenSubscriberFallsBehind()
     {
         var subscriber = Substitute.For<IAsyncSubscriber<DnsQueryEvent>>();
-        await using var store = new LiveQueryStore(subscriber);
+        await using var store = new LiveQueryStore(Substitute.For<ILiveQueryFilters>(), subscriber);
         var (reader, subscription) = store.Subscribe();
         using (subscription)
         {

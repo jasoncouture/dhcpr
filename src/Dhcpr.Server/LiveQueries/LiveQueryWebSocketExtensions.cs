@@ -16,6 +16,7 @@ public static class LiveQueryWebSocketExtensions
     private static async Task HandleAsync(
         HttpContext httpContext,
         IGrainFactory grainFactory,
+        ILiveQueryFilters filters,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -29,6 +30,7 @@ public static class LiveQueryWebSocketExtensions
         await LiveQueryWebSocketSession.RunAsync(
             socket,
             grainFactory,
+            filters,
             loggerFactory.CreateLogger(typeof(LiveQueryWebSocketSession).FullName!),
             cancellationToken);
     }

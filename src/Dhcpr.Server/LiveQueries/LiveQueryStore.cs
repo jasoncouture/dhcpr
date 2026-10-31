@@ -17,6 +17,7 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
     public const int SnapshotCapacity = 250;
     public const int FanOutCapacity = 1000;
 
+    private readonly ILiveQueryFilters _filters;
     private readonly IAsyncSubscriber<DnsQueryEvent> _subscriber;
     private readonly object _ringLock = new();
     private readonly LinkedList<DnsQueryEvent> _ring = new();
@@ -27,8 +28,9 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
 
     public long QueryCount => Volatile.Read(ref _queryCount);
 
-    public LiveQueryStore(IAsyncSubscriber<DnsQueryEvent> subscriber)
+    public LiveQueryStore(ILiveQueryFilters filters, IAsyncSubscriber<DnsQueryEvent> subscriber)
     {
+        _filters = filters;
         _subscriber = subscriber;
     }
 
@@ -75,7 +77,7 @@ public sealed class LiveQueryStore : ILiveQueryStore, IHostedService, IAsyncMess
     public async ValueTask HandleAsync(DnsQueryEvent message, CancellationToken cancellationToken)
     {
         await Task.Yield();
-        if (LiveQueryFilters.IsHealthCheckProbe(message))
+        if (_filters.IsHealthCheckProbe(message))
             return;
 
         Interlocked.Increment(ref _queryCount);

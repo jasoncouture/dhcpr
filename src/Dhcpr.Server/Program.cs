@@ -67,6 +67,8 @@ builder.Services.AddHostedService<DataProtectionKeyOrleansBridge>();
 builder.Services.AddSingleton<IDnsServerCookieSecretSnapshot, DnsServerCookieSecretSnapshot>();
 builder.Services.Replace(ServiceDescriptor.Singleton<IDnsServerCookieSecretSource, OrleansDnsServerCookieSecretSource>());
 builder.Services.AddHostedService<DnsServerCookieSecretOrleansBridge>();
+// One per process. The store and the WebSocket session share the probe filter.
+builder.Services.AddSingleton<ILiveQueryFilters, LiveQueryFilters>();
 builder.Services.AddSingleton<ILiveQueryStore, LiveQueryStore>();
 builder.Services.AddHostedService(static sp =>
     (LiveQueryStore)sp.GetRequiredService<ILiveQueryStore>());

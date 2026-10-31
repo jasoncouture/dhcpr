@@ -7,6 +7,8 @@ using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server.LiveQueries;
 using Dhcpr.Server.Orleans.LiveQueries;
 
+using NSubstitute;
+
 namespace Dhcpr.Server.UnitTests;
 
 public sealed class LiveQueryWebSocketMessageTests
@@ -47,11 +49,14 @@ public sealed class LiveQueryWebSocketMessageTests
     public void EnqueueSkipsHealthCheckProbes()
     {
         var channel = Channel.CreateUnbounded<DnsQueryEventMessage>();
+        var filters = Substitute.For<ILiveQueryFilters>();
+        filters.IsHealthCheckProbe(Arg.Is<DnsQueryEventMessage>(evt => evt.Client != null && evt.Client.EndsWith(":0", StringComparison.Ordinal)))
+            .Returns(true);
         var probe = DnsQueryEventMessage.From(CreateEvent(new IPEndPoint(IPAddress.Loopback, 0)));
         var real = DnsQueryEventMessage.From(CreateEvent(new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000)));
 
-        Assert.False(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, probe));
-        Assert.True(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, real));
+        Assert.False(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, filters, probe));
+        Assert.True(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, filters, real));
         Assert.True(channel.Reader.TryRead(out var received));
         Assert.Equal(real.Id, received.Id);
         Assert.False(channel.Reader.TryRead(out _));
@@ -73,7 +78,7 @@ public sealed class LiveQueryWebSocketMessageTests
             var evt = DnsQueryEventMessage.From(CreateEvent(
                 new IPEndPoint(IPAddress.Parse("203.0.113.10"), 53000 + i),
                 $"q-{i}.example"));
-            Assert.True(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, evt));
+            Assert.True(LiveQueryWebSocketSession.TryEnqueue(channel.Writer, Substitute.For<ILiveQueryFilters>(), evt));
         }
 
         var count = 0;

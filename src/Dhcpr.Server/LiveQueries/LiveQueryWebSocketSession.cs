@@ -27,11 +27,12 @@ internal sealed partial class LiveQueryWebSocketSession
     public static async Task RunAsync(
         WebSocket socket,
         IGrainFactory grainFactory,
+        ILiveQueryFilters filters,
         ILogger logger,
         CancellationToken cancellationToken)
     {
         var channel = Channel.CreateBounded<DnsQueryEventMessage>(ChannelOptions);
-        var observerInstance = new HubObserver(channel.Writer);
+        var observerInstance = new HubObserver(channel.Writer, filters);
         var observer = grainFactory.CreateObjectReference<ILiveQueryObserver>(observerInstance);
         var hub = grainFactory.GetGrain<ILiveQueryHubGrain>(Guid.Empty);
 
@@ -80,9 +81,12 @@ internal sealed partial class LiveQueryWebSocketSession
         }
     }
 
-    internal static bool TryEnqueue(ChannelWriter<DnsQueryEventMessage> writer, DnsQueryEventMessage evt)
+    internal static bool TryEnqueue(
+        ChannelWriter<DnsQueryEventMessage> writer,
+        ILiveQueryFilters filters,
+        DnsQueryEventMessage evt)
     {
-        if (LiveQueryFilters.IsHealthCheckProbe(evt))
+        if (filters.IsHealthCheckProbe(evt))
             return false;
 
         return writer.TryWrite(evt);
@@ -177,16 +181,18 @@ internal sealed partial class LiveQueryWebSocketSession
     private sealed class HubObserver : ILiveQueryObserver
     {
         private readonly ChannelWriter<DnsQueryEventMessage> _writer;
+        private readonly ILiveQueryFilters _filters;
 
-        public HubObserver(ChannelWriter<DnsQueryEventMessage> writer)
+        public HubObserver(ChannelWriter<DnsQueryEventMessage> writer, ILiveQueryFilters filters)
         {
             _writer = writer;
+            _filters = filters;
         }
 
         public async Task OnEventAsync(DnsQueryEventMessage evt, CancellationToken cancellationToken)
         {
             await Task.Yield();
-            TryEnqueue(_writer, evt);
+            TryEnqueue(_writer, _filters, evt);
         }
     }
 }

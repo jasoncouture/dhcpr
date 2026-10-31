@@ -1,17 +1,18 @@
 namespace Dhcpr.Server.Components.Pages.Admin.Settings;
 
-internal static class SettingsEdit
+/// <inheritdoc cref="ISettingsEdit"/>
+public sealed class SettingsEdit : ISettingsEdit
 {
-    public static string[] SplitLines(string text)
+    public string[] SplitLines(string text)
         => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    public static string JoinLines(string[]? values)
+    public string JoinLines(string[]? values)
         => values is { Length: > 0 } ? string.Join('\n', values) : "";
 
-    public static string JoinBytes(byte[]? values)
+    public string JoinBytes(byte[]? values)
         => values is { Length: > 0 } ? string.Join(',', values) : "";
 
-    public static bool TryParseBytes(string text, string name, out byte[] values, out string? error)
+    public bool TryParseBytes(string text, string name, out byte[] values, out string? error)
     {
         values = [];
         error = null;

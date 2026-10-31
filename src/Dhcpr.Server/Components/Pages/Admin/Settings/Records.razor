@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
 @inject IRuntimeSettingsStore Store
+@inject ISettingsEdit Edit
 
 <SettingsForm Title="Records" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
     @foreach (var record in _records)
@@ -61,7 +62,7 @@
                 Type = string.IsNullOrWhiteSpace(record.Type) ? "A" : record.Type.ToUpperInvariant(),
                 Ttl = record.Ttl?.ToString(),
                 Value = record.Value,
-                Clients = SettingsEdit.JoinLines(record.Clients)
+                Clients = Edit.JoinLines(record.Clients)
             });
         }
     }
@@ -95,7 +96,7 @@
                     Type = edit.Type.Trim(),
                     Ttl = ttl,
                     Value = edit.Value.Trim(),
-                    Clients = SettingsEdit.SplitLines(edit.Clients)
+                    Clients = Edit.SplitLines(edit.Clients)
                 });
             }
 

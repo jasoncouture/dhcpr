@@ -5,6 +5,7 @@ using Dhcpr.Dns.Core.Protocol;
 using Dhcpr.Dns.Core.Protocol.Processing;
 using Dhcpr.Server;
 using Dhcpr.Server.Components;
+using Dhcpr.Server.Components.Pages.Admin.Settings;
 using Dhcpr.Dns.Core.Resolvers.Caching;
 using Dhcpr.Server.Cache;
 using Dhcpr.Server.LiveQueries;
@@ -50,6 +51,8 @@ builder.Services.AddCoreServices();
 builder.Services.AddDns();
 builder.UseTlsCertificateForHttps();
 builder.Services.AddDhcprRuntimeSettings();
+// One per process. The settings forms share the line and byte parsers.
+builder.Services.AddSingleton<ISettingsEdit, SettingsEdit>();
 builder.Services.AddDhcp();
 builder.Services.AddDhcprHealthChecks();
 builder.AddDhcprOrleans();

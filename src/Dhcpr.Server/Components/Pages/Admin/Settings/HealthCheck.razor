@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
 @inject IRuntimeSettingsStore Store
+@inject ISettingsEdit Edit
 
 <SettingsForm Title="Health check" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
     <label class="checkbox">
@@ -30,7 +31,7 @@
     {
         var health = Store.Current.HealthCheck;
         _enabled = health.Enabled;
-        _domains = SettingsEdit.JoinLines(health.Domains);
+        _domains = Edit.JoinLines(health.Domains);
         _timeout = health.TimeoutSeconds;
     }
 
@@ -45,7 +46,7 @@
             settings.HealthCheck = new DnsHealthCheckConfiguration
             {
                 Enabled = _enabled,
-                Domains = SettingsEdit.SplitLines(_domains),
+                Domains = Edit.SplitLines(_domains),
                 TimeoutSeconds = _timeout
             };
             _error = await Store.SaveAsync(settings, CancellationToken.None);

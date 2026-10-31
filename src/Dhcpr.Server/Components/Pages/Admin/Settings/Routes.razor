@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = ApplicationRoles.DnsAdmin)]
 @inject IRuntimeSettingsStore Store
+@inject ISettingsEdit Edit
 
 <SettingsForm Title="Routes" Error="@_error" Saved="_saved" Saving="_saving" OnSave="SaveAsync">
     @foreach (var route in _routes)
@@ -46,8 +47,8 @@
             _routes.Add(new RouteEdit
             {
                 Suffix = suffix,
-                Upstreams = SettingsEdit.JoinLines(route.Upstreams),
-                Clients = SettingsEdit.JoinLines(route.Clients)
+                Upstreams = Edit.JoinLines(route.Upstreams),
+                Clients = Edit.JoinLines(route.Clients)
             });
         }
     }
@@ -70,8 +71,8 @@
 
                 if (!routes.TryAdd(suffix, new DnsRouteConfiguration
                     {
-                        Upstreams = SettingsEdit.SplitLines(route.Upstreams),
-                        Clients = SettingsEdit.SplitLines(route.Clients)
+                        Upstreams = Edit.SplitLines(route.Upstreams),
+                        Clients = Edit.SplitLines(route.Clients)
                     }))
                 {
                     _error = $"Duplicate route suffix: {suffix}";

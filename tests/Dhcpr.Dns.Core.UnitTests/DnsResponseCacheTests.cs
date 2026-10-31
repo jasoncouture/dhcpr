@@ -452,17 +452,25 @@ public class DnsResponseCacheTests
     [Fact]
     public void SetPublishesOnceImportDoesNot()
     {
-        var publisher = new RecordingCachePublisher();
+        var publisher = Substitute.For<IDnsCacheEventPublisher>();
         var cache = CreateCache(publisher);
         var request = DomainMessage.CreateRequest("pub.example", DomainRecordType.A);
         var response = AddressResponse(request, "203.0.113.8");
 
         cache.Set(request, response);
-        Assert.Equal(1, publisher.Sets);
+        publisher.Received(1).PublishSet(
+            Arg.Any<DomainMessage>(),
+            Arg.Any<DomainMessage>(),
+            Arg.Any<DnssecValidationStatus>(),
+            Arg.Any<DateTimeOffset>());
 
         cache.Import(request, response, DnssecValidationStatus.Secure, DateTimeOffset.UtcNow);
-        Assert.Equal(1, publisher.Sets);
-        Assert.Equal(0, publisher.Clears);
+        publisher.Received(1).PublishSet(
+            Arg.Any<DomainMessage>(),
+            Arg.Any<DomainMessage>(),
+            Arg.Any<DnssecValidationStatus>(),
+            Arg.Any<DateTimeOffset>());
+        publisher.DidNotReceive().PublishClear();
     }
 
     [Fact]
@@ -485,37 +493,37 @@ public class DnsResponseCacheTests
     [Fact]
     public void ImportClearEmptiesWithoutPublishing()
     {
-        var publisher = new RecordingCachePublisher();
+        var publisher = Substitute.For<IDnsCacheEventPublisher>();
         var cache = CreateCache(publisher);
         var request = DomainMessage.CreateRequest("wipe.example", DomainRecordType.A);
         cache.Set(request, AddressResponse(request, "192.0.2.9"));
-        publisher.Sets = 0;
+        publisher.ClearReceivedCalls();
 
         cache.ImportClear();
 
         Assert.False(cache.TryGet(request, out _));
-        Assert.Equal(0, publisher.Clears);
+        publisher.DidNotReceive().PublishClear();
 
         cache.Clear();
-        Assert.Equal(1, publisher.Clears);
+        publisher.Received(1).PublishClear();
     }
 
     [Fact]
     public void ImportSecurityStatusDoesNotPublish()
     {
-        var publisher = new RecordingCachePublisher();
+        var publisher = Substitute.For<IDnsCacheEventPublisher>();
         var cache = CreateCache(publisher);
         var request = DomainMessage.CreateRequest("sec.example", DomainRecordType.A);
         cache.Set(request, AddressResponse(request, "192.0.2.10"));
 
         cache.ImportSecurityStatus(request, DnssecValidationStatus.Secure);
-        Assert.Equal(0, publisher.Statuses);
+        publisher.DidNotReceive().PublishSecurityStatus(Arg.Any<DomainMessage>(), Arg.Any<DnssecValidationStatus>());
 
         Assert.True(cache.TryGet(request, out _, out var status));
         Assert.Equal(DnssecValidationStatus.Secure, status);
 
         cache.UpdateSecurityStatus(request, DnssecValidationStatus.Insecure);
-        Assert.Equal(1, publisher.Statuses);
+        publisher.Received(1).PublishSecurityStatus(Arg.Any<DomainMessage>(), Arg.Any<DnssecValidationStatus>());
     }
 
     private static DomainMessage AddressResponse(DomainMessage request, string ip)
@@ -534,24 +542,4 @@ public class DnsResponseCacheTests
 
     private static DnsResponseCache CreateCache(IDnsCacheEventPublisher? publisher = null)
         => new(new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 }), publisher);
-
-    private sealed class RecordingCachePublisher : IDnsCacheEventPublisher
-    {
-        public Guid OriginId { get; } = Guid.NewGuid();
-        public int Sets;
-        public int Statuses;
-        public int Clears;
-
-        public void PublishSet(
-            DomainMessage request,
-            DomainMessage response,
-            DnssecValidationStatus securityStatus,
-            DateTimeOffset cachedAt)
-            => Sets++;
-
-        public void PublishSecurityStatus(DomainMessage request, DnssecValidationStatus securityStatus)
-            => Statuses++;
-
-        public void PublishClear() => Clears++;
-    }
 }

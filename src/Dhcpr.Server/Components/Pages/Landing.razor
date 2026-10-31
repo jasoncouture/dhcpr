@@ -2,21 +2,19 @@
 @layout LandingLayout
 @attribute [AllowAnonymous]
 
-<PageTitle>dhcpr — no-log DNS</PageTitle>
+<PageTitle>DNS</PageTitle>
 
 <h1>A no-log DNS server, focused on privacy.</h1>
 <p class="lead">
-    DHCPR answers a DNS query and does not keep a history of it.
-    The log records errors only. A lookup that succeeds is not written down.
+    No logs, no analytics, no tracking. Pure DNS. Period.
 </p>
-
-<LandingQueryCount />
 
 <h2>Public resolvers</h2>
 <p class="lead">
-    The same software is the public DNS service at these two names.
-    Each one speaks classic DNS, DNS-over-TLS, and DNS-over-HTTPS.
+    We host public DNS resolvers, free for anyone to use. You can use them directly, or configure your own DNS server to use them.
+    We speak classic DNS, DNS-over-TLS, and DNS-over-HTTPS.
 </p>
+<hr />
 <div class="landing-resolvers">
     <article class="landing-resolver">
         <h3><a href="https://dns.alertr.info">dns.alertr.info</a></h3>
@@ -35,3 +33,5 @@
         <p class="landing-protocols">Port 53 DNS · port 853 DNS-over-TLS · HTTPS /dns-query</p>
     </article>
 </div>
+
+<LandingQueryCount />
